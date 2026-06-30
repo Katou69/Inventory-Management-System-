@@ -1,4 +1,4 @@
-import { Package, DollarSign, Truck, TrendingUp, AlertTriangle, ClipboardCheck } from "lucide-react"
+import { Package, DollarSign, Truck, TrendingUp, AlertTriangle, ClipboardCheck, TrendingDown } from "lucide-react"
 import type { StatusCard as StatusCardType } from "@/types/dashboard"
 
 const iconMap = {
@@ -10,31 +10,45 @@ const iconMap = {
   orders: ClipboardCheck,
 }
 
-interface StatusCardProps {
-  card: StatusCardType
+const iconColors: Record<string, string> = {
+  stocks: "bg-indigo-100 text-indigo-600",
+  value: "bg-emerald-100 text-emerald-600",
+  suppliers: "bg-sky-100 text-sky-600",
+  revenue: "bg-violet-100 text-violet-600",
+  lowStock: "bg-amber-100 text-amber-600",
+  orders: "bg-teal-100 text-teal-600",
 }
 
-export default function StatusCard({ card }: StatusCardProps) {
+export default function StatusCard({ card }: { card: StatusCardType }) {
   const Icon = iconMap[card.icon]
+  const isUp = card.changeDirection === "up"
+  const isAlert = card.icon === "lowStock"
 
   return (
-    <div className="bg-white relative rounded-[10px] border border-[#515151] p-[20px] flex flex-col gap-2">
+    <div className="bg-white rounded-xl border border-slate-200 p-5 flex flex-col gap-3 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between">
-        <p className="font-sans font-light text-[16px] text-black leading-[normal]">
+        <p className="text-sm font-medium text-slate-500 leading-snug max-w-[160px]">
           {card.label}
         </p>
-        <div className="size-[36px] flex items-center justify-center">
-          <svg className="size-full" fill="none" viewBox="0 0 24 24">
-            <path d="M2 22L22 2M22 22V2H2" stroke="#34C759" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
-          </svg>
+        <div className={`size-9 rounded-lg flex items-center justify-center shrink-0 ${iconColors[card.icon]}`}>
+          <Icon className="size-4.5" />
         </div>
       </div>
-      <p className="font-sans font-bold text-[28px] text-black leading-[normal]">
+
+      <p className="text-2xl font-bold text-slate-900 tracking-tight">
         {card.value}
       </p>
-      <p className="font-sans font-normal text-[12px] text-black leading-[normal]">
-        {card.changeText}
-      </p>
+
+      <div className={`flex items-center gap-1 text-xs font-medium ${isAlert ? "text-amber-600" : isUp ? "text-emerald-600" : "text-red-500"}`}>
+        {isAlert ? (
+          <AlertTriangle className="size-3.5" />
+        ) : isUp ? (
+          <TrendingUp className="size-3.5" />
+        ) : (
+          <TrendingDown className="size-3.5" />
+        )}
+        <span>{card.changeText}</span>
+      </div>
     </div>
   )
 }

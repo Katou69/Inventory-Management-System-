@@ -3,50 +3,39 @@ import { activities } from "@/data/dashboard-data"
 
 export default function ActivityFeed() {
   return (
-    <div className="bg-[#e4eeee] rounded-[10px] border border-[#515151] p-5 w-[624px]">
-      <div className="flex items-center h-[50px] mb-[10px]">
-        <h3 className="font-mono font-bold text-2xl text-black">
-          Recent User Activities
-        </h3>
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm w-[380px] shrink-0 overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+        <div>
+          <h3 className="text-base font-semibold text-slate-900">Recent Activity</h3>
+          <p className="text-xs text-slate-400 mt-0.5">Latest user actions</p>
+        </div>
       </div>
 
-      <div className="flex flex-col gap-[8px]">
+      <div className="divide-y divide-slate-100 overflow-y-auto max-h-[420px]">
         {activities.map((a) => (
-          <div key={a.id} className="bg-white rounded-[10px] border-[0.5px] border-[#727272]">
-            <div className="flex items-center p-[10px] gap-[15px]">
-              <div className="flex items-center gap-[5px] w-[220px]">
-                <img src={a.avatar} alt="" className="size-[25px] rounded-full" />
-                <div className="flex flex-col">
-                  <span className="font-mono font-bold text-[12px] text-black">
-                    {a.name}
-                  </span>
-                  <span className="font-sans font-light not-italic text-[10px] text-black">
-                    {a.role}
-                  </span>
+          <div key={a.id} className="flex items-start gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors">
+            <img src={a.avatar} alt="" className="size-8 rounded-full object-cover ring-1 ring-slate-200 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-slate-800 leading-tight">{a.name}</p>
+                  <p className="text-xs text-slate-400 leading-tight">{a.role}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-xs text-slate-400">{a.date}</p>
+                  <p className="text-xs text-slate-300">{a.time}</p>
                 </div>
               </div>
-              <p className="font-sans font-light not-italic text-[12px] text-black w-[250px]">
-                {a.description}
-              </p>
-              <div className="flex flex-col items-end w-[65px]">
-                <div className="size-[20px]" />
-                <span className="font-sans font-light not-italic text-[10px] text-black">
-                  {a.date}
-                </span>
-                <span className="font-mono font-extralight text-[10px] text-black">
-                  {a.time}
-                </span>
-              </div>
+              <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{a.description}</p>
             </div>
           </div>
         ))}
+      </div>
 
-        <div className="flex items-center justify-end gap-[5px] h-[25px]">
-          <span className="font-mono font-normal text-[12px] text-[#0d99ff]">
-            View More
-          </span>
-          <ArrowRight className="size-[15px] text-[#0d99ff]" />
-        </div>
+      <div className="px-5 py-3 border-t border-slate-100">
+        <button className="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 text-xs font-medium transition-colors">
+          View all activity <ArrowRight className="size-3.5" />
+        </button>
       </div>
     </div>
   )
