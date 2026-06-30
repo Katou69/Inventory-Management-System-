@@ -1,89 +1,208 @@
 "use client"
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
-import { ChevronDown } from "lucide-react"
-import { inventoryData } from "@/data/dashboard-data"
+import { useState } from "react"
+import {
+  ComposedChart, Bar, Line, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, Customized,
+} from "recharts"
+import { inventoryByPeriod } from "@/data/dashboard-data"
+import type { InventoryPeriod } from "@/types/dashboard"
 
-const COLORS = { stockIn: "#f5b942", stockOut: "#9b51e0", stockValue: "#3b9eff" }
-const NAMES  = { stockIn: "Stock in", stockOut: "Stock Out", stockValue: "Stock value" }
+const PERIODS: { key: InventoryPeriod; label: string }[] = [
+  { key: "days",   label: "Days"   },
+  { key: "months", label: "Months" },
+  { key: "years",  label: "Years"  },
+]
 
-function StripedBar(props: any) {
-  const { x, y, width, height, capColor } = props
+function GradientBar(props: any) {
+  const { x, y, width, height, color } = props
   if (!height || height <= 0 || !width) return null
-
-  const capH  = 3
-  const bodyY = y + capH
+  const capH  = 5
   const bodyH = Math.max(height - capH, 0)
-
-  // Draw thin vertical lines directly — no SVG pattern needed
-  const lines: React.ReactNode[] = []
-  for (let lx = x + 1.5; lx < x + width; lx += 5) {
-    lines.push(
-      <line key={lx} x1={lx} y1={bodyY} x2={lx} y2={bodyY + bodyH}
-        stroke="#cbd5e1" strokeWidth="1.5" />
-    )
-  }
-
+  const id    = `grad-${color.replace("#", "")}`
   return (
     <g>
-      {lines}
-      <rect x={x} y={y} width={width} height={capH} fill={capColor} rx={1} />
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor={color} stopOpacity={0.25} />
+          <stop offset="100%" stopColor={color} stopOpacity={0.05} />
+        </linearGradient>
+      </defs>
+      <rect x={x} y={y + capH} width={width} height={bodyH} fill={`url(#${id})`} />
+      <rect x={x} y={y} width={width} height={capH} rx={2.5} fill={color} />
     </g>
   )
 }
 
-const barShapes = {
-  stockIn:    (props: any) => <StripedBar {...props} capColor={COLORS.stockIn} />,
-  stockOut:   (props: any) => <StripedBar {...props} capColor={COLORS.stockOut} />,
-  stockValue: (props: any) => <StripedBar {...props} capColor={COLORS.stockValue} />,
-}
-
-function CustomTooltip({ active, payload }: any) {
+function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
-  const top   = [...payload].sort((a: any, b: any) => b.value - a.value)[0]
-  const color = COLORS[top.dataKey as keyof typeof COLORS]
-  const name  = NAMES[top.dataKey as keyof typeof NAMES]
+  const stockIn    = payload.find((p: any) => p.dataKey === "stockIn")?.value
+  const stockOut   = payload.find((p: any) => p.dataKey === "stockOut")?.value
+  const stockValue = payload.find((p: any) => p.dataKey === "stockValue")?.value
+  const fmt = (v: number) =>
+    v >= 1_000_000 ? `$${(v / 1_000_000).toFixed(1)}M`
+    : v >= 1_000   ? `$${(v / 1_000).toFixed(0)}k`
+    : `$${v}`
   return (
-    <div className="bg-white rounded-xl shadow-lg border border-slate-100 px-4 py-3 min-w-[150px]">
-      <div className="flex items-center gap-2 text-slate-500 text-xs mb-1">
-        <span className="size-2.5 rounded-full shrink-0" style={{ background: color }} />
-        {name}
+    <div className="bg-white rounded-xl shadow-lg border border-slate-100 px-4 py-3 min-w-[160px]">
+      <p className="text-xs font-bold text-slate-800 mb-2">{label}</p>
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-1.5">
+            <span className="size-2 rounded-sm shrink-0" style={{ background: "#f59e0b" }} />
+            <span className="text-xs text-slate-500">Stock In</span>
+          </div>
+          <span className="text-xs font-semibold text-slate-800">{fmt(stockIn)}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-1.5">
+            <span className="size-2 rounded-sm shrink-0" style={{ background: "#8b5cf6" }} />
+            <span className="text-xs text-slate-500">Stock Out</span>
+          </div>
+          <span className="text-xs font-semibold text-slate-800">{fmt(stockOut)}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-1.5">
+            <span className="size-2 rounded-full border-2 border-[#3b9eff] bg-white shrink-0" />
+            <span className="text-xs text-slate-500">Stock Value</span>
+          </div>
+          <span className="text-xs font-semibold text-slate-800">{fmt(stockValue)}</span>
+        </div>
       </div>
-      <p className="text-2xl font-bold text-slate-900">${top.value.toLocaleString()}</p>
     </div>
   )
 }
 
+function AlternatingBackground({ xAxisMap, yAxisMap }: any) {
+  const xAxis = xAxisMap && Object.values(xAxisMap)[0] as any
+  const yAxis = yAxisMap && Object.values(yAxisMap)[0] as any
+  if (!xAxis?.niceTicks && !xAxis?.domain) return null
+  const { x, y, width, height, scale } = xAxis
+  if (!scale) return null
+  const bandWidth = scale.bandwidth ? scale.bandwidth() : 0
+  const slots: number[] = scale.domain ? scale.domain() : []
+  return (
+    <g>
+      {slots.map((slot: any, i: number) => {
+        if (i % 2 !== 0) return null
+        const sx = scale(slot)
+        return (
+          <rect
+            key={i}
+            x={sx - (bandWidth > 0 ? 0 : bandWidth / 2)}
+            y={yAxis?.y ?? y}
+            width={bandWidth || width / slots.length}
+            height={yAxis?.height ?? height}
+            fill="#f8fafc"
+          />
+        )
+      })}
+    </g>
+  )
+}
+
+function yTickFormatter(v: number) {
+  if (v === 0) return "0"
+  if (v >= 1_000_000) return `${v / 1_000_000}M`
+  if (v >= 1_000)     return `${v / 1_000}k`
+  return String(v)
+}
+
+function buildTicks(data: typeof inventoryByPeriod["months"]) {
+  const max = Math.max(...data.map(d => Math.max(d.stockIn, d.stockOut, d.stockValue)))
+  const nice = Math.ceil(max / 4 / 10000) * 10000 || Math.ceil(max / 4 / 1000) * 1000 || Math.ceil(max / 4 / 100) * 100
+  return [0, nice, nice * 2, nice * 3, nice * 4]
+}
+
 export default function InventoryStatisticsChart() {
+  const [period, setPeriod] = useState<InventoryPeriod>("months")
+  const data  = inventoryByPeriod[period]
+  const ticks = buildTicks(data)
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
       <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
         <h3 className="text-base font-semibold text-slate-900">Inventory Statistics</h3>
-        <div className="flex items-center gap-4">
-          {(Object.keys(COLORS) as Array<keyof typeof COLORS>).map((key) => (
-            <div key={key} className="flex items-center gap-1.5 text-xs text-slate-500">
-              <span className="size-2 rounded-full inline-block" style={{ background: COLORS[key] }} />
-              {NAMES[key]}
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <span className="size-2 rounded-full inline-block bg-[#f59e0b]" />
+              Stock In
             </div>
-          ))}
-          <button className="flex items-center gap-1 text-xs text-slate-500 border border-slate-200 rounded-lg px-2.5 py-1.5 hover:bg-slate-50 transition-colors">
-            Monthly <ChevronDown className="size-3.5" />
-          </button>
+            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <span className="size-2 rounded-full inline-block bg-[#8b5cf6]" />
+              Stock Out
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <svg width="16" height="8" className="shrink-0">
+                <line x1="0" y1="4" x2="16" y2="4" stroke="#3b9eff" strokeWidth="2" strokeDasharray="4,2" />
+              </svg>
+              <span className="size-2 rounded-full border-2 border-[#3b9eff] bg-white inline-block" />
+              Stock Value
+            </div>
+          </div>
+          <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden">
+            {PERIODS.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setPeriod(key)}
+                className={`text-xs px-3 py-1.5 transition-colors ${
+                  period === key
+                    ? "bg-indigo-600 text-white font-medium"
+                    : "text-slate-500 hover:bg-slate-50"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       <ResponsiveContainer width="100%" height={260}>
-        <BarChart data={inventoryData} barSize={10} barGap={2} barCategoryGap="35%">
-          <XAxis dataKey="month" axisLine={false} tickLine={false}
-            tick={{ fontSize: 11, fill: "#94a3b8" }} />
-          <YAxis tickFormatter={(v) => v === 0 ? "0k" : `${v / 1000}k`}
-            axisLine={false} tickLine={false}
+        <ComposedChart
+          data={data}
+          barSize={8}
+          barGap={3}
+          barCategoryGap="20%"
+          margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
+        >
+          <Customized component={AlternatingBackground} />
+          <XAxis
+            dataKey="label"
+            axisLine={false}
+            tickLine={false}
             tick={{ fontSize: 11, fill: "#94a3b8" }}
-            ticks={[0, 10000, 20000, 30000, 40000]} />
-          <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(59,158,255,0.06)" }} />
-          <Bar dataKey="stockIn"    shape={barShapes.stockIn} />
-          <Bar dataKey="stockOut"   shape={barShapes.stockOut} />
-          <Bar dataKey="stockValue" shape={barShapes.stockValue} />
-        </BarChart>
+          />
+          <YAxis
+            tickFormatter={yTickFormatter}
+            ticks={ticks}
+            axisLine={false}
+            tickLine={false}
+            tick={{ fontSize: 11, fill: "#94a3b8" }}
+            width={36}
+          />
+          <Tooltip
+            content={<CustomTooltip />}
+            cursor={{ fill: "rgba(99,102,241,0.06)", rx: 4 }}
+          />
+          <Bar
+            dataKey="stockIn"
+            shape={(props: any) => <GradientBar {...props} color="#f59e0b" />}
+          />
+          <Bar
+            dataKey="stockOut"
+            shape={(props: any) => <GradientBar {...props} color="#8b5cf6" />}
+          />
+          <Line
+            dataKey="stockValue"
+            type="monotone"
+            stroke="#3b9eff"
+            strokeWidth={2}
+            strokeDasharray="5 3"
+            dot={{ r: 3.5, fill: "white", stroke: "#3b9eff", strokeWidth: 2 }}
+            activeDot={{ r: 5, fill: "white", stroke: "#3b9eff", strokeWidth: 2 }}
+          />
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   )

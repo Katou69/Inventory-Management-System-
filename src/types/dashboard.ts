@@ -44,3 +44,12 @@ export interface InventoryMonth {
   stockOut: number
   stockValue: number
 }
+
+export interface InventoryDataPoint {
+  label: string
+  stockIn: number
+  stockOut: number
+  stockValue: number
+}
+
+export type InventoryPeriod = "days" | "months" | "years"
