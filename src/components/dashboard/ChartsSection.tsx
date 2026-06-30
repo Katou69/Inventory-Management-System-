@@ -1,5 +1,11 @@
-import InventoryStatisticsChart from "./InventoryStatisticsChart"
+"use client"
+import dynamic from "next/dynamic"
 import SalesGauge from "./SalesGauge"
+
+const InventoryStatisticsChart = dynamic(
+  () => import("./InventoryStatisticsChart"),
+  { ssr: false }
+)
 
 export default function ChartsSection() {
   return (

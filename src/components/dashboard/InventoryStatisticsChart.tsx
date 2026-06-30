@@ -45,15 +45,6 @@ function CustomTooltip({ active, payload }: any) {
 export default function InventoryStatisticsChart() {
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-      {/* Define SVG stripe pattern globally */}
-      <svg style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}>
-        <defs>
-          <pattern id="inv-stripes" x="0" y="0" width="5" height="10" patternUnits="userSpaceOnUse">
-            <line x1="1.5" y1="0" x2="1.5" y2="10" stroke="#cbd5e1" strokeWidth="1.5" />
-          </pattern>
-        </defs>
-      </svg>
-
       <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
         <h3 className="text-base font-semibold text-slate-900">Inventory Statistics</h3>
         <div className="flex items-center gap-4">
@@ -71,23 +62,14 @@ export default function InventoryStatisticsChart() {
 
       <ResponsiveContainer width="100%" height={260}>
         <BarChart data={inventoryData} barSize={10} barGap={2} barCategoryGap="35%">
-          <XAxis
-            dataKey="month"
-            axisLine={false}
-            tickLine={false}
-            tick={{ fontSize: 11, fill: "#94a3b8" }}
-          />
-          <YAxis
-            tickFormatter={(v) => v === 0 ? "0k" : `${v / 1000}k`}
-            axisLine={false}
-            tickLine={false}
-            tick={{ fontSize: 11, fill: "#94a3b8" }}
-            ticks={[0, 10000, 20000, 30000, 40000]}
-          />
-          <Tooltip
-            content={<CustomTooltip />}
-            cursor={{ fill: "rgba(59, 158, 255, 0.06)" }}
-          />
+          <defs>
+            <pattern id="inv-stripes" x="0" y="0" width="5" height="10" patternUnits="userSpaceOnUse">
+              <line x1="1.5" y1="0" x2="1.5" y2="10" stroke="#cbd5e1" strokeWidth="1.5" />
+            </pattern>
+          </defs>
+          <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94a3b8" }} />
+          <YAxis tickFormatter={(v) => v === 0 ? "0k" : `${v / 1000}k`} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94a3b8" }} ticks={[0, 10000, 20000, 30000, 40000]} />
+          <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(59, 158, 255, 0.06)" }} />
           <Bar dataKey="stockIn"    shape={barShapes.stockIn} />
           <Bar dataKey="stockOut"   shape={barShapes.stockOut} />
           <Bar dataKey="stockValue" shape={barShapes.stockValue} />
