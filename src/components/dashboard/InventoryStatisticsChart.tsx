@@ -4,17 +4,28 @@ import { ChevronDown } from "lucide-react"
 import { inventoryData } from "@/data/dashboard-data"
 
 const COLORS = { stockIn: "#f5b942", stockOut: "#9b51e0", stockValue: "#3b9eff" }
-const NAMES = { stockIn: "Stock in", stockOut: "Stock Out", stockValue: "Stock value" }
+const NAMES  = { stockIn: "Stock in", stockOut: "Stock Out", stockValue: "Stock value" }
 
-function StripedBar({ x, y, width, height, capColor }: {
-  x: number; y: number; width: number; height: number; capColor: string
-}) {
-  if (!height || height <= 0) return <g />
-  const capH = 3
+function StripedBar(props: any) {
+  const { x, y, width, height, capColor } = props
+  if (!height || height <= 0 || !width) return null
+
+  const capH  = 3
+  const bodyY = y + capH
   const bodyH = Math.max(height - capH, 0)
+
+  // Draw thin vertical lines directly — no SVG pattern needed
+  const lines: React.ReactNode[] = []
+  for (let lx = x + 1.5; lx < x + width; lx += 5) {
+    lines.push(
+      <line key={lx} x1={lx} y1={bodyY} x2={lx} y2={bodyY + bodyH}
+        stroke="#cbd5e1" strokeWidth="1.5" />
+    )
+  }
+
   return (
     <g>
-      <rect x={x} y={y + capH} width={width} height={bodyH} fill="url(#inv-stripes)" />
+      {lines}
       <rect x={x} y={y} width={width} height={capH} fill={capColor} rx={1} />
     </g>
   )
@@ -28,9 +39,9 @@ const barShapes = {
 
 function CustomTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null
-  const top = [...payload].sort((a: any, b: any) => b.value - a.value)[0]
+  const top   = [...payload].sort((a: any, b: any) => b.value - a.value)[0]
   const color = COLORS[top.dataKey as keyof typeof COLORS]
-  const name = NAMES[top.dataKey as keyof typeof NAMES]
+  const name  = NAMES[top.dataKey as keyof typeof NAMES]
   return (
     <div className="bg-white rounded-xl shadow-lg border border-slate-100 px-4 py-3 min-w-[150px]">
       <div className="flex items-center gap-2 text-slate-500 text-xs mb-1">
@@ -62,14 +73,13 @@ export default function InventoryStatisticsChart() {
 
       <ResponsiveContainer width="100%" height={260}>
         <BarChart data={inventoryData} barSize={10} barGap={2} barCategoryGap="35%">
-          <defs>
-            <pattern id="inv-stripes" x="0" y="0" width="5" height="10" patternUnits="userSpaceOnUse">
-              <line x1="1.5" y1="0" x2="1.5" y2="10" stroke="#cbd5e1" strokeWidth="1.5" />
-            </pattern>
-          </defs>
-          <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94a3b8" }} />
-          <YAxis tickFormatter={(v) => v === 0 ? "0k" : `${v / 1000}k`} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94a3b8" }} ticks={[0, 10000, 20000, 30000, 40000]} />
-          <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(59, 158, 255, 0.06)" }} />
+          <XAxis dataKey="month" axisLine={false} tickLine={false}
+            tick={{ fontSize: 11, fill: "#94a3b8" }} />
+          <YAxis tickFormatter={(v) => v === 0 ? "0k" : `${v / 1000}k`}
+            axisLine={false} tickLine={false}
+            tick={{ fontSize: 11, fill: "#94a3b8" }}
+            ticks={[0, 10000, 20000, 30000, 40000]} />
+          <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(59,158,255,0.06)" }} />
           <Bar dataKey="stockIn"    shape={barShapes.stockIn} />
           <Bar dataKey="stockOut"   shape={barShapes.stockOut} />
           <Bar dataKey="stockValue" shape={barShapes.stockValue} />
