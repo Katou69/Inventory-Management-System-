@@ -107,10 +107,18 @@ function yTickFormatter(v: number) {
   return String(v)
 }
 
+function niceStep(rawStep: number) {
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)))
+  const fraction  = rawStep / magnitude
+  const nice      = fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 5 ? 5 : 10
+  return nice * magnitude
+}
+
 function buildTicks(data: typeof inventoryByPeriod["months"]) {
-  const max = Math.max(...data.map(d => Math.max(d.stockIn, d.stockOut, d.stockValue)))
-  const nice = Math.ceil(max / 4 / 10000) * 10000 || Math.ceil(max / 4 / 1000) * 1000 || Math.ceil(max / 4 / 100) * 100
-  return [0, nice, nice * 2, nice * 3, nice * 4]
+  const max  = Math.max(...data.map(d => Math.max(d.stockIn, d.stockOut, d.stockValue)))
+  const step = niceStep(max / 4)
+  const top  = Math.ceil(max / step) * step
+  return [0, top / 4, top / 2, (top * 3) / 4, top]
 }
 
 export default function InventoryStatisticsChart() {
