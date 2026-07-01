@@ -36,7 +36,13 @@ function buildSpokes(percent: number) {
     const y2 = CY - R_OUTER * sin
     const filled = t <= percent / 100
     // Blue intensity: richer blue at centre of arc (t≈0.5), lighter at edges
-    spokes.push({ x1, y1, x2, y2, filled, t })
+    spokes.push({
+      x1: Math.round(x1 * 1e4) / 1e4,
+      y1: Math.round(y1 * 1e4) / 1e4,
+      x2: Math.round(x2 * 1e4) / 1e4,
+      y2: Math.round(y2 * 1e4) / 1e4,
+      filled, t,
+    })
   }
   return spokes
 }

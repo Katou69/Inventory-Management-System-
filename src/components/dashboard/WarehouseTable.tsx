@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { Plus, ArrowUpRight } from "lucide-react"
 import { warehouses } from "@/data/dashboard-data"
 
@@ -67,9 +68,12 @@ export default function WarehouseTable() {
                   </div>
                 </td>
                 <td className="px-5 py-3">
-                  <button className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 text-xs font-medium transition-colors">
+                  <Link
+                    href={`/dashboard/warehouse/${wh.id}`}
+                    className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 text-xs font-medium transition-colors"
+                  >
                     View <ArrowUpRight className="size-3.5" />
-                  </button>
+                  </Link>
                 </td>
               </tr>
             ))}

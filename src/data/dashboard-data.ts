@@ -1,4 +1,7 @@
-import type { StatusCard, Warehouse, Product, ActivityEntry, InventoryMonth, InventoryDataPoint } from "@/types/dashboard"
+import type {
+  StatusCard, Warehouse, Product, ActivityEntry, InventoryMonth, InventoryDataPoint,
+  WarehouseDetail, WarehouseStatus, StockMovement, WarehouseProduct, WarehouseActivity,
+} from "@/types/dashboard"
 
 export const statusCards: StatusCard[] = [
   {
@@ -151,4 +154,131 @@ export const inventoryByPeriod: Record<"days" | "months" | "years", InventoryDat
     { label: "29", stockIn: 1100, stockOut: 750,  stockValue: 1700 },
     { label: "30", stockIn: 700,  stockOut: 500,  stockValue: 1100 },
   ],
+}
+// ---------------------------------------------------------------------------
+// Warehouse detail data
+// ---------------------------------------------------------------------------
+
+const warehouseStatuses: Record<number, WarehouseStatus> = {
+  1: "Active", 2: "Active", 3: "Active", 4: "Under Maintenance", 5: "Active",
+  6: "Active", 7: "Closed", 8: "Active", 9: "Under Maintenance", 10: "Active",
+}
+
+const managerContacts: Record<number, { phone: string; email: string; address: string }> = {
+  1:  { phone: "+95 9 770 112 233", email: "hein.htet@grgi.com",   address: "No. 12, Bayint Naung Rd, Yangon" },
+  2:  { phone: "+95 9 445 668 900", email: "thaw.tun@grgi.com",    address: "Chan Mya Tharzi, Mandalay" },
+  3:  { phone: "+95 9 251 889 077", email: "aung.pyae@grgi.com",   address: "Taunggyi, Shan State, Myanmar" },
+  4:  { phone: "+95 9 660 234 118", email: "soe.yadanar@grgi.com", address: "Zabu Thiri, Naypyidaw" },
+  5:  { phone: "+95 9 330 552 447", email: "kyaw.htike@grgi.com",  address: "Industrial Zone, Bago" },
+  6:  { phone: "+95 9 780 991 223", email: "hein.thu@grgi.com",    address: "Myaing Tharyar, Mawlamyaing" },
+  7:  { phone: "+95 9 112 334 556", email: "bhone.kyaw@grgi.com",  address: "Insein Rd, Yangon" },
+  8:  { phone: "+95 9 909 887 665", email: "aung.oo@grgi.com",     address: "Pyi Gyi Tagon, Mandalay" },
+  9:  { phone: "+95 9 445 110 998", email: "billy.jeans@grgi.com", address: "North Dagon, Yangon" },
+  10: { phone: "+95 9 223 447 889", email: "john.doe@grgi.com",    address: "Aye Thar Yar, Taunggyi" },
+}
+
+const productPool = [
+  { sku: "GRS-001", name: "Grand Royal Signature",       category: "Whisky" },
+  { sku: "GRS-002", name: "Grand Royal Smooth",          category: "Whisky" },
+  { sku: "GRB-003", name: "Grand Royal Black",           category: "Whisky" },
+  { sku: "GRD-004", name: "Grand Royal Double Cask",     category: "Whisky" },
+  { sku: "CSY-005", name: "Chingu Soju (Yogurt)",        category: "Non-Whiskey" },
+  { sku: "CSP-006", name: "Chingu Soju (Peach)",         category: "Non-Whiskey" },
+  { sku: "CSG-007", name: "Chingu Soju (Grape)",         category: "Non-Whiskey" },
+  { sku: "GRR-008", name: "Grand Royal Special Reserve", category: "Whisky" },
+]
+
+// Small deterministic pseudo-random generator so data is stable per warehouse
+function seeded(seed: number) {
+  let s = seed * 9301 + 49297
+  return () => {
+    s = (s * 9301 + 49297) % 233280
+    return s / 233280
+  }
+}
+
+function buildDailyMovement(rand: () => number) {
+  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+  return days.map((day) => ({
+    day,
+    inbound:  Math.round(120 + rand() * 400),
+    outbound: Math.round(80 + rand() * 320),
+  }))
+}
+
+function buildMovements(rand: () => number): StockMovement[] {
+  const rows: StockMovement[] = []
+  const types = ["Inbound", "Outbound", "Transfer Out", "Inbound", "Outbound"] as const
+  for (let i = 0; i < 5; i++) {
+    const p = productPool[Math.floor(rand() * productPool.length)]
+    const type = types[i]
+    const magnitude = Math.round(20 + rand() * 230)
+    const qty = type === "Inbound" ? magnitude : -magnitude
+    rows.push({
+      id: i + 1,
+      item: p.name,
+      type,
+      qty,
+      date: `${24 - i} Jun 2026`,
+    })
+  }
+  return rows
+}
+
+function buildProducts(rand: () => number): WarehouseProduct[] {
+  return productPool.map((p, i) => {
+    const quantity = Math.round(15 + rand() * 400)
+    const status: WarehouseProduct["status"] =
+      quantity < 40 ? "Critical" : quantity < 90 ? "Low" : "Normal"
+    return {
+      id: i + 1,
+      sku: p.sku,
+      name: p.name,
+      category: p.category,
+      quantity,
+      status,
+      lastUpdated: `${20 + (i % 8)} Jun 2026`,
+    }
+  })
+}
+
+function buildActivities(rand: () => number, manager: string): WarehouseActivity[] {
+  const initials = (name: string) =>
+    name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()
+  const base: Omit<WarehouseActivity, "id">[] = [
+    { name: manager,          role: "Manager",     initials: initials(manager), description: "Approved stock transfer of 30 units to WH-001", category: "Stock",      date: "26 Jun 2026", time: "3:45 PM" },
+    { name: "Thaw Thaw Tun",  role: "Inspector",   initials: "TT",              description: "Conducted routine safety inspection",           category: "Inspection", date: "26 Jun 2026", time: "11:20 AM" },
+    { name: "Soe Yadanar",    role: "Operator",    initials: "SY",              description: "Updated inventory records — 150 units inbound",  category: "Stock",      date: "25 Jun 2026", time: "4:10 PM" },
+    { name: "Hein Htet Aung", role: "Auditor",     initials: "HH",              description: "Completed monthly audit — all clear",           category: "Inspection", date: "25 Jun 2026", time: "10:30 AM" },
+    { name: "Billy Jeans",    role: "Coordinator", initials: "BJ",              description: "Requested stock reallocation for Q3",            category: "User",       date: "24 Jun 2026", time: "2:15 PM" },
+  ]
+  return base.map((a, i) => ({ id: i + 1, ...a }))
+}
+
+export function getWarehouseDetail(id: number): WarehouseDetail | undefined {
+  const base = warehouses.find((w) => w.id === id)
+  if (!base) return undefined
+
+  const rand    = seeded(id + 7)
+  const contact = managerContacts[id] ?? { phone: "+95 9 000 000 000", email: "team@grgi.com", address: base.location }
+  const products = buildProducts(rand)
+  const dailyMovement = buildDailyMovement(rand)
+  const throughput = dailyMovement.reduce((sum, d) => sum + d.inbound + d.outbound, 0)
+
+  return {
+    ...base,
+    status: warehouseStatuses[id] ?? "Active",
+    phone: contact.phone,
+    email: contact.email,
+    address: contact.address,
+    nextInspection: "18 Dec 2026",
+    totalSkus: products.reduce((sum, p) => sum + p.quantity, 0),
+    lowStockCount: products.filter((p) => p.status !== "Normal").length,
+    pendingInbound: Math.round(2 + rand() * 10),
+    throughput,
+    dailyMovement,
+    movements: buildMovements(rand),
+    products,
+    activities: buildActivities(rand, base.manager),
+  }
 }

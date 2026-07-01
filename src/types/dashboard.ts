@@ -53,3 +53,62 @@ export interface InventoryDataPoint {
 }
 
 export type InventoryPeriod = "days" | "months" | "years"
+
+export type WarehouseStatus = "Active" | "Under Maintenance" | "Closed"
+
+export type MovementType = "Inbound" | "Outbound" | "Transfer In" | "Transfer Out"
+
+export interface StockMovement {
+  id: number
+  item: string
+  type: MovementType
+  qty: number // signed: positive inbound, negative outbound
+  date: string
+}
+
+export interface DailyMovement {
+  day: string
+  inbound: number
+  outbound: number
+}
+
+export type ProductStockStatus = "Normal" | "Low" | "Critical"
+
+export interface WarehouseProduct {
+  id: number
+  sku: string
+  name: string
+  category: string
+  quantity: number
+  status: ProductStockStatus
+  lastUpdated: string
+}
+
+export type WarehouseActivityCategory = "Stock" | "Inspection" | "User"
+
+export interface WarehouseActivity {
+  id: number
+  name: string
+  role: string
+  initials: string
+  description: string
+  category: WarehouseActivityCategory
+  date: string
+  time: string
+}
+
+export interface WarehouseDetail extends Warehouse {
+  status: WarehouseStatus
+  phone: string
+  email: string
+  address: string
+  nextInspection: string
+  totalSkus: number
+  lowStockCount: number
+  pendingInbound: number
+  throughput: number
+  dailyMovement: DailyMovement[]
+  movements: StockMovement[]
+  products: WarehouseProduct[]
+  activities: WarehouseActivity[]
+}
