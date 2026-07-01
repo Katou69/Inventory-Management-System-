@@ -1,4 +1,4 @@
-import type { StatusCard, Warehouse, Product, ActivityEntry, InventoryMonth } from "@/types/dashboard"
+import type { StatusCard, Warehouse, Product, ActivityEntry, InventoryMonth, InventoryDataPoint } from "@/types/dashboard"
 
 export const statusCards: StatusCard[] = [
   {
@@ -94,3 +94,61 @@ export const inventoryData: InventoryMonth[] = [
   { month: "Aug", stockIn: 18000, stockOut: 24000, stockValue: 14000 },
   { month: "Sep", stockIn: 26000, stockOut: 19000, stockValue: 29500 },
 ]
+
+export const inventoryByPeriod: Record<"days" | "months" | "years", InventoryDataPoint[]> = {
+  months: [
+    { label: "Jan", stockIn: 18000, stockOut: 12000, stockValue: 28000 },
+    { label: "Feb", stockIn: 25000, stockOut: 18000, stockValue: 32000 },
+    { label: "Mar", stockIn: 22000, stockOut: 15000, stockValue: 30000 },
+    { label: "Apr", stockIn: 30000, stockOut: 22000, stockValue: 38000 },
+    { label: "May", stockIn: 27000, stockOut: 20000, stockValue: 35000 },
+    { label: "Jun", stockIn: 35000, stockOut: 28000, stockValue: 40000 },
+    { label: "Jul", stockIn: 28000, stockOut: 19000, stockValue: 34000 },
+    { label: "Aug", stockIn: 32000, stockOut: 24000, stockValue: 37000 },
+    { label: "Sep", stockIn: 24000, stockOut: 16000, stockValue: 30000 },
+    { label: "Oct", stockIn: 29000, stockOut: 21000, stockValue: 35000 },
+    { label: "Nov", stockIn: 38000, stockOut: 30000, stockValue: 42000 },
+    { label: "Dec", stockIn: 31000, stockOut: 22000, stockValue: 38000 },
+  ],
+  years: [
+    { label: "2019", stockIn: 180000, stockOut: 130000, stockValue: 220000 },
+    { label: "2020", stockIn: 160000, stockOut: 120000, stockValue: 200000 },
+    { label: "2021", stockIn: 210000, stockOut: 155000, stockValue: 260000 },
+    { label: "2022", stockIn: 275000, stockOut: 200000, stockValue: 320000 },
+    { label: "2023", stockIn: 310000, stockOut: 230000, stockValue: 370000 },
+    { label: "2024", stockIn: 355000, stockOut: 265000, stockValue: 420000 },
+    { label: "2025", stockIn: 390000, stockOut: 290000, stockValue: 460000 },
+  ],
+  days: [
+    { label: "1",  stockIn: 800,  stockOut: 500,  stockValue: 1200 },
+    { label: "2",  stockIn: 1100, stockOut: 700,  stockValue: 1600 },
+    { label: "3",  stockIn: 600,  stockOut: 900,  stockValue: 1100 },
+    { label: "4",  stockIn: 1400, stockOut: 800,  stockValue: 1800 },
+    { label: "5",  stockIn: 950,  stockOut: 600,  stockValue: 1400 },
+    { label: "6",  stockIn: 700,  stockOut: 1100, stockValue: 1000 },
+    { label: "7",  stockIn: 1600, stockOut: 900,  stockValue: 2100 },
+    { label: "8",  stockIn: 1200, stockOut: 750,  stockValue: 1700 },
+    { label: "9",  stockIn: 500,  stockOut: 600,  stockValue: 900  },
+    { label: "10", stockIn: 1800, stockOut: 1100, stockValue: 2400 },
+    { label: "11", stockIn: 1300, stockOut: 850,  stockValue: 1900 },
+    { label: "12", stockIn: 900,  stockOut: 700,  stockValue: 1300 },
+    { label: "13", stockIn: 2100, stockOut: 1300, stockValue: 2800 },
+    { label: "14", stockIn: 1500, stockOut: 1000, stockValue: 2200 },
+    { label: "15", stockIn: 1100, stockOut: 800,  stockValue: 1600 },
+    { label: "16", stockIn: 700,  stockOut: 500,  stockValue: 1000 },
+    { label: "17", stockIn: 1900, stockOut: 1200, stockValue: 2500 },
+    { label: "18", stockIn: 1400, stockOut: 900,  stockValue: 2000 },
+    { label: "19", stockIn: 800,  stockOut: 650,  stockValue: 1200 },
+    { label: "20", stockIn: 2300, stockOut: 1500, stockValue: 3000 },
+    { label: "21", stockIn: 1700, stockOut: 1100, stockValue: 2300 },
+    { label: "22", stockIn: 1000, stockOut: 700,  stockValue: 1500 },
+    { label: "23", stockIn: 600,  stockOut: 450,  stockValue: 900  },
+    { label: "24", stockIn: 1600, stockOut: 1000, stockValue: 2200 },
+    { label: "25", stockIn: 2000, stockOut: 1300, stockValue: 2700 },
+    { label: "26", stockIn: 1200, stockOut: 800,  stockValue: 1800 },
+    { label: "27", stockIn: 900,  stockOut: 600,  stockValue: 1400 },
+    { label: "28", stockIn: 1500, stockOut: 950,  stockValue: 2100 },
+    { label: "29", stockIn: 1100, stockOut: 750,  stockValue: 1700 },
+    { label: "30", stockIn: 700,  stockOut: 500,  stockValue: 1100 },
+  ],
+}
