@@ -1,6 +1,9 @@
+"use client"
 import Link from "next/link"
-import { Plus, ArrowUpRight } from "lucide-react"
-import { warehouses } from "@/data/dashboard-data"
+import { useState } from "react"
+import { Plus, ArrowUpRight, X } from "lucide-react"
+import { warehouses as initialWarehouses } from "@/data/dashboard-data"
+import type { Warehouse } from "@/types/dashboard"
 
 function CapacityBar({ used, total }: { used: number; total: number }) {
   const pct = Math.round((used / total) * 100)
@@ -15,7 +18,35 @@ function CapacityBar({ used, total }: { used: number; total: number }) {
   )
 }
 
+const emptyForm = { name: "", location: "", manager: "", capacityTotal: "" }
+
 export default function WarehouseTable() {
+  const [warehouses, setWarehouses] = useState<Warehouse[]>(initialWarehouses)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [form, setForm] = useState(emptyForm)
+
+  const canSubmit = form.name.trim() && form.location.trim() && form.manager.trim() && Number(form.capacityTotal) > 0
+
+  function handleAdd(e: React.FormEvent) {
+    e.preventDefault()
+    if (!canSubmit) return
+    const nextId = Math.max(0, ...warehouses.map((w) => w.id)) + 1
+    const newWarehouse: Warehouse = {
+      id: nextId,
+      name: form.name.trim(),
+      image: "/images/ellipse-2.png",
+      lastInspection: new Date().toLocaleDateString("en-GB").replace(/\//g, "-"),
+      warehouseId: `WH-${String(nextId).padStart(3, "0")}`,
+      location: form.location.trim(),
+      manager: form.manager.trim(),
+      capacityUsed: 0,
+      capacityTotal: Number(form.capacityTotal),
+    }
+    setWarehouses((prev) => [newWarehouse, ...prev])
+    setForm(emptyForm)
+    setModalOpen(false)
+  }
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
@@ -23,7 +54,10 @@ export default function WarehouseTable() {
           <h3 className="text-base font-semibold text-slate-900">Warehouse Overview</h3>
           <p className="text-xs text-slate-400 mt-0.5">{warehouses.length} warehouses total</p>
         </div>
-        <button className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition-colors">
+        <button
+          onClick={() => setModalOpen(true)}
+          className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
+        >
           <Plus className="size-4" />
           Add Warehouse
         </button>
@@ -80,6 +114,53 @@ export default function WarehouseTable() {
           </tbody>
         </table>
       </div>
+
+      {/* Add Warehouse modal */}
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setModalOpen(false)} />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-semibold text-slate-900">Add Warehouse</h3>
+              <button onClick={() => setModalOpen(false)} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors">
+                <X className="size-4 text-slate-400" />
+              </button>
+            </div>
+            <form onSubmit={handleAdd} className="flex flex-col gap-4">
+              <Field label="Warehouse name" value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="e.g. Yangon East Depot" />
+              <Field label="Location" value={form.location} onChange={(v) => setForm((f) => ({ ...f, location: v }))} placeholder="e.g. Yangon" />
+              <Field label="Manager" value={form.manager} onChange={(v) => setForm((f) => ({ ...f, manager: v }))} placeholder="e.g. Aung Aung" />
+              <Field label="Total capacity (units)" value={form.capacityTotal} onChange={(v) => setForm((f) => ({ ...f, capacityTotal: v.replace(/[^0-9]/g, "") }))} placeholder="e.g. 5000" inputMode="numeric" />
+              <div className="flex items-center justify-end gap-2 mt-2">
+                <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+                  Cancel
+                </button>
+                <button type="submit" disabled={!canSubmit} className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                  Add Warehouse
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
+  )
+}
+
+function Field({
+  label, value, onChange, placeholder, inputMode,
+}: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; inputMode?: "numeric" | "text" }) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-sm font-medium text-slate-700">{label}</span>
+      <input
+        type="text"
+        inputMode={inputMode}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
+      />
+    </label>
   )
 }

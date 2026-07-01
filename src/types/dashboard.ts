@@ -97,6 +97,17 @@ export interface WarehouseActivity {
   time: string
 }
 
+export type NotificationType = "stock" | "order" | "alert" | "user"
+
+export interface NotificationItem {
+  id: number
+  type: NotificationType
+  title: string
+  description: string
+  time: string
+  unread: boolean
+}
+
 export interface WarehouseDetail extends Warehouse {
   status: WarehouseStatus
   phone: string

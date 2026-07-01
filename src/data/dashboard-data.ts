@@ -1,6 +1,7 @@
 import type {
   StatusCard, Warehouse, Product, ActivityEntry, InventoryMonth, InventoryDataPoint,
   WarehouseDetail, WarehouseStatus, StockMovement, WarehouseProduct, WarehouseActivity,
+  NotificationItem,
 } from "@/types/dashboard"
 
 export const statusCards: StatusCard[] = [
@@ -76,15 +77,24 @@ export const products: Product[] = [
   { id: 6, name: "Chingu Soju (Peach)", image: "/images/ellipse-6.png", category: "Non-Whiskey", quantity: "120 units", revenue: "$13,945" },
 ]
 
-export const activities: ActivityEntry[] = Array.from({ length: 8 }, (_, i) => ({
-  id: i + 1,
-  name: "Aung Htoo Pyae",
-  role: "Manager of Yangon Central Warehouse",
-  avatar: "/images/ellipse-9.png",
-  description: "Approved a stock transfer request for WH-001 to WH-003.",
-  date: "26 Jun 2026",
-  time: "3:45 PM",
-}))
+export const activities: ActivityEntry[] = [
+  { id: 1, name: "Aung Htoo Pyae",   role: "Manager · Taunggyi Distribution", avatar: "/images/ellipse-9.png", description: "Approved a stock transfer of 30 units from WH-001 to WH-003.", date: "26 Jun 2026", time: "3:45 PM" },
+  { id: 2, name: "Thaw Thaw Tun",    role: "Inspector · Mandalay Cold Store", avatar: "/images/ellipse-9.png", description: "Completed a routine safety inspection — all clear.",           date: "26 Jun 2026", time: "11:20 AM" },
+  { id: 3, name: "Soe Yadanar",      role: "Operator · Naypyidaw Hub",        avatar: "/images/ellipse-9.png", description: "Recorded 150 units inbound for Grand Royal Signature.",       date: "25 Jun 2026", time: "4:10 PM" },
+  { id: 4, name: "Hein Htet Aung",   role: "Manager · Yangon Central",        avatar: "/images/ellipse-9.png", description: "Flagged Chingu Soju (Peach) as low stock (38 units left).",   date: "25 Jun 2026", time: "1:05 PM" },
+  { id: 5, name: "Kyaw Ko Htike",    role: "Manager · Bago Main Store",       avatar: "/images/ellipse-9.png", description: "Created purchase order PO-2291 for 500 units.",               date: "24 Jun 2026", time: "5:30 PM" },
+  { id: 6, name: "Bhone Wint Kyaw",  role: "Coordinator · Yangon Cold 2",     avatar: "/images/ellipse-9.png", description: "Dispatched outbound shipment of 220 units to a retailer.",     date: "24 Jun 2026", time: "9:50 AM" },
+  { id: 7, name: "Aung Than Lwin Oo",role: "Manager · Mandalay Distribution", avatar: "/images/ellipse-9.png", description: "Updated capacity records after a warehouse re-layout.",        date: "23 Jun 2026", time: "2:15 PM" },
+  { id: 8, name: "Soe Yadanar",      role: "Operator · Naypyidaw Hub",        avatar: "/images/ellipse-9.png", description: "Returned 12 damaged units to supplier for replacement.",       date: "23 Jun 2026", time: "10:40 AM" },
+]
+
+export const notifications: NotificationItem[] = [
+  { id: 1, type: "alert", title: "Low stock alert",        description: "Chingu Soju (Peach) dropped below 40 units at WH-001.", time: "10 min ago", unread: true },
+  { id: 2, type: "order", title: "New purchase order",     description: "PO-2291 for 500 units was created by Kyaw Ko Htike.",    time: "1 hour ago", unread: true },
+  { id: 3, type: "stock", title: "Stock transfer approved",description: "30 units moved from WH-001 to WH-003.",                 time: "3 hours ago", unread: true },
+  { id: 4, type: "user",  title: "Inspection completed",   description: "Mandalay Cold Store passed its safety inspection.",      time: "Yesterday",  unread: false },
+  { id: 5, type: "order", title: "Shipment dispatched",    description: "220 units sent out from Yangon Cold Store 2.",           time: "Yesterday",  unread: false },
+]
 
 export const inventoryData: InventoryMonth[] = [
   { month: "Jan", stockIn: 23000, stockOut: 17000, stockValue: 23500 },
