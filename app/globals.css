@@ -20,6 +20,19 @@
   --text-primary: #0f172a;
   --text-secondary: #64748b;
   --text-muted: #94a3b8;
+
+  --success: #22c55e;
+  --success-bg: #dcfce7;
+
+  --warning: #f59e0b;
+  --warning-bg: #fef3c7;
+
+  --danger: #ef4444;
+  --danger-bg: #fee2e2;
+
+  --info: #3b82f6;
+  --info-bg: #dbeafe;
+
 }
 
 @theme inline {
