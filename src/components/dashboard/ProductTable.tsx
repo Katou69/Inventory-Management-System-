@@ -1,7 +1,6 @@
 "use client"
 import { useState } from "react"
 import { Eye, ChevronDown, X } from "lucide-react"
-import { products } from "@/data/dashboard-data"
 import type { Product } from "@/types/dashboard"
 
 const categoryColors: Record<string, string> = {
@@ -11,7 +10,8 @@ const categoryColors: Record<string, string> = {
 
 const PERIODS = ["This week", "This month", "This quarter", "This year"]
 
-export default function ProductTable() {
+export default function ProductTable({ initialProducts }: { initialProducts: Product[] }) {
+  const products = initialProducts
   const [period, setPeriod] = useState("This month")
   const [periodOpen, setPeriodOpen] = useState(false)
   const [selected, setSelected] = useState<Product | null>(null)

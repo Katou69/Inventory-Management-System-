@@ -1,9 +1,9 @@
 "use client"
 import { useState } from "react"
 import { ArrowRight, X } from "lucide-react"
-import { activities } from "@/data/dashboard-data"
+import type { ActivityEntry } from "@/types/dashboard"
 
-function ActivityRow({ a }: { a: (typeof activities)[number] }) {
+function ActivityRow({ a }: { a: ActivityEntry }) {
   return (
     <div className="flex items-start gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors">
       <img src={a.avatar} alt="" className="size-8 rounded-full object-cover ring-1 ring-slate-200 shrink-0 mt-0.5" />
@@ -24,7 +24,7 @@ function ActivityRow({ a }: { a: (typeof activities)[number] }) {
   )
 }
 
-export default function ActivityFeed() {
+export default function ActivityFeed({ activities }: { activities: ActivityEntry[] }) {
   const [showAll, setShowAll] = useState(false)
 
   return (

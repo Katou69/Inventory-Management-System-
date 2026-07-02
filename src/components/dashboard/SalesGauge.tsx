@@ -1,6 +1,7 @@
 "use client"
 import { useState } from "react"
 import { MoreVertical, TrendingUp, Target, RotateCcw, X } from "lucide-react"
+import { updateSalesGoal } from "@/services/dashboard-service"
 
 interface SalesGaugeProps {
   numberOfSales?: number
@@ -48,10 +49,14 @@ export default function SalesGauge({
   const spokes = buildSpokes(percent)
   const onTrack = percent >= 60
 
-  function saveTarget(e: React.FormEvent) {
+  async function saveTarget(e: React.FormEvent) {
     e.preventDefault()
     const val = Number(draft)
-    if (val > 0) setTarget(val)
+    if (val > 0) {
+      setTarget(val) // optimistic
+      const updated = await updateSalesGoal(val)
+      setTarget(updated.target)
+    }
     setEditing(false)
   }
 

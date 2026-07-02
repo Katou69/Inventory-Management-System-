@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import { getWarehouseDetail, warehouses } from "@/data/dashboard-data"
+import { getWarehouseDetail, getWarehouses } from "@/services/dashboard-service"
 import WarehouseHeader from "@/components/warehouse/WarehouseHeader"
 import WarehouseProfileCard from "@/components/warehouse/WarehouseProfileCard"
 import QuickStatsRow from "@/components/warehouse/QuickStatsRow"
@@ -8,7 +8,8 @@ import StockMovementCard from "@/components/warehouse/StockMovementCard"
 import WarehouseProductsTable from "@/components/warehouse/WarehouseProductsTable"
 import WarehouseActivitiesCard from "@/components/warehouse/WarehouseActivitiesCard"
 
-export function generateStaticParams() {
+export async function generateStaticParams() {
+  const warehouses = await getWarehouses()
   return warehouses.map((w) => ({ id: String(w.id) }))
 }
 
@@ -18,7 +19,7 @@ export default async function WarehouseDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const wh = getWarehouseDetail(Number(id))
+  const wh = await getWarehouseDetail(Number(id))
   if (!wh) notFound()
 
   return (
