@@ -1,5 +1,15 @@
-import PlaceholderPage from "@/components/dashboard/PlaceholderPage"
+import { Filters, OrdersTable, Pagination } from "@/components/orders";
 
 export default function OrdersPage() {
-  return <PlaceholderPage title="Orders" description="Order management is coming soon. Review, fulfil, and track customer orders here." />
+  return (
+    <div className="flex flex-col gap-[30px]">
+      <div>
+        <h1 className="text-3xl font-bold">Order History</h1>
+        <p className="text-muted-foreground">Track and manage all customer orders</p>
+      </div>
+      <Filters />
+      <OrdersTable />
+      <Pagination />
+    </div>
+  );
 }
