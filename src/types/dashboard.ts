@@ -97,6 +97,24 @@ export interface WarehouseActivity {
   time: string
 }
 
+export interface SalesOverview {
+  numberOfSales: number
+  totalSales: number
+  target: number
+}
+
+export interface CreateWarehouseInput {
+  name: string
+  location: string
+  manager: string
+  capacityTotal: number
+}
+
+export interface SearchIndex {
+  products: Product[]
+  warehouses: Warehouse[]
+}
+
 export type NotificationType = "stock" | "order" | "alert" | "user"
 
 export interface NotificationItem {

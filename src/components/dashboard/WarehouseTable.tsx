@@ -2,7 +2,7 @@
 import Link from "next/link"
 import { useState } from "react"
 import { Plus, ArrowUpRight, X } from "lucide-react"
-import { warehouses as initialWarehouses } from "@/data/dashboard-data"
+import { createWarehouse } from "@/services/dashboard-service"
 import type { Warehouse } from "@/types/dashboard"
 
 function CapacityBar({ used, total }: { used: number; total: number }) {
@@ -20,31 +20,31 @@ function CapacityBar({ used, total }: { used: number; total: number }) {
 
 const emptyForm = { name: "", location: "", manager: "", capacityTotal: "" }
 
-export default function WarehouseTable() {
+export default function WarehouseTable({ initialWarehouses }: { initialWarehouses: Warehouse[] }) {
   const [warehouses, setWarehouses] = useState<Warehouse[]>(initialWarehouses)
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState(emptyForm)
+  const [submitting, setSubmitting] = useState(false)
 
   const canSubmit = form.name.trim() && form.location.trim() && form.manager.trim() && Number(form.capacityTotal) > 0
 
-  function handleAdd(e: React.FormEvent) {
+  async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
-    if (!canSubmit) return
-    const nextId = Math.max(0, ...warehouses.map((w) => w.id)) + 1
-    const newWarehouse: Warehouse = {
-      id: nextId,
-      name: form.name.trim(),
-      image: "/images/ellipse-2.png",
-      lastInspection: new Date().toLocaleDateString("en-GB").replace(/\//g, "-"),
-      warehouseId: `WH-${String(nextId).padStart(3, "0")}`,
-      location: form.location.trim(),
-      manager: form.manager.trim(),
-      capacityUsed: 0,
-      capacityTotal: Number(form.capacityTotal),
+    if (!canSubmit || submitting) return
+    setSubmitting(true)
+    try {
+      const newWarehouse = await createWarehouse({
+        name: form.name.trim(),
+        location: form.location.trim(),
+        manager: form.manager.trim(),
+        capacityTotal: Number(form.capacityTotal),
+      })
+      setWarehouses((prev) => [newWarehouse, ...prev])
+      setForm(emptyForm)
+      setModalOpen(false)
+    } finally {
+      setSubmitting(false)
     }
-    setWarehouses((prev) => [newWarehouse, ...prev])
-    setForm(emptyForm)
-    setModalOpen(false)
   }
 
   return (
@@ -135,8 +135,8 @@ export default function WarehouseTable() {
                 <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
                   Cancel
                 </button>
-                <button type="submit" disabled={!canSubmit} className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                  Add Warehouse
+                <button type="submit" disabled={!canSubmit || submitting} className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                  {submitting ? "Adding…" : "Add Warehouse"}
                 </button>
               </div>
             </form>

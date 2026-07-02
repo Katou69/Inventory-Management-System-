@@ -2,8 +2,8 @@
 import Link from "next/link"
 import { useState, useMemo } from "react"
 import { Bell, Search, Package, Warehouse as WarehouseIcon, X, LogOut, User, Settings } from "lucide-react"
-import { products, warehouses, notifications as initialNotifications } from "@/data/dashboard-data"
-import type { NotificationType } from "@/types/dashboard"
+import { markAllNotificationsRead, markNotificationRead } from "@/services/dashboard-service"
+import type { NotificationType, Product, Warehouse, NotificationItem } from "@/types/dashboard"
 
 const notifTone: Record<NotificationType, string> = {
   stock: "bg-indigo-100 text-indigo-600",
@@ -12,7 +12,15 @@ const notifTone: Record<NotificationType, string> = {
   user:  "bg-violet-100 text-violet-600",
 }
 
-export default function Header() {
+export default function Header({
+  products,
+  warehouses,
+  notifications: initialNotifications,
+}: {
+  products: Product[]
+  warehouses: Warehouse[]
+  notifications: NotificationItem[]
+}) {
   const [query, setQuery] = useState("")
   const [searchFocused, setSearchFocused] = useState(false)
   const [bellOpen, setBellOpen] = useState(false)
@@ -124,7 +132,7 @@ export default function Header() {
                 <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
                   <p className="text-sm font-semibold text-slate-800">Notifications</p>
                   {unread > 0 && (
-                    <button onClick={() => setNotifs((ns) => ns.map((n) => ({ ...n, unread: false })))} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+                    <button onClick={() => { setNotifs((ns) => ns.map((n) => ({ ...n, unread: false }))); void markAllNotificationsRead() }} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
                       Mark all read
                     </button>
                   )}
@@ -133,7 +141,7 @@ export default function Header() {
                   {notifs.map((n) => (
                     <button
                       key={n.id}
-                      onClick={() => setNotifs((ns) => ns.map((x) => x.id === n.id ? { ...x, unread: false } : x))}
+                      onClick={() => { setNotifs((ns) => ns.map((x) => x.id === n.id ? { ...x, unread: false } : x)); if (n.unread) void markNotificationRead(n.id) }}
                       className={`w-full text-left flex gap-3 px-4 py-3 hover:bg-slate-50 transition-colors ${n.unread ? "bg-indigo-50/40" : ""}`}
                     >
                       <div className={`size-8 rounded-lg flex items-center justify-center shrink-0 ${notifTone[n.type]}`}>

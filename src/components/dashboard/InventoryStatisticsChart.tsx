@@ -4,8 +4,7 @@ import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, Customized,
 } from "recharts"
-import { inventoryByPeriod } from "@/data/dashboard-data"
-import type { InventoryPeriod } from "@/types/dashboard"
+import type { InventoryPeriod, InventoryDataPoint } from "@/types/dashboard"
 
 const PERIODS: { key: InventoryPeriod; label: string }[] = [
   { key: "days",   label: "Days"   },
@@ -114,16 +113,20 @@ function niceStep(rawStep: number) {
   return nice * magnitude
 }
 
-function buildTicks(data: typeof inventoryByPeriod["months"]) {
+function buildTicks(data: InventoryDataPoint[]) {
   const max  = Math.max(...data.map(d => Math.max(d.stockIn, d.stockOut, d.stockValue)))
   const step = niceStep(max / 4)
   const top  = Math.ceil(max / step) * step
   return [0, top / 4, top / 2, (top * 3) / 4, top]
 }
 
-export default function InventoryStatisticsChart() {
+export default function InventoryStatisticsChart({
+  data: dataByPeriod,
+}: {
+  data: Record<InventoryPeriod, InventoryDataPoint[]>
+}) {
   const [period, setPeriod] = useState<InventoryPeriod>("months")
-  const data  = inventoryByPeriod[period]
+  const data  = dataByPeriod[period]
   const ticks = buildTicks(data)
 
   return (

@@ -1,10 +1,10 @@
-import { statusCards } from "@/data/dashboard-data"
 import StatusCard from "./StatusCard"
+import type { StatusCard as StatusCardType } from "@/types/dashboard"
 
-export default function StatusCardGrid() {
+export default function StatusCardGrid({ cards }: { cards: StatusCardType[] }) {
   return (
     <div className="grid grid-cols-3 gap-[15px]">
-      {statusCards.map((card) => (
+      {cards.map((card) => (
         <StatusCard key={card.id} card={card} />
       ))}
     </div>

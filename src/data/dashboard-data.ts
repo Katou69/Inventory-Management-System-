@@ -265,7 +265,7 @@ function buildActivities(rand: () => number, manager: string): WarehouseActivity
   return base.map((a, i) => ({ id: i + 1, ...a }))
 }
 
-export function getWarehouseDetail(id: number): WarehouseDetail | undefined {
+export function buildWarehouseDetail(id: number): WarehouseDetail | undefined {
   const base = warehouses.find((w) => w.id === id)
   if (!base) return undefined
 
