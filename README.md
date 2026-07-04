@@ -1,9 +1,2 @@
-
-  # Inventory Management Web App
-
-  ## Running the code
-
-  Run `npm i` to install the dependencies.
-
-  Run `npm run dev` to start the development server.
-  
+# ctf-writeups
+my own space of solved puzzles, late-night debugging, and “aha” moments...
