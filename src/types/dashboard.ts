@@ -103,16 +103,25 @@ export interface WarehouseActivity {
 
 export type ViewerRole = "admin" | "manager" | "staff"
 
-/** Live layout row — the "true" state, and the storage unit itself. */
+/**
+ * Two kinds of box on the map:
+ *  - "shelf" — a storage unit: label + capacity + live occupancy color.
+ *  - "zone"  — a label-only grouping container used to organize shelf blocks;
+ *              no capacity, no stock, no occupancy color.
+ */
+export type SectionKind = "shelf" | "zone"
+
+/** Live layout row — the "true" state, and (for shelves) the storage unit. */
 export interface ZoneSection {
   id: number
   warehouseId: number
+  kind: SectionKind
   code: string
   x: number
   y: number
   width: number
   height: number
-  /** Max total units this zone holds; structural, changes need approval. */
+  /** Max total units a shelf holds; ignored for "zone" boxes. Structural. */
   capacity: number
 }
 
@@ -128,7 +137,7 @@ export type ZoneChangeAction = "create" | "update" | "delete"
 export type ZoneChangeStatus = "pending" | "approved" | "rejected"
 
 /** Editable zone fields carried in proposed/previous snapshots. */
-export type ZoneFields = Partial<Pick<ZoneSection, "code" | "x" | "y" | "width" | "height" | "capacity">>
+export type ZoneFields = Partial<Pick<ZoneSection, "kind" | "code" | "x" | "y" | "width" | "height" | "capacity">>
 
 export interface ZoneChangeRequest {
   id: number

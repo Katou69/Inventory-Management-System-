@@ -26,19 +26,24 @@ import type {
 // Mock store (module-level, survives across calls within a browser session)
 // ---------------------------------------------------------------------------
 
-// Zones are square by default (equal width/height).
+// Shelf blocks are square by default (equal width/height); zone boxes are
+// free-form grouping containers rendered behind the shelves.
 const seedZones: ZoneSection[] = [
-  // Warehouse 1
-  { id: 1, warehouseId: 1, code: "A", x: 40,  y: 40,  width: 150, height: 150, capacity: 400 },
-  { id: 2, warehouseId: 1, code: "B", x: 240, y: 40,  width: 150, height: 150, capacity: 250 },
-  { id: 3, warehouseId: 1, code: "C", x: 40,  y: 240, width: 150, height: 150, capacity: 300 },
-  { id: 4, warehouseId: 1, code: "D", x: 240, y: 240, width: 150, height: 150, capacity: 500 },
-  { id: 5, warehouseId: 1, code: "RET", x: 440, y: 40, width: 150, height: 150, capacity: 80 },
+  // Warehouse 1 — grouping zone boxes (rendered behind, organize the shelves)
+  { id: 20, warehouseId: 1, kind: "zone", code: "INBOUND",  x: 20,  y: 20,  width: 380, height: 190, capacity: 0 },
+  { id: 21, warehouseId: 1, kind: "zone", code: "STORAGE",  x: 20,  y: 220, width: 380, height: 190, capacity: 0 },
+  // Warehouse 1 — shelf blocks (square)
+  { id: 1, warehouseId: 1, kind: "shelf", code: "A", x: 40,  y: 40,  width: 150, height: 150, capacity: 400 },
+  { id: 2, warehouseId: 1, kind: "shelf", code: "B", x: 240, y: 40,  width: 150, height: 150, capacity: 250 },
+  { id: 3, warehouseId: 1, kind: "shelf", code: "C", x: 40,  y: 240, width: 150, height: 150, capacity: 300 },
+  { id: 4, warehouseId: 1, kind: "shelf", code: "D", x: 240, y: 240, width: 150, height: 150, capacity: 500 },
+  { id: 5, warehouseId: 1, kind: "shelf", code: "RET", x: 440, y: 40, width: 150, height: 150, capacity: 80 },
   // Warehouse 3 (Taunggyi — the detail-page example)
-  { id: 6, warehouseId: 3, code: "A", x: 40,  y: 40,  width: 150, height: 150, capacity: 450 },
-  { id: 7, warehouseId: 3, code: "B", x: 240, y: 40,  width: 150, height: 150, capacity: 300 },
-  { id: 8, warehouseId: 3, code: "C", x: 40,  y: 240, width: 150, height: 150, capacity: 350 },
-  { id: 9, warehouseId: 3, code: "COLD", x: 440, y: 40, width: 150, height: 150, capacity: 120 },
+  { id: 9,  warehouseId: 3, kind: "zone",  code: "COLD CHAIN", x: 420, y: 20, width: 200, height: 240, capacity: 0 },
+  { id: 6,  warehouseId: 3, kind: "shelf", code: "A", x: 40,  y: 40,  width: 150, height: 150, capacity: 450 },
+  { id: 7,  warehouseId: 3, kind: "shelf", code: "B", x: 240, y: 40,  width: 150, height: 150, capacity: 300 },
+  { id: 8,  warehouseId: 3, kind: "shelf", code: "C", x: 40,  y: 240, width: 150, height: 150, capacity: 350 },
+  { id: 10, warehouseId: 3, kind: "shelf", code: "COLD", x: 440, y: 60, width: 150, height: 150, capacity: 120 },
 ]
 
 const seedStock: ZoneStockEntry[] = [
@@ -49,8 +54,8 @@ const seedStock: ZoneStockEntry[] = [
   { id: 5, sectionId: 4, itemName: "Chingu Soju (Yogurt)",  quantity: 120 }, // zone 4: partial
   { id: 6, sectionId: 6, itemName: "Grand Royal Signature", quantity: 450 }, // zone 6: full
   { id: 7, sectionId: 7, itemName: "Grand Royal Double Cask", quantity: 60 }, // zone 7: partial
-  { id: 8, sectionId: 9, itemName: "Chingu Soju (Grape)",   quantity: 120 }, // zone 9: full
-  // zones 3, 5, 8: empty
+  { id: 8, sectionId: 10, itemName: "Chingu Soju (Grape)",  quantity: 120 }, // shelf 10 (COLD): full
+  // shelves 3, 5, 8: empty
 ]
 
 // Default zones for any warehouse without an explicit seed, so every detail
@@ -58,9 +63,9 @@ const seedStock: ZoneStockEntry[] = [
 function defaultZones(warehouseId: number): ZoneSection[] {
   const base = warehouseId * 100
   return [
-    { id: base + 1, warehouseId, code: "A", x: 40,  y: 40,  width: 150, height: 150, capacity: 300 },
-    { id: base + 2, warehouseId, code: "B", x: 240, y: 40,  width: 150, height: 150, capacity: 300 },
-    { id: base + 3, warehouseId, code: "C", x: 40,  y: 240, width: 150, height: 150, capacity: 200 },
+    { id: base + 1, warehouseId, kind: "shelf", code: "A", x: 40,  y: 40,  width: 150, height: 150, capacity: 300 },
+    { id: base + 2, warehouseId, kind: "shelf", code: "B", x: 240, y: 40,  width: 150, height: 150, capacity: 300 },
+    { id: base + 3, warehouseId, kind: "shelf", code: "C", x: 40,  y: 240, width: 150, height: 150, capacity: 200 },
   ]
 }
 
@@ -89,6 +94,7 @@ function applyToSections(req: ZoneChangeRequest) {
     store.zones.push({
       id,
       warehouseId: req.warehouseId,
+      kind: req.proposedData?.kind ?? "shelf",
       code: req.proposedData?.code ?? "NEW",
       x: req.proposedData?.x ?? 40,
       y: req.proposedData?.y ?? 40,

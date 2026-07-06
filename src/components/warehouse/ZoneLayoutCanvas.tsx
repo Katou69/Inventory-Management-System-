@@ -1,6 +1,6 @@
 "use client"
 /**
- * Shared warehouse zone canvas (see grgi_zone_layout_spec.md).
+ * Shared warehouse zone MAP (see grgi_zone_layout_spec.md).
  *
  * One component for all three roles — behavior differs only by the `role`
  * prop:
@@ -8,13 +8,20 @@
  *   manager → same edit gestures, but each submits a pending proposal with a
  *             required note; own pending shown as dashed-previous +
  *             solid-proposed + "Pending" tag
- *   staff   → live layout only, zero edit affordances
+ *   staff   → live layout only, zero edit affordances (can still pan/zoom)
+ *
+ * Map behaviours:
+ *   - Infinite world: zones live in unbounded world coordinates; the canvas is
+ *     just a window that pans (drag empty space / Hand tool) and zooms (wheel
+ *     or the ± controls, zoom-to-cursor). Fit + Reset recentre the view.
+ *   - Draw tool: managers/admins drag on empty space to draw a new rectangular
+ *     zone at real map coordinates.
  *
  * Zones are hollow rectangles; border color = live occupancy derived from
  * zone_stock vs capacity (gray empty / amber partial / red full).
  */
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Plus, X, Check, Loader2 } from "lucide-react"
+import { MousePointer2, Hand, Boxes, SquareDashed, Plus, Minus, Maximize, LocateFixed, X, Check, Loader2 } from "lucide-react"
 import {
   getZones, getZoneStock, getPendingRequests,
   applyDirectChange, proposeChange, approveRequest, rejectRequest,
@@ -25,9 +32,12 @@ import type {
   ZoneChangeAction, ZoneFields, ZoneOccupancy,
 } from "@/types/dashboard"
 
-const CANVAS_W = 720
-const CANVAS_H = 440
-const MIN_SIZE = 60
+const VIEW_H     = 560   // canvas window height (px)
+const GRID       = 20    // world units per grid cell
+const MIN_SIZE   = 40    // smallest zone (world units)
+const MIN_DRAW   = 24    // min drag to count as a drawn zone (world units)
+const MIN_ZOOM   = 0.2
+const MAX_ZOOM   = 3
 
 const occupancyBorder: Record<ZoneOccupancy, string> = {
   empty:   "border-slate-400",
@@ -43,10 +53,15 @@ const occupancyLabel: Record<ZoneOccupancy, string> = {
   empty: "Empty", partial: "Partial", full: "Full",
 }
 
+type Tool = "select" | "pan" | "draw-shelf" | "draw-zone"
+type View = { zoom: number; x: number; y: number }
+
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max)
+const snap = (v: number) => Math.round(v / GRID) * GRID
+const isDrawTool = (t: Tool) => t === "draw-shelf" || t === "draw-zone"
 
 function snapshot(z: ZoneSection): ZoneFields {
-  return { code: z.code, x: z.x, y: z.y, width: z.width, height: z.height, capacity: z.capacity }
+  return { kind: z.kind, code: z.code, x: z.x, y: z.y, width: z.width, height: z.height, capacity: z.capacity }
 }
 
 /** Fields in `proposed` that differ from `previous`. */
@@ -68,10 +83,12 @@ function actionSummary(req: ZoneChangeRequest): string {
 type DragState = {
   zoneId: number
   mode: "move" | "resize"
-  startX: number
+  startX: number   // client px
   startY: number
   orig: ZoneSection
 }
+type PanState = { startX: number; startY: number; ox: number; oy: number; moved: boolean }
+type DrawState = { x0: number; y0: number; x1: number; y1: number } // world coords
 
 type CommitDraft = {
   actionType: ZoneChangeAction
@@ -91,25 +108,26 @@ export default function ZoneLayoutCanvas({
   const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null)
   const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null)
 
-  // Local geometry overrides while dragging/resizing (before commit)
+  // Map viewport
+  const [tool, setTool] = useState<Tool>("select")
+  const [view, setView] = useState<View>({ zoom: 1, x: 40, y: 40 })
+  const viewRef = useRef(view)
+  viewRef.current = view
+
+  // Live geometry overrides while dragging/resizing (before commit)
   const [draftGeom, setDraftGeom] = useState<Record<number, ZoneFields>>({})
+  const [drawRect, setDrawRect] = useState<DrawState | null>(null)
+
   const dragRef = useRef<DragState | null>(null)
   const dragMovedRef = useRef(false)
+  const panRef = useRef<PanState | null>(null)
+  const drawRef = useRef<DrawState | null>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
 
-  // Manager staging: edits accumulate locally and are submitted together via
-  // the "Submit Proposal" button, which opens the shared note modal.
   const [noteDraft, setNoteDraft] = useState("")
-  const [noteModalOpen, setNoteModalOpen] = useState(false)
-  const [staged, setStaged] = useState<CommitDraft[]>([])
-  // Client-side ids for zones a manager has created but not yet submitted.
-  const nextStagedIdRef = useRef(-1)
-
-  // Zone form (edit panel fields)
+  const [commitDraft, setCommitDraft] = useState<CommitDraft | null>(null)
   const [formCode, setFormCode] = useState("")
   const [formCapacity, setFormCapacity] = useState("")
-
-  // Admin reject note
   const [rejectNote, setRejectNote] = useState("")
   const [busy, setBusy] = useState(false)
 
@@ -125,52 +143,16 @@ export default function ZoneLayoutCanvas({
     setStock(s)
     setPending(p)
     setDraftGeom({})
-    setStaged([])
     setLoading(false)
   }, [warehouseId])
 
   useEffect(() => { void refresh() }, [refresh])
 
-  const pendingForZone = (zoneId: number) =>
-    pending.find((r) => r.sectionId === zoneId)
+  // If a role can't draw, never leave them stuck on a draw tool
+  useEffect(() => { if (!canEdit && isDrawTool(tool)) setTool("select") }, [canEdit, tool])
 
-  // Manager staging lookups
-  const stagedFor = (zoneId: number) =>
-    staged.find((d) => d.sectionId === zoneId) ?? null
-  const stagedDeleteIds = new Set(
-    staged.filter((d) => d.actionType === "delete").map((d) => d.sectionId),
-  )
-
-  /**
-   * What the manager sees on the canvas: live zones with their own staged
-   * edits folded in (updates applied, deletes removed) plus not-yet-submitted
-   * creates. Admin/staff see the plain live zones.
-   */
-  const displayZones: ZoneSection[] =
-    role === "manager"
-      ? [
-          ...zones
-            .filter((z) => !stagedDeleteIds.has(z.id))
-            .map((z) => {
-              const s = stagedFor(z.id)
-              return s?.actionType === "update" && s.proposed ? { ...z, ...s.proposed } : z
-            }),
-          ...staged
-            .filter((d) => d.actionType === "create" && d.sectionId != null)
-            .map((d) => ({
-              id: d.sectionId as number,
-              warehouseId,
-              code: d.proposed?.code ?? "NEW",
-              x: d.proposed?.x ?? 20,
-              y: d.proposed?.y ?? 20,
-              width: d.proposed?.width ?? 150,
-              height: d.proposed?.height ?? 150,
-              capacity: d.proposed?.capacity ?? 100,
-            })),
-        ]
-      : zones
-
-  const selectedZone = displayZones.find((z) => z.id === selectedZoneId) ?? null
+  const pendingForZone = (zoneId: number) => pending.find((r) => r.sectionId === zoneId)
+  const selectedZone = zones.find((z) => z.id === selectedZoneId) ?? null
   const selectedRequest = pending.find((r) => r.id === selectedRequestId) ?? null
 
   useEffect(() => {
@@ -181,8 +163,65 @@ export default function ZoneLayoutCanvas({
   }, [selectedZoneId, selectedZone])
 
   // -------------------------------------------------------------------------
-  // Commit flow: admin applies each edit directly; manager stages edits
-  // locally and submits them together via the "Submit Proposal" button.
+  // Coordinate transforms
+  // -------------------------------------------------------------------------
+  const screenToWorld = useCallback((clientX: number, clientY: number) => {
+    const rect = canvasRef.current?.getBoundingClientRect()
+    const v = viewRef.current
+    const sx = clientX - (rect?.left ?? 0)
+    const sy = clientY - (rect?.top ?? 0)
+    return { x: (sx - v.x) / v.zoom, y: (sy - v.y) / v.zoom }
+  }, [])
+
+  const zoomAt = useCallback((nextZoom: number, clientX: number, clientY: number) => {
+    const rect = canvasRef.current?.getBoundingClientRect()
+    const v = viewRef.current
+    const z = clamp(nextZoom, MIN_ZOOM, MAX_ZOOM)
+    const sx = clientX - (rect?.left ?? 0)
+    const sy = clientY - (rect?.top ?? 0)
+    const wx = (sx - v.x) / v.zoom
+    const wy = (sy - v.y) / v.zoom
+    setView({ zoom: z, x: sx - wx * z, y: sy - wy * z })
+  }, [])
+
+  // Native wheel listener so we can preventDefault (map-style zoom-to-cursor)
+  useEffect(() => {
+    const el = canvasRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1
+      zoomAt(viewRef.current.zoom * factor, e.clientX, e.clientY)
+    }
+    el.addEventListener("wheel", onWheel, { passive: false })
+    return () => el.removeEventListener("wheel", onWheel)
+  }, [zoomAt])
+
+  function fitToContent() {
+    const boxes = [
+      ...zones.map((z) => ({ x: z.x, y: z.y, w: z.width, h: z.height })),
+      ...pending.filter((r) => r.actionType === "create").map((r) => ({
+        x: r.proposedData?.x ?? 0, y: r.proposedData?.y ?? 0,
+        w: r.proposedData?.width ?? 0, h: r.proposedData?.height ?? 0,
+      })),
+    ]
+    const rect = canvasRef.current?.getBoundingClientRect()
+    const vw = rect?.width ?? 720
+    const vh = rect?.height ?? VIEW_H
+    if (boxes.length === 0) { setView({ zoom: 1, x: 40, y: 40 }); return }
+    const minX = Math.min(...boxes.map((b) => b.x))
+    const minY = Math.min(...boxes.map((b) => b.y))
+    const maxX = Math.max(...boxes.map((b) => b.x + b.w))
+    const maxY = Math.max(...boxes.map((b) => b.y + b.h))
+    const pad = 48
+    const zoom = clamp(Math.min((vw - pad * 2) / (maxX - minX || 1), (vh - pad * 2) / (maxY - minY || 1)), MIN_ZOOM, MAX_ZOOM)
+    const cx = (minX + maxX) / 2
+    const cy = (minY + maxY) / 2
+    setView({ zoom, x: vw / 2 - cx * zoom, y: vh / 2 - cy * zoom })
+  }
+
+  // -------------------------------------------------------------------------
+  // Commit flow: admin applies directly; manager attaches a required note
   // -------------------------------------------------------------------------
   async function submitChange(draft: CommitDraft) {
     if (role === "admin") {
@@ -198,68 +237,42 @@ export default function ZoneLayoutCanvas({
           requestedBy: viewerName,
         })
         await refresh()
-      } finally {
-        setBusy(false)
-      }
+      } finally { setBusy(false) }
     } else {
-      stageChange(draft)
+      setNoteDraft("")
+      setCommitDraft(draft)
     }
   }
 
-  /** Add a manager edit to the local staging set (no server call yet). */
-  function stageChange(draft: CommitDraft) {
-    setStaged((prev) => {
-      // Deleting a still-unsubmitted create just drops it from staging.
-      if (draft.actionType === "delete" && draft.sectionId != null && draft.sectionId < 0) {
-        return prev.filter((d) => d.sectionId !== draft.sectionId)
-      }
-      // Collapse repeated edits to the same zone into one entry.
-      const rest = prev.filter((d) => d.sectionId !== draft.sectionId)
-      // An update to a staged create stays a create, carrying the new fields.
-      const existing = prev.find((d) => d.sectionId === draft.sectionId)
-      if (existing?.actionType === "create" && draft.actionType === "update") {
-        return [...rest, { ...existing, proposed: { ...existing.proposed, ...draft.proposed } }]
-      }
-      return [...rest, draft]
-    })
-    setDraftGeom({})
-  }
-
-  /** Submit every staged change as its own proposal, sharing one note. */
   async function submitProposal() {
-    if (staged.length === 0 || !noteDraft.trim()) return
+    if (!commitDraft || !noteDraft.trim()) return
     setBusy(true)
     try {
-      for (const draft of staged) {
-        await proposeChange({
-          warehouseId,
-          actionType: draft.actionType,
-          // Staged creates use negative temp ids; the server assigns the real one.
-          sectionId: draft.sectionId != null && draft.sectionId < 0 ? null : draft.sectionId,
-          proposedData: draft.proposed,
-          previousData: draft.previous,
-          requestNote: noteDraft.trim(),
-          requestedBy: viewerName,
-        })
-      }
-      setNoteModalOpen(false)
+      await proposeChange({
+        warehouseId,
+        actionType: commitDraft.actionType,
+        sectionId: commitDraft.sectionId,
+        proposedData: commitDraft.proposed,
+        previousData: commitDraft.previous,
+        requestNote: noteDraft.trim(),
+        requestedBy: viewerName,
+      })
+      setCommitDraft(null)
       await refresh()
-    } finally {
-      setBusy(false)
-    }
+    } finally { setBusy(false) }
   }
 
-  function discardStaged() {
-    setStaged([])
+  function cancelProposal() {
+    setCommitDraft(null)
     setDraftGeom({})
-    setSelectedZoneId(null)
   }
 
   // -------------------------------------------------------------------------
-  // Drag / resize
+  // Pointer handling
   // -------------------------------------------------------------------------
   function onZonePointerDown(e: React.PointerEvent, zone: ZoneSection, mode: "move" | "resize") {
-    if (!canEdit || pendingForZone(zone.id)) return
+    if (!canEdit || tool === "pan" || pendingForZone(zone.id)) return
+    if (isDrawTool(tool) && mode === "move") return // draw tools don't move zones
     e.preventDefault()
     e.stopPropagation()
     ;(e.target as Element).setPointerCapture(e.pointerId)
@@ -267,65 +280,121 @@ export default function ZoneLayoutCanvas({
     dragMovedRef.current = false
   }
 
-  function onPointerMove(e: React.PointerEvent) {
-    const drag = dragRef.current
-    if (!drag) return
-    const dx = e.clientX - drag.startX
-    const dy = e.clientY - drag.startY
-    if (Math.abs(dx) + Math.abs(dy) > 3) dragMovedRef.current = true
-    const { orig } = drag
-    if (drag.mode === "move") {
-      setDraftGeom((g) => ({
-        ...g,
-        [drag.zoneId]: {
-          x: clamp(orig.x + dx, 0, CANVAS_W - orig.width),
-          y: clamp(orig.y + dy, 0, CANVAS_H - orig.height),
-        },
-      }))
+  function onCanvasPointerDown(e: React.PointerEvent) {
+    // background press: pan (select/pan tools) or start drawing (draw tools)
+    if (isDrawTool(tool) && canEdit) {
+      const w = screenToWorld(e.clientX, e.clientY)
+      const start = { x0: w.x, y0: w.y, x1: w.x, y1: w.y }
+      drawRef.current = start
+      setDrawRect(start)
     } else {
-      setDraftGeom((g) => ({
-        ...g,
-        [drag.zoneId]: {
-          width:  clamp(orig.width + dx, MIN_SIZE, CANVAS_W - orig.x),
-          height: clamp(orig.height + dy, MIN_SIZE, CANVAS_H - orig.y),
-        },
-      }))
+      panRef.current = { startX: e.clientX, startY: e.clientY, ox: view.x, oy: view.y, moved: false }
+    }
+    ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
+  }
+
+  function onCanvasPointerMove(e: React.PointerEvent) {
+    const drag = dragRef.current
+    if (drag) {
+      const dx = (e.clientX - drag.startX) / view.zoom
+      const dy = (e.clientY - drag.startY) / view.zoom
+      if (Math.abs(e.clientX - drag.startX) + Math.abs(e.clientY - drag.startY) > 3) dragMovedRef.current = true
+      const { orig } = drag
+      if (drag.mode === "move") {
+        setDraftGeom((g) => ({ ...g, [drag.zoneId]: { x: snap(orig.x + dx), y: snap(orig.y + dy) } }))
+      } else {
+        setDraftGeom((g) => ({ ...g, [drag.zoneId]: {
+          width:  Math.max(MIN_SIZE, snap(orig.width + dx)),
+          height: Math.max(MIN_SIZE, snap(orig.height + dy)),
+        } }))
+      }
+      return
+    }
+    if (drawRef.current) {
+      const w = screenToWorld(e.clientX, e.clientY)
+      const next = { ...drawRef.current, x1: w.x, y1: w.y }
+      drawRef.current = next
+      setDrawRect(next)
+      return
+    }
+    if (panRef.current) {
+      const p = panRef.current
+      const dx = e.clientX - p.startX
+      const dy = e.clientY - p.startY
+      if (Math.abs(dx) + Math.abs(dy) > 3) p.moved = true
+      setView((v) => ({ ...v, x: p.ox + dx, y: p.oy + dy }))
     }
   }
 
-  function onPointerUp() {
+  function onCanvasPointerUp() {
+    // finish zone drag/resize
     const drag = dragRef.current
-    dragRef.current = null
-    if (!drag) return
-    const zone = displayZones.find((z) => z.id === drag.zoneId)
-    const geom = draftGeom[drag.zoneId]
-    if (!dragMovedRef.current || !zone || !geom) {
-      // treat as a click-select
-      setSelectedZoneId(drag.zoneId)
-      setSelectedRequestId(null)
-      setDraftGeom((g) => {
-        const { [drag.zoneId]: _, ...rest } = g
-        return rest
-      })
+    if (drag) {
+      dragRef.current = null
+      const zone = zones.find((z) => z.id === drag.zoneId)
+      const geom = draftGeom[drag.zoneId]
+      if (!dragMovedRef.current || !zone || !geom) {
+        setSelectedZoneId(drag.zoneId)
+        setSelectedRequestId(null)
+        setDraftGeom((g) => { const { [drag.zoneId]: _omit, ...rest } = g; return rest })
+        return
+      }
+      const previous = snapshot(zone)
+      const proposed = { ...previous, ...geom }
+      void submitChange({ actionType: "update", sectionId: zone.id, proposed, previous })
       return
     }
-    const previous = snapshot(zone)
-    const proposed = { ...previous, ...geom }
-    void submitChange({
-      actionType: "update",
-      sectionId: zone.id,
-      proposed,
-      previous,
-    })
+    // finish drawing a new zone
+    if (drawRef.current) {
+      const d = drawRef.current
+      drawRef.current = null
+      setDrawRect(null)
+      const x = snap(Math.min(d.x0, d.x1))
+      const y = snap(Math.min(d.y0, d.y1))
+      const width = snap(Math.abs(d.x1 - d.x0))
+      const height = snap(Math.abs(d.y1 - d.y0))
+      if (width >= MIN_DRAW && height >= MIN_DRAW) {
+        const kind = tool === "draw-zone" ? "zone" : "shelf"
+        void submitChange({
+          actionType: "create",
+          sectionId: null,
+          proposed: {
+            kind,
+            code: kind === "zone" ? nextCode("ZONE") : nextCode("S"),
+            x, y, width, height,
+            capacity: kind === "zone" ? 0 : 100,
+          },
+          previous: null,
+        })
+        // stay on the draw tool so several boxes can be laid out in a row
+      }
+      return
+    }
+    // finish pan (a click without movement deselects)
+    if (panRef.current) {
+      if (!panRef.current.moved) { setSelectedZoneId(null); setSelectedRequestId(null) }
+      panRef.current = null
+    }
+  }
+
+  function nextCode(prefix: string) {
+    const codes = new Set(zones.map((z) => z.code))
+    let n = 1
+    while (codes.has(`${prefix}${n}`)) n++
+    return `${prefix}${n}`
   }
 
   // -------------------------------------------------------------------------
-  // Panel actions: rename / capacity / delete / create
+  // Panel actions
   // -------------------------------------------------------------------------
   function saveZoneForm() {
     if (!selectedZone) return
     const previous = snapshot(selectedZone)
-    const proposed: ZoneFields = { ...previous, code: formCode.trim() || previous.code, capacity: Number(formCapacity) > 0 ? Number(formCapacity) : previous.capacity }
+    const proposed: ZoneFields = {
+      ...previous,
+      code: formCode.trim() || previous.code,
+      capacity: Number(formCapacity) > 0 ? Number(formCapacity) : previous.capacity,
+    }
     if (Object.keys(changedFields(previous, proposed)).length === 0) return
     void submitChange({ actionType: "update", sectionId: selectedZone.id, proposed, previous })
   }
@@ -336,46 +405,19 @@ export default function ZoneLayoutCanvas({
     setSelectedZoneId(null)
   }
 
-  function createZone() {
-    const codes = new Set(displayZones.map((z) => z.code))
-    let n = 1
-    while (codes.has(`Z${n}`)) n++
-    // Managers stage creates under a negative temp id so the new zone renders
-    // and stays editable until the batch is submitted; admins create directly.
-    const sectionId = role === "manager" ? nextStagedIdRef.current-- : null
-    void submitChange({
-      actionType: "create",
-      sectionId,
-      proposed: { code: `Z${n}`, x: 20, y: 20, width: 150, height: 150, capacity: 100 },
-      previous: null,
-    })
-  }
-
   // -------------------------------------------------------------------------
   // Admin review actions
   // -------------------------------------------------------------------------
   async function onApprove(req: ZoneChangeRequest) {
     setBusy(true)
-    try {
-      await approveRequest(req.id, viewerName)
-      setSelectedRequestId(null)
-      await refresh()
-    } finally {
-      setBusy(false)
-    }
+    try { await approveRequest(req.id, viewerName); setSelectedRequestId(null); await refresh() }
+    finally { setBusy(false) }
   }
-
   async function onReject(req: ZoneChangeRequest) {
     if (!rejectNote.trim()) return
     setBusy(true)
-    try {
-      await rejectRequest(req.id, viewerName, rejectNote.trim())
-      setSelectedRequestId(null)
-      setRejectNote("")
-      await refresh()
-    } finally {
-      setBusy(false)
-    }
+    try { await rejectRequest(req.id, viewerName, rejectNote.trim()); setSelectedRequestId(null); setRejectNote(""); await refresh() }
+    finally { setBusy(false) }
   }
 
   // -------------------------------------------------------------------------
@@ -383,20 +425,33 @@ export default function ZoneLayoutCanvas({
   // -------------------------------------------------------------------------
   const showPendingOverlays = role !== "staff"
   const pendingCreates = showPendingOverlays ? pending.filter((r) => r.actionType === "create") : []
+  const commitCreatePreview = commitDraft?.actionType === "create" ? commitDraft.proposed : null
+
+  const cursor =
+    tool === "pan"    ? (panRef.current ? "grabbing" : "grab") :
+    isDrawTool(tool)  ? "crosshair" : "default"
+
+  const tools: { key: Tool; label: string; icon: React.ElementType; editorOnly?: boolean }[] = [
+    { key: "select",     label: "Select / move",   icon: MousePointer2 },
+    { key: "pan",        label: "Pan",             icon: Hand },
+    { key: "draw-shelf", label: "Draw shelf block", icon: Boxes,       editorOnly: true },
+    { key: "draw-zone",  label: "Draw zone box",   icon: SquareDashed, editorOnly: true },
+  ]
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
       <div className="flex items-start justify-between flex-wrap gap-3 mb-4">
         <div>
-          <h3 className="text-base font-semibold text-slate-900">Zone Layout</h3>
+          <h3 className="text-base font-semibold text-slate-900">Warehouse Map</h3>
           <p className="text-xs text-slate-400 mt-0.5">
-            {role === "staff" ? "Live layout (view only)" :
-             role === "manager" ? "Drag, resize, or edit zones — changes are submitted for approval" :
+            {role === "staff" ? "Live layout (view only) — drag to pan, scroll to zoom" :
+             tool === "draw-shelf" ? "Drag on the map to draw a shelf block" :
+             tool === "draw-zone" ? "Drag on the map to draw a zone box (grouping)" :
+             role === "manager" ? "Move/resize/draw boxes — changes are submitted for approval" :
              "Edits are live immediately and logged"}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          {/* Occupancy legend */}
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             {(["empty", "partial", "full"] as const).map((o) => (
               <span key={o} className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -404,197 +459,223 @@ export default function ZoneLayoutCanvas({
                 {occupancyLabel[o]}
               </span>
             ))}
+            <span className="flex items-center gap-1.5 text-xs text-slate-500">
+              <span className="size-2.5 rounded-sm border-2 border-dashed border-slate-400" />
+              Zone
+            </span>
           </div>
           {pending.length > 0 && showPendingOverlays && (
             <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-xs font-medium ring-1 ring-indigo-200">
               {pending.length} pending
             </span>
           )}
-          {role === "manager" && staged.length > 0 && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-xs font-medium ring-1 ring-amber-200">
-              {staged.length} unsubmitted
-            </span>
-          )}
-          {canEdit && (
-            <button
-              onClick={createZone}
-              disabled={busy}
-              className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-            >
-              <Plus className="size-3.5" /> Add Zone
-            </button>
-          )}
-          {/* Manager's dedicated proposal button — opens the note modal on click */}
-          {role === "manager" && (
-            <>
-              <button
-                onClick={discardStaged}
-                disabled={busy || staged.length === 0}
-                className="text-xs font-medium text-slate-500 hover:text-slate-700 px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-40"
-              >
-                Discard
-              </button>
-              <button
-                onClick={() => { setNoteDraft(""); setNoteModalOpen(true) }}
-                disabled={busy || staged.length === 0}
-                className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-40"
-              >
-                <Check className="size-3.5" /> Submit Proposal{staged.length > 0 ? ` (${staged.length})` : ""}
-              </button>
-            </>
-          )}
         </div>
       </div>
 
-      {/* Canvas */}
-      <div className="overflow-x-auto">
+      {/* Map window */}
+      <div className="relative">
+        {/* Tool palette */}
+        <div className="absolute top-3 left-3 z-10 flex flex-col gap-1 bg-white/95 backdrop-blur rounded-lg border border-slate-200 shadow-sm p-1">
+          {tools.filter((t) => !t.editorOnly || canEdit).map((t) => (
+            <button
+              key={t.key}
+              title={t.label}
+              onClick={() => setTool(t.key)}
+              className={`size-8 rounded-md flex items-center justify-center transition-colors ${
+                tool === t.key ? "bg-indigo-600 text-white" : "text-slate-500 hover:bg-slate-100"
+              }`}
+            >
+              <t.icon className="size-4" />
+            </button>
+          ))}
+        </div>
+
+        {/* Zoom / view controls */}
+        <div className="absolute top-3 right-3 z-10 flex items-center gap-1 bg-white/95 backdrop-blur rounded-lg border border-slate-200 shadow-sm p-1">
+          <button title="Zoom out" onClick={() => zoomAt(view.zoom / 1.2, (canvasRef.current?.getBoundingClientRect().left ?? 0) + (canvasRef.current?.clientWidth ?? 0) / 2, (canvasRef.current?.getBoundingClientRect().top ?? 0) + VIEW_H / 2)} className="size-8 rounded-md flex items-center justify-center text-slate-500 hover:bg-slate-100">
+            <Minus className="size-4" />
+          </button>
+          <span className="text-xs text-slate-500 w-10 text-center tabular-nums">{Math.round(view.zoom * 100)}%</span>
+          <button title="Zoom in" onClick={() => zoomAt(view.zoom * 1.2, (canvasRef.current?.getBoundingClientRect().left ?? 0) + (canvasRef.current?.clientWidth ?? 0) / 2, (canvasRef.current?.getBoundingClientRect().top ?? 0) + VIEW_H / 2)} className="size-8 rounded-md flex items-center justify-center text-slate-500 hover:bg-slate-100">
+            <Plus className="size-4" />
+          </button>
+          <div className="w-px h-5 bg-slate-200 mx-0.5" />
+          <button title="Fit to content" onClick={fitToContent} className="size-8 rounded-md flex items-center justify-center text-slate-500 hover:bg-slate-100">
+            <Maximize className="size-4" />
+          </button>
+          <button title="Reset view" onClick={() => setView({ zoom: 1, x: 40, y: 40 })} className="size-8 rounded-md flex items-center justify-center text-slate-500 hover:bg-slate-100">
+            <LocateFixed className="size-4" />
+          </button>
+        </div>
+
         <div
           ref={canvasRef}
-          className="relative rounded-lg border border-slate-200 bg-slate-50 select-none"
+          className="relative rounded-lg border border-slate-200 bg-slate-50 overflow-hidden touch-none"
           style={{
-            width: CANVAS_W,
-            height: CANVAS_H,
+            height: VIEW_H,
+            cursor,
             backgroundImage:
-              "linear-gradient(to right, rgba(148,163,184,0.12) 1px, transparent 1px)," +
-              "linear-gradient(to bottom, rgba(148,163,184,0.12) 1px, transparent 1px)",
-            backgroundSize: "20px 20px",
+              "linear-gradient(to right, rgba(148,163,184,0.15) 1px, transparent 1px)," +
+              "linear-gradient(to bottom, rgba(148,163,184,0.15) 1px, transparent 1px)",
+            backgroundSize: `${GRID * view.zoom}px ${GRID * view.zoom}px`,
+            backgroundPosition: `${view.x}px ${view.y}px`,
           }}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onClick={() => { setSelectedZoneId(null); setSelectedRequestId(null) }}
+          onPointerDown={onCanvasPointerDown}
+          onPointerMove={onCanvasPointerMove}
+          onPointerUp={onCanvasPointerUp}
         >
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm">
-              <Loader2 className="size-4 animate-spin mr-2" /> Loading layout…
+              <Loader2 className="size-4 animate-spin mr-2" /> Loading map…
             </div>
           )}
 
-          {/* Zones (live for admin/staff; live + staged edits for manager) */}
-          {displayZones.map((zone) => {
-            const req = showPendingOverlays ? pendingForZone(zone.id) : undefined
-            const stagedDraft = role === "manager" ? stagedFor(zone.id) : null
-            const geom = draftGeom[zone.id]
-            const x = geom?.x ?? zone.x
-            const y = geom?.y ?? zone.y
-            const w = geom?.width ?? zone.width
-            const h = geom?.height ?? zone.height
-            const occ = zoneOccupancy(zone, stock)
-            const total = zoneStockTotal(zone.id, stock)
-            const selected = selectedZoneId === zone.id
+          {/* World layer */}
+          <div
+            className="absolute top-0 left-0"
+            style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`, transformOrigin: "0 0" }}
+          >
+            {/* zone-kind boxes render first so they sit behind shelf blocks */}
+            {[...zones].sort((a, b) => (a.kind === "zone" ? 0 : 1) - (b.kind === "zone" ? 0 : 1)).map((zone) => {
+              const req = showPendingOverlays ? pendingForZone(zone.id) : undefined
+              const geom = draftGeom[zone.id]
+              const x = geom?.x ?? zone.x
+              const y = geom?.y ?? zone.y
+              const w = geom?.width ?? zone.width
+              const h = geom?.height ?? zone.height
+              const isZone = zone.kind === "zone"
+              const occ = isZone ? "empty" : zoneOccupancy(zone, stock)
+              const total = isZone ? 0 : zoneStockTotal(zone.id, stock)
+              const selected = selectedZoneId === zone.id
+              const liveIsDashed = !!req
 
-            // Zone with a pending update/delete: live state renders dashed
-            const liveIsDashed = !!req
-
-            return (
-              <div key={zone.id}>
-                {/* live (or previous) box */}
-                <div
-                  onPointerDown={(e) => onZonePointerDown(e, zone, "move")}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (req) { setSelectedRequestId(req.id); setSelectedZoneId(null) }
-                    else { setSelectedZoneId(zone.id); setSelectedRequestId(null) }
-                  }}
-                  className={`absolute rounded-md border-2 bg-transparent ${occupancyBorder[occ]} ${
-                    liveIsDashed ? "border-dashed opacity-60" : ""
-                  } ${stagedDraft ? "ring-2 ring-amber-400 ring-offset-1" : ""} ${
-                    selected ? "ring-2 ring-indigo-400 ring-offset-1" : ""
-                  } ${canEdit && !req ? "cursor-move" : "cursor-pointer"}`}
-                  style={{ left: x, top: y, width: w, height: h }}
-                >
-                  <div className="absolute top-1 left-1.5 leading-tight pointer-events-none">
-                    <p className="text-xs font-bold text-slate-700">{zone.code}</p>
-                    <p className={`text-[10px] font-medium ${occupancyText[occ]}`}>
-                      {total.toLocaleString()} / {zone.capacity.toLocaleString()}
-                    </p>
+              return (
+                <div key={zone.id}>
+                  <div
+                    onPointerDown={(e) => onZonePointerDown(e, zone, "move")}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (req) { setSelectedRequestId(req.id); setSelectedZoneId(null) }
+                      else { setSelectedZoneId(zone.id); setSelectedRequestId(null) }
+                    }}
+                    className={`absolute rounded-md border-2 ${
+                      isZone ? "border-dashed border-slate-400 bg-slate-500/[0.04]" : `bg-transparent ${occupancyBorder[occ]}`
+                    } ${liveIsDashed ? "border-dashed opacity-60" : ""} ${
+                      selected ? "ring-2 ring-indigo-400 ring-offset-1" : ""
+                    } ${canEdit && !req && tool !== "pan" ? "cursor-move" : ""}`}
+                    style={{ left: x, top: y, width: w, height: h }}
+                  >
+                    {isZone ? (
+                      <span className="absolute top-1.5 left-1.5 bg-white/80 text-slate-500 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-px rounded pointer-events-none">
+                        {zone.code}
+                      </span>
+                    ) : (
+                      <div className="absolute top-1 left-1.5 leading-tight pointer-events-none">
+                        <p className="text-xs font-bold text-slate-700">{zone.code}</p>
+                        <p className={`text-[10px] font-medium ${occupancyText[occ]}`}>
+                          {total.toLocaleString()} / {zone.capacity.toLocaleString()}
+                        </p>
+                      </div>
+                    )}
+                    {canEdit && !req && tool !== "pan" && (
+                      <div
+                        onPointerDown={(e) => onZonePointerDown(e, zone, "resize")}
+                        className="absolute -bottom-1 -right-1 size-3 rounded-sm bg-white border-2 border-slate-400 cursor-se-resize"
+                      />
+                    )}
                   </div>
-                  {stagedDraft && (
-                    <span className="absolute -top-2.5 right-1 px-1.5 py-px rounded bg-amber-500 text-white text-[10px] font-semibold pointer-events-none">
-                      Draft
-                    </span>
-                  )}
-                  {canEdit && !req && (
+
+                  {req && req.actionType === "update" && req.proposedData && (
                     <div
-                      onPointerDown={(e) => onZonePointerDown(e, zone, "resize")}
-                      className="absolute -bottom-1 -right-1 size-3 rounded-sm bg-white border-2 border-slate-400 cursor-se-resize"
-                    />
+                      onClick={(e) => { e.stopPropagation(); setSelectedRequestId(req.id); setSelectedZoneId(null) }}
+                      className={`absolute rounded-md border-2 bg-transparent border-indigo-500 cursor-pointer ${
+                        selectedRequestId === req.id ? "ring-2 ring-indigo-400 ring-offset-1" : ""
+                      }`}
+                      style={{
+                        left:   req.proposedData.x ?? zone.x,
+                        top:    req.proposedData.y ?? zone.y,
+                        width:  req.proposedData.width ?? zone.width,
+                        height: req.proposedData.height ?? zone.height,
+                      }}
+                    >
+                      <div className="absolute top-1 left-1.5 leading-tight pointer-events-none">
+                        <p className="text-xs font-bold text-indigo-700">{req.proposedData.code ?? zone.code}</p>
+                      </div>
+                      <span className="absolute -top-2.5 right-1 px-1.5 py-px rounded bg-indigo-600 text-white text-[10px] font-semibold pointer-events-none">Pending</span>
+                    </div>
+                  )}
+
+                  {req && req.actionType === "delete" && (
+                    <span className="absolute px-1.5 py-px rounded bg-red-600 text-white text-[10px] font-semibold pointer-events-none" style={{ left: x + 4, top: y - 10 }}>
+                      Delete pending
+                    </span>
                   )}
                 </div>
+              )
+            })}
 
-                {/* proposed box for a pending update */}
-                {req && req.actionType === "update" && req.proposedData && (
-                  <div
-                    onClick={(e) => { e.stopPropagation(); setSelectedRequestId(req.id); setSelectedZoneId(null) }}
-                    className={`absolute rounded-md border-2 bg-transparent border-indigo-500 cursor-pointer ${
-                      selectedRequestId === req.id ? "ring-2 ring-indigo-400 ring-offset-1" : ""
-                    }`}
-                    style={{
-                      left:   req.proposedData.x ?? zone.x,
-                      top:    req.proposedData.y ?? zone.y,
-                      width:  req.proposedData.width ?? zone.width,
-                      height: req.proposedData.height ?? zone.height,
-                    }}
-                  >
-                    <div className="absolute top-1 left-1.5 leading-tight pointer-events-none">
-                      <p className="text-xs font-bold text-indigo-700">{req.proposedData.code ?? zone.code}</p>
-                    </div>
-                    <span className="absolute -top-2.5 right-1 px-1.5 py-px rounded bg-indigo-600 text-white text-[10px] font-semibold pointer-events-none">
-                      Pending
-                    </span>
-                  </div>
-                )}
-
-                {/* delete tag for a pending delete */}
-                {req && req.actionType === "delete" && (
-                  <span
-                    className="absolute px-1.5 py-px rounded bg-red-600 text-white text-[10px] font-semibold pointer-events-none"
-                    style={{ left: x + 4, top: y - 10 }}
-                  >
-                    Delete pending
-                  </span>
-                )}
+            {/* Pending creates (no live counterpart) */}
+            {pendingCreates.map((req) => (
+              <div
+                key={`create-${req.id}`}
+                onClick={(e) => { e.stopPropagation(); setSelectedRequestId(req.id); setSelectedZoneId(null) }}
+                className={`absolute rounded-md border-2 bg-transparent border-indigo-500 cursor-pointer ${
+                  selectedRequestId === req.id ? "ring-2 ring-indigo-400 ring-offset-1" : ""
+                }`}
+                style={{ left: req.proposedData?.x ?? 20, top: req.proposedData?.y ?? 20, width: req.proposedData?.width ?? 160, height: req.proposedData?.height ?? 120 }}
+              >
+                <div className="absolute top-1 left-1.5 leading-tight pointer-events-none">
+                  <p className="text-xs font-bold text-indigo-700">{req.proposedData?.code}</p>
+                </div>
+                <span className="absolute -top-2.5 right-1 px-1.5 py-px rounded bg-indigo-600 text-white text-[10px] font-semibold pointer-events-none">Pending</span>
               </div>
-            )
-          })}
+            ))}
 
-          {/* Pending creates (no live counterpart) */}
-          {pendingCreates.map((req) => (
-            <div
-              key={`create-${req.id}`}
-              onClick={(e) => { e.stopPropagation(); setSelectedRequestId(req.id); setSelectedZoneId(null) }}
-              className={`absolute rounded-md border-2 bg-transparent border-indigo-500 cursor-pointer ${
-                selectedRequestId === req.id ? "ring-2 ring-indigo-400 ring-offset-1" : ""
-              }`}
-              style={{
-                left: req.proposedData?.x ?? 20,
-                top: req.proposedData?.y ?? 20,
-                width: req.proposedData?.width ?? 160,
-                height: req.proposedData?.height ?? 120,
-              }}
-            >
-              <div className="absolute top-1 left-1.5 leading-tight pointer-events-none">
-                <p className="text-xs font-bold text-indigo-700">{req.proposedData?.code}</p>
-              </div>
-              <span className="absolute -top-2.5 right-1 px-1.5 py-px rounded bg-indigo-600 text-white text-[10px] font-semibold pointer-events-none">
-                Pending
-              </span>
-            </div>
-          ))}
+            {/* Manager's in-flight create (while typing the note) */}
+            {commitCreatePreview && (
+              <div
+                className="absolute rounded-md border-2 border-dashed border-indigo-400 bg-indigo-50/30 pointer-events-none"
+                style={{ left: commitCreatePreview.x, top: commitCreatePreview.y, width: commitCreatePreview.width, height: commitCreatePreview.height }}
+              />
+            )}
+
+            {/* Rubber-band while drawing */}
+            {drawRect && (
+              <div
+                className="absolute rounded-md border-2 border-dashed border-indigo-500 bg-indigo-100/30 pointer-events-none"
+                style={{
+                  left: Math.min(drawRect.x0, drawRect.x1),
+                  top: Math.min(drawRect.y0, drawRect.y1),
+                  width: Math.abs(drawRect.x1 - drawRect.x0),
+                  height: Math.abs(drawRect.y1 - drawRect.y0),
+                }}
+              />
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Selected zone panel */}
+      {/* Selected box panel */}
       {selectedZone && !selectedRequest && (
         <div className="mt-4 border-t border-slate-100 pt-4 flex flex-col sm:flex-row gap-6">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2">
-              <h4 className="text-sm font-semibold text-slate-800">Zone {selectedZone.code}</h4>
-              <span className={`text-xs font-medium ${occupancyText[zoneOccupancy(selectedZone, stock)]}`}>
-                {occupancyLabel[zoneOccupancy(selectedZone, stock)]} · {zoneStockTotal(selectedZone.id, stock).toLocaleString()} / {selectedZone.capacity.toLocaleString()} units
-              </span>
-            </div>
-            {stock.filter((s) => s.sectionId === selectedZone.id).length === 0 ? (
-              <p className="text-xs text-slate-400">No stock in this zone.</p>
+            {selectedZone.kind === "zone" ? (
+              <div className="flex items-center gap-2 mb-1">
+                <h4 className="text-sm font-semibold text-slate-800">Zone box {selectedZone.code}</h4>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-xs font-medium">Grouping</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 mb-2">
+                <h4 className="text-sm font-semibold text-slate-800">Shelf {selectedZone.code}</h4>
+                <span className={`text-xs font-medium ${occupancyText[zoneOccupancy(selectedZone, stock)]}`}>
+                  {occupancyLabel[zoneOccupancy(selectedZone, stock)]} · {zoneStockTotal(selectedZone.id, stock).toLocaleString()} / {selectedZone.capacity.toLocaleString()} units
+                </span>
+              </div>
+            )}
+            {selectedZone.kind === "zone" ? (
+              <p className="text-xs text-slate-400">A zone box groups shelf blocks — it carries no stock of its own.</p>
+            ) : stock.filter((s) => s.sectionId === selectedZone.id).length === 0 ? (
+              <p className="text-xs text-slate-400">No stock in this shelf.</p>
             ) : (
               <ul className="space-y-1">
                 {stock.filter((s) => s.sectionId === selectedZone.id).map((s) => (
@@ -610,29 +691,20 @@ export default function ZoneLayoutCanvas({
           {canEdit && (
             <div className="flex flex-col gap-2.5 sm:w-64 shrink-0">
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-slate-500">Zone name / code</span>
-                <input
-                  value={formCode}
-                  onChange={(e) => setFormCode(e.target.value)}
-                  className="px-2.5 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-                />
+                <span className="text-xs font-medium text-slate-500">{selectedZone.kind === "zone" ? "Zone name / label" : "Shelf name / code"}</span>
+                <input value={formCode} onChange={(e) => setFormCode(e.target.value)} className="px-2.5 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
               </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-slate-500">Capacity (units)</span>
-                <input
-                  value={formCapacity}
-                  inputMode="numeric"
-                  onChange={(e) => setFormCapacity(e.target.value.replace(/[^0-9]/g, ""))}
-                  className="px-2.5 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-                />
-              </label>
+              {selectedZone.kind === "shelf" && (
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-slate-500">Capacity (units)</span>
+                  <input value={formCapacity} inputMode="numeric" onChange={(e) => setFormCapacity(e.target.value.replace(/[^0-9]/g, ""))} className="px-2.5 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
+                </label>
+              )}
               <div className="flex items-center gap-2 mt-1">
-                <button onClick={() => { saveZoneForm(); setSelectedZoneId(null) }} disabled={busy} className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-50">
-                  {role === "manager" ? "Stage changes" : "Save"}
+                <button onClick={saveZoneForm} disabled={busy} className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-50">
+                  {role === "manager" ? "Propose changes" : "Save"}
                 </button>
-                <button onClick={deleteZone} disabled={busy} className="px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50">
-                  Delete
-                </button>
+                <button onClick={deleteZone} disabled={busy} className="px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50">Delete</button>
               </div>
             </div>
           )}
@@ -649,32 +721,17 @@ export default function ZoneLayoutCanvas({
                 <h4 className="text-sm font-semibold text-slate-800">{actionSummary(selectedRequest)}</h4>
               </div>
               <p className="text-xs text-slate-400 mt-1">Requested by {selectedRequest.requestedBy}</p>
-              <p className="text-sm text-slate-600 mt-2 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
-                “{selectedRequest.requestNote}”
-              </p>
+              <p className="text-sm text-slate-600 mt-2 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">“{selectedRequest.requestNote}”</p>
             </div>
 
             {role === "admin" ? (
               <div className="flex flex-col gap-2 sm:w-72 shrink-0">
-                <button
-                  onClick={() => onApprove(selectedRequest)}
-                  disabled={busy}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-50"
-                >
+                <button onClick={() => onApprove(selectedRequest)} disabled={busy} className="flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-50">
                   <Check className="size-4" /> Approve
                 </button>
                 <div className="flex flex-col gap-1.5">
-                  <input
-                    value={rejectNote}
-                    onChange={(e) => setRejectNote(e.target.value)}
-                    placeholder="Reason for rejection (required)"
-                    className="px-2.5 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30"
-                  />
-                  <button
-                    onClick={() => onReject(selectedRequest)}
-                    disabled={busy || !rejectNote.trim()}
-                    className="flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-red-600 border border-red-200 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40"
-                  >
+                  <input value={rejectNote} onChange={(e) => setRejectNote(e.target.value)} placeholder="Reason for rejection (required)" className="px-2.5 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30" />
+                  <button onClick={() => onReject(selectedRequest)} disabled={busy || !rejectNote.trim()} className="flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-red-600 border border-red-200 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40">
                     <X className="size-4" /> Reject
                   </button>
                 </div>
@@ -686,40 +743,25 @@ export default function ZoneLayoutCanvas({
         </div>
       )}
 
-      {/* Manager proposal modal — opened by the "Submit Proposal" button,
-          covers all staged changes with one shared note. */}
-      {noteModalOpen && (
+      {/* Manager note modal */}
+      {commitDraft && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => !busy && setNoteModalOpen(false)} />
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={cancelProposal} />
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-            <h3 className="text-base font-semibold text-slate-900 mb-1">Submit proposal</h3>
-            <p className="text-xs text-slate-400 mb-3">
-              A short message is required — the admin will see it when reviewing your {staged.length === 1 ? "change" : `${staged.length} changes`}.
-            </p>
-            {staged.length > 0 && (
-              <ul className="mb-3 max-h-32 overflow-y-auto space-y-1 rounded-lg bg-slate-50 border border-slate-100 p-2">
-                {staged.map((d, i) => (
-                  <li key={i} className="text-xs text-slate-600">• {draftSummary(d)}</li>
-                ))}
-              </ul>
-            )}
+            <h3 className="text-base font-semibold text-slate-900 mb-1">Describe this change</h3>
+            <p className="text-xs text-slate-400 mb-4">A short message is required — the admin will see it when reviewing your proposal.</p>
             <textarea
-              autoFocus
-              value={noteDraft}
-              onChange={(e) => setNoteDraft(e.target.value)}
-              rows={3}
-              placeholder="e.g. Re-laid out the inbound zones for Q3"
+              autoFocus value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} rows={3}
+              placeholder={
+                commitDraft.actionType === "create" ? "e.g. New overflow zone for Q3 inbound" :
+                commitDraft.actionType === "delete" ? "e.g. Zone unused since the re-layout" :
+                "e.g. Moved zone B nearer the loading dock"
+              }
               className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 resize-none"
             />
             <div className="flex items-center justify-end gap-2 mt-4">
-              <button onClick={() => setNoteModalOpen(false)} disabled={busy} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50">
-                Cancel
-              </button>
-              <button
-                onClick={submitProposal}
-                disabled={!noteDraft.trim() || busy || staged.length === 0}
-                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-40"
-              >
+              <button onClick={cancelProposal} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
+              <button onClick={submitProposal} disabled={!noteDraft.trim() || busy} className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-40">
                 {busy ? "Submitting…" : "Submit proposal"}
               </button>
             </div>
@@ -728,12 +770,4 @@ export default function ZoneLayoutCanvas({
       )}
     </div>
   )
-}
-
-/** Human summary of a staged manager change for the proposal modal list. */
-function draftSummary(d: CommitDraft): string {
-  if (d.actionType === "create") return `Create zone "${d.proposed?.code ?? "NEW"}"`
-  if (d.actionType === "delete") return `Delete zone "${d.previous?.code ?? ""}"`
-  const keys = Object.keys(changedFields(d.previous ?? {}, d.proposed ?? {}))
-  return `Update zone "${d.previous?.code ?? ""}" (${keys.join(", ") || "geometry"})`
 }
