@@ -26,18 +26,19 @@ import type {
 // Mock store (module-level, survives across calls within a browser session)
 // ---------------------------------------------------------------------------
 
+// Zones are square by default (equal width/height).
 const seedZones: ZoneSection[] = [
   // Warehouse 1
-  { id: 1, warehouseId: 1, code: "A", x: 40,  y: 40,  width: 200, height: 140, capacity: 400 },
-  { id: 2, warehouseId: 1, code: "B", x: 280, y: 40,  width: 160, height: 140, capacity: 250 },
-  { id: 3, warehouseId: 1, code: "C", x: 40,  y: 220, width: 140, height: 180, capacity: 300 },
-  { id: 4, warehouseId: 1, code: "D", x: 280, y: 220, width: 240, height: 120, capacity: 500 },
-  { id: 5, warehouseId: 1, code: "RET", x: 560, y: 40, width: 120, height: 100, capacity: 80 },
+  { id: 1, warehouseId: 1, code: "A", x: 40,  y: 40,  width: 150, height: 150, capacity: 400 },
+  { id: 2, warehouseId: 1, code: "B", x: 240, y: 40,  width: 150, height: 150, capacity: 250 },
+  { id: 3, warehouseId: 1, code: "C", x: 40,  y: 240, width: 150, height: 150, capacity: 300 },
+  { id: 4, warehouseId: 1, code: "D", x: 240, y: 240, width: 150, height: 150, capacity: 500 },
+  { id: 5, warehouseId: 1, code: "RET", x: 440, y: 40, width: 150, height: 150, capacity: 80 },
   // Warehouse 3 (Taunggyi — the detail-page example)
-  { id: 6, warehouseId: 3, code: "A", x: 40,  y: 40,  width: 220, height: 150, capacity: 450 },
-  { id: 7, warehouseId: 3, code: "B", x: 300, y: 40,  width: 180, height: 150, capacity: 300 },
-  { id: 8, warehouseId: 3, code: "C", x: 40,  y: 230, width: 180, height: 160, capacity: 350 },
-  { id: 9, warehouseId: 3, code: "COLD", x: 520, y: 40, width: 150, height: 200, capacity: 120 },
+  { id: 6, warehouseId: 3, code: "A", x: 40,  y: 40,  width: 150, height: 150, capacity: 450 },
+  { id: 7, warehouseId: 3, code: "B", x: 240, y: 40,  width: 150, height: 150, capacity: 300 },
+  { id: 8, warehouseId: 3, code: "C", x: 40,  y: 240, width: 150, height: 150, capacity: 350 },
+  { id: 9, warehouseId: 3, code: "COLD", x: 440, y: 40, width: 150, height: 150, capacity: 120 },
 ]
 
 const seedStock: ZoneStockEntry[] = [
@@ -57,9 +58,9 @@ const seedStock: ZoneStockEntry[] = [
 function defaultZones(warehouseId: number): ZoneSection[] {
   const base = warehouseId * 100
   return [
-    { id: base + 1, warehouseId, code: "A", x: 40,  y: 40,  width: 200, height: 150, capacity: 300 },
-    { id: base + 2, warehouseId, code: "B", x: 280, y: 40,  width: 200, height: 150, capacity: 300 },
-    { id: base + 3, warehouseId, code: "C", x: 40,  y: 230, width: 200, height: 150, capacity: 200 },
+    { id: base + 1, warehouseId, code: "A", x: 40,  y: 40,  width: 150, height: 150, capacity: 300 },
+    { id: base + 2, warehouseId, code: "B", x: 240, y: 40,  width: 150, height: 150, capacity: 300 },
+    { id: base + 3, warehouseId, code: "C", x: 40,  y: 240, width: 150, height: 150, capacity: 200 },
   ]
 }
 
@@ -91,8 +92,8 @@ function applyToSections(req: ZoneChangeRequest) {
       code: req.proposedData?.code ?? "NEW",
       x: req.proposedData?.x ?? 40,
       y: req.proposedData?.y ?? 40,
-      width: req.proposedData?.width ?? 160,
-      height: req.proposedData?.height ?? 120,
+      width: req.proposedData?.width ?? 150,
+      height: req.proposedData?.height ?? 150,
       capacity: req.proposedData?.capacity ?? 100,
     })
   } else if (req.actionType === "update" && req.sectionId != null) {
