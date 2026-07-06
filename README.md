@@ -1,2 +1,3 @@
-# ctf-writeups
-my own space of solved puzzles, late-night debugging, and “aha” moments...
+# run the code
+npm i 
+npm run dev
