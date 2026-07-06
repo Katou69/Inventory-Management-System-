@@ -116,7 +116,10 @@ export interface ZoneSection {
   id: number
   warehouseId: number
   kind: SectionKind
+  /** Short label (e.g. "A", "COLD"). */
   code: string
+  /** Human-readable name (e.g. "Receiving", "Bulk Storage 1"). */
+  name: string
   x: number
   y: number
   width: number
@@ -137,7 +140,7 @@ export type ZoneChangeAction = "create" | "update" | "delete"
 export type ZoneChangeStatus = "pending" | "approved" | "rejected"
 
 /** Editable zone fields carried in proposed/previous snapshots. */
-export type ZoneFields = Partial<Pick<ZoneSection, "kind" | "code" | "x" | "y" | "width" | "height" | "capacity">>
+export type ZoneFields = Partial<Pick<ZoneSection, "kind" | "code" | "name" | "x" | "y" | "width" | "height" | "capacity">>
 
 export interface ZoneChangeRequest {
   id: number

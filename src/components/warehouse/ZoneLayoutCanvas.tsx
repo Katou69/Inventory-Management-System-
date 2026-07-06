@@ -61,13 +61,13 @@ const snap = (v: number) => Math.round(v / GRID) * GRID
 const isDrawTool = (t: Tool) => t === "draw-shelf" || t === "draw-zone"
 
 function snapshot(z: ZoneSection): ZoneFields {
-  return { kind: z.kind, code: z.code, x: z.x, y: z.y, width: z.width, height: z.height, capacity: z.capacity }
+  return { kind: z.kind, code: z.code, name: z.name, x: z.x, y: z.y, width: z.width, height: z.height, capacity: z.capacity }
 }
 
 /** Fields in `proposed` that differ from `previous`. */
 function changedFields(previous: ZoneFields, proposed: ZoneFields): ZoneFields {
   const out: ZoneFields = {}
-  for (const key of ["code", "x", "y", "width", "height", "capacity"] as const) {
+  for (const key of ["code", "name", "x", "y", "width", "height", "capacity"] as const) {
     if (previous[key] !== proposed[key]) (out as Record<string, unknown>)[key] = proposed[key]
   }
   return out
@@ -127,6 +127,7 @@ export default function ZoneLayoutCanvas({
   const [noteDraft, setNoteDraft] = useState("")
   const [commitDraft, setCommitDraft] = useState<CommitDraft | null>(null)
   const [formCode, setFormCode] = useState("")
+  const [formName, setFormName] = useState("")
   const [formCapacity, setFormCapacity] = useState("")
   const [rejectNote, setRejectNote] = useState("")
   const [busy, setBusy] = useState(false)
@@ -158,6 +159,7 @@ export default function ZoneLayoutCanvas({
   useEffect(() => {
     if (selectedZone) {
       setFormCode(selectedZone.code)
+      setFormName(selectedZone.name)
       setFormCapacity(String(selectedZone.capacity))
     }
   }, [selectedZoneId, selectedZone])
@@ -355,12 +357,14 @@ export default function ZoneLayoutCanvas({
       const height = snap(Math.abs(d.y1 - d.y0))
       if (width >= MIN_DRAW && height >= MIN_DRAW) {
         const kind = tool === "draw-zone" ? "zone" : "shelf"
+        const code = kind === "zone" ? nextCode("ZONE") : nextCode("S")
         void submitChange({
           actionType: "create",
           sectionId: null,
           proposed: {
             kind,
-            code: kind === "zone" ? nextCode("ZONE") : nextCode("S"),
+            code,
+            name: kind === "zone" ? "New zone" : "New shelf",
             x, y, width, height,
             capacity: kind === "zone" ? 0 : 100,
           },
@@ -393,6 +397,7 @@ export default function ZoneLayoutCanvas({
     const proposed: ZoneFields = {
       ...previous,
       code: formCode.trim() || previous.code,
+      name: formName.trim() || previous.name,
       capacity: Number(formCapacity) > 0 ? Number(formCapacity) : previous.capacity,
     }
     if (Object.keys(changedFields(previous, proposed)).length === 0) return
@@ -567,14 +572,20 @@ export default function ZoneLayoutCanvas({
                   >
                     {isZone ? (
                       <span className="absolute top-1.5 left-1.5 bg-white/80 text-slate-500 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-px rounded pointer-events-none">
-                        {zone.code}
+                        {zone.code} · {zone.name}
                       </span>
                     ) : (
-                      <div className="absolute top-1 left-1.5 leading-tight pointer-events-none">
+                      <div className="absolute top-1 left-1.5 right-1 leading-tight pointer-events-none">
                         <p className="text-xs font-bold text-slate-700">{zone.code}</p>
-                        <p className={`text-[10px] font-medium ${occupancyText[occ]}`}>
-                          {total.toLocaleString()} / {zone.capacity.toLocaleString()}
-                        </p>
+                        {/* Drop lines that won't fit so small/narrow racks stay legible */}
+                        {h >= 52 && w >= 90 && (
+                          <p className="text-[10px] font-medium text-slate-500 truncate">{zone.name}</p>
+                        )}
+                        {h >= 40 && (
+                          <p className={`text-[10px] font-medium ${occupancyText[occ]}`}>
+                            {total.toLocaleString()} / {zone.capacity.toLocaleString()}
+                          </p>
+                        )}
                       </div>
                     )}
                     {canEdit && !req && tool !== "pan" && (
@@ -661,12 +672,12 @@ export default function ZoneLayoutCanvas({
           <div className="flex-1 min-w-0">
             {selectedZone.kind === "zone" ? (
               <div className="flex items-center gap-2 mb-1">
-                <h4 className="text-sm font-semibold text-slate-800">Zone box {selectedZone.code}</h4>
+                <h4 className="text-sm font-semibold text-slate-800">Zone box {selectedZone.code} · {selectedZone.name}</h4>
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-xs font-medium">Grouping</span>
               </div>
             ) : (
               <div className="flex items-center gap-2 mb-2">
-                <h4 className="text-sm font-semibold text-slate-800">Shelf {selectedZone.code}</h4>
+                <h4 className="text-sm font-semibold text-slate-800">Shelf {selectedZone.code} · {selectedZone.name}</h4>
                 <span className={`text-xs font-medium ${occupancyText[zoneOccupancy(selectedZone, stock)]}`}>
                   {occupancyLabel[zoneOccupancy(selectedZone, stock)]} · {zoneStockTotal(selectedZone.id, stock).toLocaleString()} / {selectedZone.capacity.toLocaleString()} units
                 </span>
@@ -691,8 +702,12 @@ export default function ZoneLayoutCanvas({
           {canEdit && (
             <div className="flex flex-col gap-2.5 sm:w-64 shrink-0">
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-slate-500">{selectedZone.kind === "zone" ? "Zone name / label" : "Shelf name / code"}</span>
+                <span className="text-xs font-medium text-slate-500">Code / label</span>
                 <input value={formCode} onChange={(e) => setFormCode(e.target.value)} className="px-2.5 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-slate-500">{selectedZone.kind === "zone" ? "Zone name" : "Shelf name"}</span>
+                <input value={formName} onChange={(e) => setFormName(e.target.value)} className="px-2.5 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
               </label>
               {selectedZone.kind === "shelf" && (
                 <label className="flex flex-col gap-1">
