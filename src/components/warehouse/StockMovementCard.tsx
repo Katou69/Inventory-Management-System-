@@ -17,7 +17,7 @@ export default function StockMovementCard({ wh }: { wh: WarehouseDetail }) {
   const barW = 8
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 w-full lg:w-[440px] shrink-0">
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex-1 min-w-0">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-base font-semibold text-slate-900">Recent Stock Movement</h3>

@@ -7,6 +7,7 @@ import CapacityCard from "@/components/warehouse/CapacityCard"
 import StockMovementCard from "@/components/warehouse/StockMovementCard"
 import WarehouseProductsTable from "@/components/warehouse/WarehouseProductsTable"
 import WarehouseActivitiesCard from "@/components/warehouse/WarehouseActivitiesCard"
+import ZoneLayoutSection from "@/components/warehouse/ZoneLayoutSection"
 
 export async function generateStaticParams() {
   const warehouses = await getWarehouses()
@@ -27,10 +28,14 @@ export default async function WarehouseDetailPage({
       <WarehouseHeader name={wh.name} />
       <WarehouseProfileCard wh={wh} />
       <QuickStatsRow wh={wh} />
+      <div className="min-h-[260px] bg-white rounded-xl border border-dashed border-slate-300 shadow-sm p-6 flex items-center justify-center text-sm text-slate-400">
+        Placeholder
+      </div>
       <div className="flex flex-col lg:flex-row gap-6 items-stretch">
         <CapacityCard wh={wh} />
         <StockMovementCard wh={wh} />
       </div>
+      <ZoneLayoutSection warehouseId={wh.id} />
       <WarehouseProductsTable wh={wh} />
       <WarehouseActivitiesCard activities={wh.activities} warehouseName={wh.name} />
     </div>

@@ -97,6 +97,58 @@ export interface WarehouseActivity {
   time: string
 }
 
+// ---------------------------------------------------------------------------
+// Warehouse zone layout (see grgi_zone_layout_spec.md)
+// ---------------------------------------------------------------------------
+
+export type ViewerRole = "admin" | "manager" | "staff"
+
+/** Live layout row — the "true" state, and the storage unit itself. */
+export interface ZoneSection {
+  id: number
+  warehouseId: number
+  code: string
+  x: number
+  y: number
+  width: number
+  height: number
+  /** Max total units this zone holds; structural, changes need approval. */
+  capacity: number
+}
+
+/** A zone can hold a mix of SKUs — one row per SKU per zone. */
+export interface ZoneStockEntry {
+  id: number
+  sectionId: number
+  itemName: string
+  quantity: number
+}
+
+export type ZoneChangeAction = "create" | "update" | "delete"
+export type ZoneChangeStatus = "pending" | "approved" | "rejected"
+
+/** Editable zone fields carried in proposed/previous snapshots. */
+export type ZoneFields = Partial<Pick<ZoneSection, "code" | "x" | "y" | "width" | "height" | "capacity">>
+
+export interface ZoneChangeRequest {
+  id: number
+  warehouseId: number
+  requestedBy: string
+  actionType: ZoneChangeAction
+  /** null when actionType = "create" */
+  sectionId: number | null
+  proposedData: ZoneFields | null
+  previousData: ZoneFields | null
+  requestNote: string
+  status: ZoneChangeStatus
+  reviewedBy: string | null
+  reviewedAt: string | null
+  reviewNote: string | null
+}
+
+/** Derived at render time from zone_stock totals vs capacity — never stored. */
+export type ZoneOccupancy = "empty" | "partial" | "full"
+
 export interface SalesOverview {
   numberOfSales: number
   totalSales: number

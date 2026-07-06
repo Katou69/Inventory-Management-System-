@@ -14,11 +14,11 @@ export default function CapacityCard({ wh }: { wh: WarehouseDetail }) {
   const usedDash = (pct / 100) * c
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex-1 min-w-0">
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex-1 min-w-0 flex flex-col">
       <h3 className="text-base font-semibold text-slate-900">Capacity Overview</h3>
       <p className="text-xs text-slate-400 mt-0.5">{wh.name} • Total {total.toLocaleString()} units</p>
 
-      <div className="flex items-center gap-8 mt-5 flex-wrap justify-center sm:justify-start">
+      <div className="flex flex-1 items-center justify-center gap-8 mt-5 flex-wrap">
         <div className="relative shrink-0" style={{ width: size, height: size }}>
           <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
             <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#e2e8f0" strokeWidth={stroke} />
