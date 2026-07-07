@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/auth/auth-context"
 import AuthPage from "./AuthPage"
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
-  const { user, login, theme, setTheme, ready } = useAuth()
+  const { user, ready } = useAuth()
 
   // Avoid a flash of the login screen before persisted state hydrates.
   if (!ready) {
@@ -12,7 +12,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
-    return <AuthPage onLogin={login} theme={theme} setTheme={setTheme} />
+    return <AuthPage />
   }
 
   return <>{children}</>

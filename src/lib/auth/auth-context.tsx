@@ -1,11 +1,16 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState } from "react"
-import type { UserType, Theme } from "@/types/user"
+import type { UserType, Theme, Role } from "@/types/user"
+import { config } from "@/lib/config"
+import * as authService from "@/services/auth-service"
 
 interface AuthContextValue {
   user: UserType | null
-  login: (user: UserType) => void
+  /** Sign in with credentials. Live mode validates against the backend; throws ApiError on failure. */
+  signIn: (email: string, password: string, demo?: { name?: string; role?: Role; warehouseId?: number | "all" }) => Promise<void>
+  /** Mock-only quick demo login (no-op affordance when live). */
+  signInDemo: (role: Role) => void
   logout: () => void
   theme: Theme
   setTheme: (t: Theme) => void
@@ -22,20 +27,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>("light")
   const [ready, setReady] = useState(false)
 
-  // Hydrate persisted state on mount (client only). This must be an effect:
-  // localStorage is unavailable during SSR, so state is synced from storage
-  // after mount. setState here is the intended pattern for this case.
+  // Hydrate session + theme on mount (client only).
+  // - Mock mode: restore the demo user from localStorage (zero-backend).
+  // - Live mode: ask the backend who we are via the httpOnly cookie (no token in JS).
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
+    let cancelled = false
+
     try {
-      const rawUser = localStorage.getItem(USER_KEY)
-      if (rawUser) setUser(JSON.parse(rawUser))
       const rawTheme = localStorage.getItem(THEME_KEY) as Theme | null
       if (rawTheme === "light" || rawTheme === "dark") setThemeState(rawTheme)
     } catch {
       /* ignore malformed storage */
     }
-    setReady(true)
+
+    if (config.useMockAuth) {
+      try {
+        const rawUser = localStorage.getItem(USER_KEY)
+        if (rawUser) setUser(JSON.parse(rawUser))
+      } catch {
+        /* ignore malformed storage */
+      }
+      setReady(true)
+    } else {
+      void authService
+        .getCurrentUser()
+        .then((u) => {
+          if (!cancelled) setUser(u)
+        })
+        .catch(() => {
+          /* not authenticated */
+        })
+        .finally(() => {
+          if (!cancelled) setReady(true)
+        })
+    }
+
+    return () => {
+      cancelled = true
+    }
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [])
 
@@ -49,28 +79,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [theme])
 
-  const login = (u: UserType) => {
-    setUser(u)
+  const persistMockUser = (u: UserType | null) => {
+    // Only the mock demo persists the user object to localStorage; in live mode
+    // the httpOnly cookie is the session and the user is re-fetched via /auth/me.
+    if (!config.useMockAuth) return
     try {
-      localStorage.setItem(USER_KEY, JSON.stringify(u))
+      if (u) localStorage.setItem(USER_KEY, JSON.stringify(u))
+      else localStorage.removeItem(USER_KEY)
     } catch {
       /* ignore */
     }
   }
 
+  const signIn: AuthContextValue["signIn"] = async (email, password, demo) => {
+    const u = await authService.login(email, password, demo)
+    setUser(u)
+    persistMockUser(u)
+  }
+
+  const signInDemo = (role: Role) => {
+    const u = authService.demoLogin(role)
+    setUser(u)
+    persistMockUser(u)
+  }
+
   const logout = () => {
+    void authService.logout().catch(() => {
+      /* clear locally regardless of network result */
+    })
     setUser(null)
-    try {
-      localStorage.removeItem(USER_KEY)
-    } catch {
-      /* ignore */
-    }
+    persistMockUser(null)
   }
 
   const setTheme = (t: Theme) => setThemeState(t)
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, theme, setTheme, ready }}>
+    <AuthContext.Provider value={{ user, signIn, signInDemo, logout, theme, setTheme, ready }}>
       {children}
     </AuthContext.Provider>
   )

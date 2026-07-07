@@ -17,6 +17,8 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   const url = `${config.apiBaseUrl}${path}`
   const res = await fetch(url, {
     ...init,
+    // Send/receive the httpOnly auth cookies cross-origin (localhost:3000 -> :8000).
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...init?.headers,

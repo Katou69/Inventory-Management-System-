@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { Warehouse, Package, Building2, Shield, TrendingUp, User, Mail, Lock, Eye, EyeOff, Sun, Moon } from "lucide-react";
-import { UserType, Theme, Role } from "@/types/user";
+import { Role } from "@/types/user";
 import type { Warehouse as WarehouseEntity } from "@/types/dashboard";
-import { MOCK_USERS } from "@/data/users-data";
 import { getWarehouses } from "@/services/dashboard-service";
+import { useAuth } from "@/lib/auth/auth-context";
+import { config } from "@/lib/config";
+import { ApiError } from "@/lib/api-client";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -22,37 +24,42 @@ function FieldIcon({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function AuthPage({
-  onLogin, theme, setTheme
-}: {
-  onLogin: (u: UserType) => void;
-  theme: Theme;
-  setTheme: (t: Theme) => void;
-}) {
+export default function AuthPage() {
+  const { signIn, signInDemo, theme, setTheme } = useAuth();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [showPw, setShowPw] = useState(false);
   const [warehouses, setWarehouses] = useState<WarehouseEntity[]>([]);
   const [form, setForm] = useState({ name: "", email: "", password: "", role: "staff" as Role, warehouseId: 1 });
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Demo affordances (quick-login buttons, signup mode) are mock-only.
+  const isMock = config.useMockAuth;
 
   useEffect(() => { void getWarehouses().then(setWarehouses); }, []);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin({
-      id: "demo",
-      name: form.name || "Morgan Lee",
-      email: form.email || "morgan.lee@grandroyal.com",
-      role: form.role,
-      warehouseId: form.role === "admin" ? "all" : form.warehouseId,
-      status: "active",
-      joinedDate: new Date().toISOString().slice(0, 10),
-    });
+    setError(null);
+    setSubmitting(true);
+    try {
+      await signIn(form.email, form.password, {
+        name: form.name,
+        role: form.role,
+        warehouseId: form.role === "admin" ? "all" : form.warehouseId,
+      });
+    } catch (err) {
+      const message =
+        err instanceof ApiError && err.status === 401
+          ? "Invalid email or password"
+          : "Sign in failed. Please try again.";
+      setError(message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const demoLogin = (role: Role) => {
-    const map = { admin: MOCK_USERS[0], manager: MOCK_USERS[1], staff: MOCK_USERS[3] };
-    onLogin(map[role]);
-  };
+  const demoLogin = (role: Role) => signInDemo(role);
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -92,20 +99,22 @@ export default function AuthPage({
             ))}
           </div>
         </div>
-        <div className="relative z-10 border border-white/10 rounded-xl p-4">
-          <p className="text-[10px] text-white/30 font-mono uppercase tracking-widest mb-3">Quick Demo Access</p>
-          <div className="flex gap-2">
-            {(["admin", "manager", "staff"] as Role[]).map(r => (
-              <button
-                key={r}
-                onClick={() => demoLogin(r)}
-                className="flex-1 py-2 rounded-lg text-xs font-medium capitalize border border-white/15 hover:bg-white/10 hover:border-white/25 transition-all"
-              >
-                {r}
-              </button>
-            ))}
+        {isMock && (
+          <div className="relative z-10 border border-white/10 rounded-xl p-4">
+            <p className="text-[10px] text-white/30 font-mono uppercase tracking-widest mb-3">Quick Demo Access</p>
+            <div className="flex gap-2">
+              {(["admin", "manager", "staff"] as Role[]).map(r => (
+                <button
+                  key={r}
+                  onClick={() => demoLogin(r)}
+                  className="flex-1 py-2 rounded-lg text-xs font-medium capitalize border border-white/15 hover:bg-white/10 hover:border-white/25 transition-all"
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Form panel */}
@@ -213,25 +222,36 @@ export default function AuthPage({
                 </>
               )}
 
+              {error && (
+                <p className="text-sm text-red-600 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">
+                  {error}
+                </p>
+              )}
+
               <button
                 type="submit"
-                className="w-full py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 active:opacity-80 transition-opacity mt-1"
+                disabled={submitting}
+                className="w-full py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 active:opacity-80 transition-opacity mt-1 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {mode === "login" ? "Sign In" : "Create Account"}
+                {submitting
+                  ? "Signing in…"
+                  : mode === "login" ? "Sign In" : "Create Account"}
               </button>
             </form>
 
-            <p className="text-center text-sm text-muted-foreground mt-5">
-              {mode === "login" ? "Don't have an account? " : "Already have an account? "}
-              <button
-                onClick={() => setMode(m => m === "login" ? "signup" : "login")}
-                className="text-primary font-medium hover:underline"
-              >
-                {mode === "login" ? "Sign up" : "Sign in"}
-              </button>
-            </p>
+            {isMock && (
+              <p className="text-center text-sm text-muted-foreground mt-5">
+                {mode === "login" ? "Don't have an account? " : "Already have an account? "}
+                <button
+                  onClick={() => setMode(m => m === "login" ? "signup" : "login")}
+                  className="text-primary font-medium hover:underline"
+                >
+                  {mode === "login" ? "Sign up" : "Sign in"}
+                </button>
+              </p>
+            )}
 
-            <div className="lg:hidden mt-8 pt-6 border-t border-border">
+            <div className={`lg:hidden mt-8 pt-6 border-t border-border${isMock ? "" : " hidden"}`}>
               <p className="text-[10px] text-muted-foreground text-center mb-3 font-mono uppercase tracking-widest">Quick Demo</p>
               <div className="flex gap-2">
                 {(["admin", "manager", "staff"] as Role[]).map(r => (
