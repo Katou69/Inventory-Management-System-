@@ -28,7 +28,7 @@ import {
   zoneOccupancy, zoneStockTotal,
 } from "@/services/zone-service"
 import type {
-  ViewerRole, ZoneSection, ZoneStockEntry, ZoneChangeRequest,
+  ViewerRole, ZoneSection, ZoneStockEntry, ZoneChangeRequest, ZoneChangeItem,
   ZoneChangeAction, ZoneFields, ZoneOccupancy,
 } from "@/types/dashboard"
 
@@ -73,11 +73,11 @@ function changedFields(previous: ZoneFields, proposed: ZoneFields): ZoneFields {
   return out
 }
 
-function actionSummary(req: ZoneChangeRequest): string {
-  if (req.actionType === "create") return `Create zone "${req.proposedData?.code}"`
-  if (req.actionType === "delete") return `Delete zone "${req.previousData?.code}"`
-  const keys = Object.keys(changedFields(req.previousData ?? {}, req.proposedData ?? {}))
-  return `Update zone "${req.previousData?.code}" (${keys.join(", ")})`
+function actionSummary(item: ZoneChangeItem): string {
+  if (item.actionType === "create") return `Create zone "${item.proposedData?.code}"`
+  if (item.actionType === "delete") return `Delete zone "${item.previousData?.code}"`
+  const keys = Object.keys(changedFields(item.previousData ?? {}, item.proposedData ?? {}))
+  return `Update zone "${item.previousData?.code}" (${keys.join(", ")})`
 }
 
 type DragState = {
@@ -92,10 +92,18 @@ type DrawState = { x0: number; y0: number; x1: number; y1: number } // world coo
 
 type CommitDraft = {
   actionType: ZoneChangeAction
+  /** Live section id for update/delete; a negative temp id for a staged create. */
   sectionId: number | null
   proposed: ZoneFields | null
   previous: ZoneFields | null
 }
+
+const toChangeItem = (d: CommitDraft): ZoneChangeItem => ({
+  actionType: d.actionType,
+  sectionId: d.sectionId,
+  proposedData: d.proposed,
+  previousData: d.previous,
+})
 
 export default function ZoneLayoutCanvas({
   warehouseId, role, viewerName,
@@ -129,7 +137,12 @@ export default function ZoneLayoutCanvas({
   const [isPanning, setIsPanning] = useState(false)
 
   const [noteDraft, setNoteDraft] = useState("")
-  const [commitDraft, setCommitDraft] = useState<CommitDraft | null>(null)
+  // Manager's uncommitted edits, accumulated until "Submit proposal".
+  const [staged, setStaged] = useState<CommitDraft[]>([])
+  const [showSubmitModal, setShowSubmitModal] = useState(false)
+  // Staged creates get a negative temp id (used as their sectionId) so they
+  // render as first-class editable zones until the batch is submitted.
+  const nextStagedIdRef = useRef(-1)
   const [formCode, setFormCode] = useState("")
   const [formName, setFormName] = useState("")
   const [formCapacity, setFormCapacity] = useState("")
@@ -151,6 +164,7 @@ export default function ZoneLayoutCanvas({
     setStock(s)
     setPending(p)
     setDraftGeom({})
+    setStaged([])
     setLoading(false)
   }, [warehouseId])
 
@@ -159,8 +173,50 @@ export default function ZoneLayoutCanvas({
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void refresh() }, [refresh])
 
-  const pendingForZone = (zoneId: number) => pending.find((r) => r.sectionId === zoneId)
-  const selectedZone = zones.find((z) => z.id === selectedZoneId) ?? null
+  // A pending batch "touches" a zone if any of its items targets that section.
+  const pendingForZone = (zoneId: number) =>
+    pending.find((r) => r.items.some((it) => it.sectionId === zoneId))
+  const pendingItemForZone = (zoneId: number): ZoneChangeItem | undefined =>
+    pending.flatMap((r) => r.items).find((it) => it.sectionId === zoneId)
+
+  // Manager staging lookups
+  const stagedFor = (zoneId: number) => staged.find((d) => d.sectionId === zoneId) ?? null
+  const stagedDeleteIds = new Set(
+    staged.filter((d) => d.actionType === "delete").map((d) => d.sectionId),
+  )
+
+  /**
+   * What the manager sees on the canvas: live zones with their own staged edits
+   * folded in (updates applied, deletes removed) plus not-yet-submitted creates
+   * (negative temp ids). Admin/staff see the plain live zones.
+   */
+  const displayZones: ZoneSection[] =
+    role === "manager"
+      ? [
+          ...zones
+            .filter((z) => !stagedDeleteIds.has(z.id))
+            .map((z) => {
+              const s = stagedFor(z.id)
+              return s?.actionType === "update" && s.proposed ? { ...z, ...s.proposed } : z
+            }),
+          ...staged
+            .filter((d) => d.actionType === "create" && d.sectionId != null)
+            .map((d) => ({
+              id: d.sectionId as number,
+              warehouseId,
+              kind: d.proposed?.kind ?? "shelf",
+              code: d.proposed?.code ?? "NEW",
+              name: d.proposed?.name ?? "",
+              x: d.proposed?.x ?? 20,
+              y: d.proposed?.y ?? 20,
+              width: d.proposed?.width ?? 150,
+              height: d.proposed?.height ?? 150,
+              capacity: d.proposed?.capacity ?? 100,
+            } satisfies ZoneSection)),
+        ]
+      : zones
+
+  const selectedZone = displayZones.find((z) => z.id === selectedZoneId) ?? null
   const selectedRequest = pending.find((r) => r.id === selectedRequestId) ?? null
 
   // Populate the edit form when the selected zone changes. Intentional
@@ -212,10 +268,13 @@ export default function ZoneLayoutCanvas({
   function fitToContent() {
     const boxes = [
       ...zones.map((z) => ({ x: z.x, y: z.y, w: z.width, h: z.height })),
-      ...pending.filter((r) => r.actionType === "create").map((r) => ({
-        x: r.proposedData?.x ?? 0, y: r.proposedData?.y ?? 0,
-        w: r.proposedData?.width ?? 0, h: r.proposedData?.height ?? 0,
-      })),
+      ...pending
+        .flatMap((r) => r.items)
+        .filter((it) => it.actionType === "create")
+        .map((it) => ({
+          x: it.proposedData?.x ?? 0, y: it.proposedData?.y ?? 0,
+          w: it.proposedData?.width ?? 0, h: it.proposedData?.height ?? 0,
+        })),
     ]
     const rect = canvasRef.current?.getBoundingClientRect()
     const vw = rect?.width ?? 720
@@ -241,49 +300,79 @@ export default function ZoneLayoutCanvas({
       try {
         await applyDirectChange({
           warehouseId,
-          actionType: draft.actionType,
-          sectionId: draft.sectionId,
-          proposedData: draft.proposed,
-          previousData: draft.previous,
-          requestNote: "",
+          item: toChangeItem(draft),
           requestedBy: viewerName,
         })
         await refresh()
       } finally { setBusy(false) }
     } else {
-      setNoteDraft("")
-      setCommitDraft(draft)
+      stageChange(draft)
     }
   }
 
+  /** Add a manager edit to the local staging set (no server call yet). */
+  function stageChange(draft: CommitDraft) {
+    setStaged((prev) => {
+      // Deleting a still-unsubmitted create just drops it from staging.
+      if (draft.actionType === "delete" && draft.sectionId != null && draft.sectionId < 0) {
+        return prev.filter((d) => d.sectionId !== draft.sectionId)
+      }
+      // Collapse repeated edits to the same zone into one entry.
+      const rest = prev.filter((d) => d.sectionId !== draft.sectionId)
+      // An update to a staged create stays a create, carrying the new fields.
+      const existing = prev.find((d) => d.sectionId === draft.sectionId)
+      if (existing?.actionType === "create" && draft.actionType === "update") {
+        return [...rest, { ...existing, proposed: { ...existing.proposed, ...draft.proposed } }]
+      }
+      return [...rest, draft]
+    })
+    setDraftGeom({})
+  }
+
+  /** Submit the whole staged set as ONE proposal batch sharing a single note. */
   async function submitProposal() {
-    if (!commitDraft || !noteDraft.trim()) return
+    if (staged.length === 0 || !noteDraft.trim()) return
     setBusy(true)
     try {
       await proposeChange({
         warehouseId,
-        actionType: commitDraft.actionType,
-        sectionId: commitDraft.sectionId,
-        proposedData: commitDraft.proposed,
-        previousData: commitDraft.previous,
+        items: staged.map((d) => ({
+          actionType: d.actionType,
+          // Staged creates use negative temp ids; the server assigns the real one.
+          sectionId: d.sectionId != null && d.sectionId < 0 ? null : d.sectionId,
+          proposedData: d.proposed,
+          previousData: d.previous,
+        })),
         requestNote: noteDraft.trim(),
         requestedBy: viewerName,
       })
-      setCommitDraft(null)
+      setShowSubmitModal(false)
       await refresh()
     } finally { setBusy(false) }
   }
 
-  function cancelProposal() {
-    setCommitDraft(null)
+  function openSubmitModal() {
+    if (staged.length === 0) return
+    setNoteDraft("")
+    setShowSubmitModal(true)
+  }
+
+  function discardStaged() {
+    setStaged([])
     setDraftGeom({})
+    setSelectedZoneId(null)
+    setShowSubmitModal(false)
   }
 
   // -------------------------------------------------------------------------
   // Pointer handling
   // -------------------------------------------------------------------------
   function onZonePointerDown(e: React.PointerEvent, zone: ZoneSection, mode: "move" | "resize") {
-    if (!canEdit || activeTool === "pan" || pendingForZone(zone.id)) return
+    // A pending box can't be dragged, but it's still selectable (admin review /
+    // manager status). Stop the press from bubbling to the canvas so it isn't
+    // treated as a background pan that would immediately clear the selection.
+    if (pendingForZone(zone.id)) { e.stopPropagation(); return }
+    if (!canEdit || activeTool === "pan") return
     if (isDrawTool(activeTool) && mode === "move") return // draw tools don't move zones
     e.preventDefault()
     e.stopPropagation()
@@ -344,7 +433,7 @@ export default function ZoneLayoutCanvas({
     const drag = dragRef.current
     if (drag) {
       dragRef.current = null
-      const zone = zones.find((z) => z.id === drag.zoneId)
+      const zone = displayZones.find((z) => z.id === drag.zoneId)
       const geom = draftGeom[drag.zoneId]
       if (!dragMovedRef.current || !zone || !geom) {
         setSelectedZoneId(drag.zoneId)
@@ -369,9 +458,12 @@ export default function ZoneLayoutCanvas({
       if (width >= MIN_DRAW && height >= MIN_DRAW) {
         const kind = activeTool === "draw-zone" ? "zone" : "shelf"
         const code = kind === "zone" ? nextCode("ZONE") : nextCode("S")
+        // Managers stage creates under a negative temp id so the new box renders
+        // and stays editable until the batch is submitted; admins create directly.
+        const sectionId = role === "manager" ? nextStagedIdRef.current-- : null
         void submitChange({
           actionType: "create",
-          sectionId: null,
+          sectionId,
           proposed: {
             kind,
             code,
@@ -394,7 +486,7 @@ export default function ZoneLayoutCanvas({
   }
 
   function nextCode(prefix: string) {
-    const codes = new Set(zones.map((z) => z.code))
+    const codes = new Set(displayZones.map((z) => z.code))
     let n = 1
     while (codes.has(`${prefix}${n}`)) n++
     return `${prefix}${n}`
@@ -441,8 +533,13 @@ export default function ZoneLayoutCanvas({
   // Rendering
   // -------------------------------------------------------------------------
   const showPendingOverlays = role !== "staff"
-  const pendingCreates = showPendingOverlays ? pending.filter((r) => r.actionType === "create") : []
-  const commitCreatePreview = commitDraft?.actionType === "create" ? commitDraft.proposed : null
+  // Flatten pending batches into per-item overlays, tagging each with its parent
+  // batch so a click selects the whole proposal.
+  type PendingOverlay = { req: ZoneChangeRequest; item: ZoneChangeItem }
+  const pendingOverlays: PendingOverlay[] = showPendingOverlays
+    ? pending.flatMap((req) => req.items.map((item) => ({ req, item })))
+    : []
+  const pendingCreates = pendingOverlays.filter((o) => o.item.actionType === "create")
 
   const cursor =
     activeTool === "pan"    ? (isPanning ? "grabbing" : "grab") :
@@ -553,8 +650,12 @@ export default function ZoneLayoutCanvas({
             style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`, transformOrigin: "0 0" }}
           >
             {/* zone-kind boxes render first so they sit behind shelf blocks */}
-            {[...zones].sort((a, b) => (a.kind === "zone" ? 0 : 1) - (b.kind === "zone" ? 0 : 1)).map((zone) => {
+            {[...displayZones].sort((a, b) => (a.kind === "zone" ? 0 : 1) - (b.kind === "zone" ? 0 : 1)).map((zone) => {
               const req = showPendingOverlays ? pendingForZone(zone.id) : undefined
+              const pItem = req ? pendingItemForZone(zone.id) : undefined
+              // Staged edit for this zone (manager only). displayZones already
+              // folds the geometry in; this just drives the "Draft" badge/border.
+              const stagedEdit = stagedFor(zone.id)
               const geom = draftGeom[zone.id]
               const x = geom?.x ?? zone.x
               const y = geom?.y ?? zone.y
@@ -578,6 +679,8 @@ export default function ZoneLayoutCanvas({
                     className={`absolute rounded-md border-2 ${
                       isZone ? "border-dashed border-slate-400 bg-slate-500/[0.04]" : `bg-transparent ${occupancyBorder[occ]}`
                     } ${liveIsDashed ? "border-dashed opacity-60" : ""} ${
+                      stagedEdit ? "border-amber-500 border-dashed" : ""
+                    } ${
                       selected ? "ring-2 ring-indigo-400 ring-offset-1" : ""
                     } ${canEdit && !req && activeTool !== "pan" ? "cursor-move" : ""}`}
                     style={{ left: x, top: y, width: w, height: h }}
@@ -608,27 +711,34 @@ export default function ZoneLayoutCanvas({
                     )}
                   </div>
 
-                  {req && req.actionType === "update" && req.proposedData && (
+                  {stagedEdit && (
+                    <span className="absolute px-1.5 py-px rounded bg-amber-500 text-white text-[10px] font-semibold pointer-events-none" style={{ left: x + 4, top: y - 10 }}>
+                      {stagedEdit.actionType === "create" ? "New · draft" : "Draft"}
+                    </span>
+                  )}
+
+                  {pItem && pItem.actionType === "update" && pItem.proposedData && (
                     <div
-                      onClick={(e) => { e.stopPropagation(); setSelectedRequestId(req.id); setSelectedZoneId(null) }}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => { e.stopPropagation(); setSelectedRequestId(req!.id); setSelectedZoneId(null) }}
                       className={`absolute rounded-md border-2 bg-transparent border-indigo-500 cursor-pointer ${
-                        selectedRequestId === req.id ? "ring-2 ring-indigo-400 ring-offset-1" : ""
+                        selectedRequestId === req!.id ? "ring-2 ring-indigo-400 ring-offset-1" : ""
                       }`}
                       style={{
-                        left:   req.proposedData.x ?? zone.x,
-                        top:    req.proposedData.y ?? zone.y,
-                        width:  req.proposedData.width ?? zone.width,
-                        height: req.proposedData.height ?? zone.height,
+                        left:   pItem.proposedData.x ?? zone.x,
+                        top:    pItem.proposedData.y ?? zone.y,
+                        width:  pItem.proposedData.width ?? zone.width,
+                        height: pItem.proposedData.height ?? zone.height,
                       }}
                     >
                       <div className="absolute top-1 left-1.5 leading-tight pointer-events-none">
-                        <p className="text-xs font-bold text-indigo-700">{req.proposedData.code ?? zone.code}</p>
+                        <p className="text-xs font-bold text-indigo-700">{pItem.proposedData.code ?? zone.code}</p>
                       </div>
                       <span className="absolute -top-2.5 right-1 px-1.5 py-px rounded bg-indigo-600 text-white text-[10px] font-semibold pointer-events-none">Pending</span>
                     </div>
                   )}
 
-                  {req && req.actionType === "delete" && (
+                  {pItem && pItem.actionType === "delete" && (
                     <span className="absolute px-1.5 py-px rounded bg-red-600 text-white text-[10px] font-semibold pointer-events-none" style={{ left: x + 4, top: y - 10 }}>
                       Delete pending
                     </span>
@@ -638,29 +748,39 @@ export default function ZoneLayoutCanvas({
             })}
 
             {/* Pending creates (no live counterpart) */}
-            {pendingCreates.map((req) => (
+            {pendingCreates.map(({ req, item }, i) => (
               <div
-                key={`create-${req.id}`}
+                key={`create-${req.id}-${i}`}
+                onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => { e.stopPropagation(); setSelectedRequestId(req.id); setSelectedZoneId(null) }}
                 className={`absolute rounded-md border-2 bg-transparent border-indigo-500 cursor-pointer ${
                   selectedRequestId === req.id ? "ring-2 ring-indigo-400 ring-offset-1" : ""
                 }`}
-                style={{ left: req.proposedData?.x ?? 20, top: req.proposedData?.y ?? 20, width: req.proposedData?.width ?? 160, height: req.proposedData?.height ?? 120 }}
+                style={{ left: item.proposedData?.x ?? 20, top: item.proposedData?.y ?? 20, width: item.proposedData?.width ?? 160, height: item.proposedData?.height ?? 120 }}
               >
                 <div className="absolute top-1 left-1.5 leading-tight pointer-events-none">
-                  <p className="text-xs font-bold text-indigo-700">{req.proposedData?.code}</p>
+                  <p className="text-xs font-bold text-indigo-700">{item.proposedData?.code}</p>
                 </div>
                 <span className="absolute -top-2.5 right-1 px-1.5 py-px rounded bg-indigo-600 text-white text-[10px] font-semibold pointer-events-none">Pending</span>
               </div>
             ))}
 
-            {/* Manager's in-flight create (while typing the note) */}
-            {commitCreatePreview && (
-              <div
-                className="absolute rounded-md border-2 border-dashed border-indigo-400 bg-indigo-50/30 pointer-events-none"
-                style={{ left: commitCreatePreview.x, top: commitCreatePreview.y, width: commitCreatePreview.width, height: commitCreatePreview.height }}
-              />
-            )}
+            {/* Staged deletes: the box is removed from displayZones, so render a
+                faint "will delete" ghost at its live position until submitted. */}
+            {role === "manager" && staged
+              .filter((d) => d.actionType === "delete" && d.sectionId != null && d.sectionId >= 0)
+              .map((d) => d.previous && (
+                <div
+                  key={`staged-delete-${d.sectionId}`}
+                  className="absolute rounded-md border-2 border-dashed border-red-400 bg-red-50/30 opacity-60 pointer-events-none"
+                  style={{ left: d.previous.x, top: d.previous.y, width: d.previous.width, height: d.previous.height }}
+                >
+                  <div className="absolute top-1 left-1.5 leading-tight">
+                    <p className="text-xs font-bold text-red-600 line-through">{d.previous.code}</p>
+                  </div>
+                  <span className="absolute -top-2.5 right-1 px-1.5 py-px rounded bg-red-500 text-white text-[10px] font-semibold">Will delete</span>
+                </div>
+              ))}
 
             {/* Rubber-band while drawing */}
             {drawRect && (
@@ -677,6 +797,26 @@ export default function ZoneLayoutCanvas({
           </div>
         </div>
       </div>
+
+      {/* Manager draft tray — accumulated edits submitted as one proposal */}
+      {role === "manager" && staged.length > 0 && (
+        <div className="mt-4 flex items-center justify-between gap-3 flex-wrap rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-medium ring-1 ring-amber-200">
+              {staged.length} unsubmitted change{staged.length === 1 ? "" : "s"}
+            </span>
+            <span className="text-xs text-amber-700/80 truncate">Edits are held as a draft — submit them together as one proposal.</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button onClick={discardStaged} disabled={busy} className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-white/60 rounded-lg transition-colors disabled:opacity-50">
+              Discard
+            </button>
+            <button onClick={openSubmitModal} disabled={busy} className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-50">
+              Submit proposal ({staged.length})
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Selected box panel */}
       {selectedZone && !selectedRequest && (
@@ -729,7 +869,7 @@ export default function ZoneLayoutCanvas({
               )}
               <div className="flex items-center gap-2 mt-1">
                 <button onClick={saveZoneForm} disabled={busy} className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-50">
-                  {role === "manager" ? "Propose changes" : "Save"}
+                  {role === "manager" ? "Add to proposal" : "Save"}
                 </button>
                 <button onClick={deleteZone} disabled={busy} className="px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50">Delete</button>
               </div>
@@ -745,9 +885,19 @@ export default function ZoneLayoutCanvas({
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="inline-flex px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-xs font-medium ring-1 ring-indigo-200">Pending</span>
-                <h4 className="text-sm font-semibold text-slate-800">{actionSummary(selectedRequest)}</h4>
+                <h4 className="text-sm font-semibold text-slate-800">
+                  Proposal · {selectedRequest.items.length} change{selectedRequest.items.length === 1 ? "" : "s"}
+                </h4>
               </div>
               <p className="text-xs text-slate-400 mt-1">Requested by {selectedRequest.requestedBy}</p>
+              <ul className="mt-2 space-y-1">
+                {selectedRequest.items.map((item, i) => (
+                  <li key={i} className="flex items-start gap-1.5 text-xs text-slate-600">
+                    <span className="text-slate-400">•</span>
+                    <span>{actionSummary(item)}</span>
+                  </li>
+                ))}
+              </ul>
               <p className="text-sm text-slate-600 mt-2 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">“{selectedRequest.requestNote}”</p>
             </div>
 
@@ -770,24 +920,31 @@ export default function ZoneLayoutCanvas({
         </div>
       )}
 
-      {/* Manager note modal */}
-      {commitDraft && (
+      {/* Manager proposal note modal — one note covers the whole batch */}
+      {showSubmitModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={cancelProposal} />
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowSubmitModal(false)} />
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-            <h3 className="text-base font-semibold text-slate-900 mb-1">Describe this change</h3>
-            <p className="text-xs text-slate-400 mb-4">A short message is required — the admin will see it when reviewing your proposal.</p>
+            <h3 className="text-base font-semibold text-slate-900 mb-1">Describe this proposal</h3>
+            <p className="text-xs text-slate-400 mb-3">
+              This covers {staged.length} change{staged.length === 1 ? "" : "s"}. A short message is
+              required — the admin will see it when reviewing.
+            </p>
+            <ul className="mb-4 max-h-32 overflow-y-auto space-y-1 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
+              {staged.map((d, i) => (
+                <li key={i} className="flex items-start gap-1.5 text-xs text-slate-600">
+                  <span className="text-slate-400">•</span>
+                  <span>{actionSummary(toChangeItem(d))}</span>
+                </li>
+              ))}
+            </ul>
             <textarea
               autoFocus value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} rows={3}
-              placeholder={
-                commitDraft.actionType === "create" ? "e.g. New overflow zone for Q3 inbound" :
-                commitDraft.actionType === "delete" ? "e.g. Zone unused since the re-layout" :
-                "e.g. Moved zone B nearer the loading dock"
-              }
+              placeholder="e.g. Re-layout of the receiving bay for Q3 inbound"
               className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 resize-none"
             />
             <div className="flex items-center justify-end gap-2 mt-4">
-              <button onClick={cancelProposal} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
+              <button onClick={() => setShowSubmitModal(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
               <button onClick={submitProposal} disabled={!noteDraft.trim() || busy} className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-40">
                 {busy ? "Submitting…" : "Submit proposal"}
               </button>
