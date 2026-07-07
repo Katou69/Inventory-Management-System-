@@ -1,102 +1,153 @@
 "use client";
 
-import Modal from "./Modal";
-
-import { InventoryRow } from "@/types";
-import { stockMovements } from "@/data/stockmovement-data";
+import { InventoryItem } from "@/types/inventory";
+import Modal from "@/components/ui/Modal";
 
 interface Props {
   open: boolean;
-  product: InventoryRow | null;
+  product: InventoryItem | null;
   onClose: () => void;
 }
 
-export default function ProductHistoryModal({
+export default function ViewHistoryModal({
   open,
   product,
   onClose,
 }: Props) {
-  if (!product) return null;
 
-  const history = stockMovements.filter(
-    (m) => m.productId === product.productId
-  );
+  if (!open || !product) return null;
+
 
   return (
     <Modal
-      open={open}
-      title={`${product.name} History`}
+      title="Product History"
+      subtitle={`${product.name} (${product.sku})`}
       onClose={onClose}
     >
-      <div className="space-y-4">
 
-        <select className="rounded-lg border p-2">
-          <option>All Time</option>
-          <option>Last 7 Days</option>
-          <option>Last 30 Days</option>
-          <option>This Month</option>
-        </select>
+      <div className="px-5 py-4 space-y-4">
 
-        <div className="max-h-72 overflow-y-auto rounded-lg border">
 
-          <table className="w-full">
+        {/* Filter section */}
+        <div className="flex gap-3">
 
-            <thead className="bg-slate-50">
-
-              <tr>
-                <th className="p-3 text-left">Date</th>
-                <th className="p-3 text-left">Type</th>
-                <th className="p-3 text-left">Qty</th>
-                <th className="p-3 text-left">Reason</th>
-              </tr>
-
-            </thead>
-
-            <tbody>
-
-              {history.map((item) => (
-                <tr
-                  key={item.id}
-                  className="border-t"
-                >
-                  <td className="p-3">{item.date}</td>
-
-                  <td
-                    className={`p-3 font-medium ${
-                      item.type === "IN"
-                        ? "text-green-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    {item.type}
-                  </td>
-
-                  <td className="p-3">
-                    {item.quantity}
-                  </td>
-
-                  <td className="p-3">
-                    {item.reason}
-                  </td>
-                </tr>
-              ))}
-
-            </tbody>
-
-          </table>
-
-        </div>
-
-        <div className="flex justify-end">
-          <button
-            onClick={onClose}
-            className="rounded-lg border px-4 py-2"
+          <select
+            className="
+              border
+              border-border
+              rounded-lg
+              px-3
+              py-2
+              text-sm
+              bg-background
+            "
           >
-            Cancel
-          </button>
+            <option>
+              All Time
+            </option>
+
+            <option>
+              Last 7 Days
+            </option>
+
+            <option>
+              Last Month
+            </option>
+
+          </select>
+
+
         </div>
+
+
+
+        {/* History list */}
+        <div className="space-y-3">
+
+
+          <div className="border border-border rounded-lg p-3">
+
+            <div className="flex justify-between">
+
+              <span className="font-medium text-sm">
+                Stock In
+              </span>
+
+              <span className="text-xs text-muted-foreground">
+                2026-06-15
+              </span>
+
+            </div>
+
+
+            <p className="text-sm text-muted-foreground mt-1">
+              +50 units added to warehouse
+            </p>
+
+          </div>
+
+
+
+          <div className="border border-border rounded-lg p-3">
+
+            <div className="flex justify-between">
+
+              <span className="font-medium text-sm">
+                Stock Out
+              </span>
+
+              <span className="text-xs text-muted-foreground">
+                2026-06-10
+              </span>
+
+            </div>
+
+
+            <p className="text-sm text-muted-foreground mt-1">
+              -10 units removed from warehouse
+            </p>
+
+          </div>
+
+
+
+        </div>
+
 
       </div>
+
+
+
+      {/* Only Close button */}
+      <div className="
+        flex
+        justify-end
+        px-5
+        py-4
+        border-t
+        border-border
+      ">
+
+        <button
+          onClick={onClose}
+          className="
+            px-5
+            py-2
+            rounded-lg
+            bg-primary
+            text-primary-foreground
+            text-sm
+            font-medium
+            hover:opacity-90
+          "
+        >
+          Close
+        </button>
+
+      </div>
+
+
     </Modal>
+
   );
 }

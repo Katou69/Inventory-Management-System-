@@ -17,8 +17,7 @@ import type {
   ZoneSection,
   ZoneStockEntry,
   ZoneChangeRequest,
-  ZoneChangeAction,
-  ZoneFields,
+  ZoneChangeItem,
   ZoneOccupancy,
 } from "@/types/dashboard"
 
@@ -103,13 +102,43 @@ function defaultZones(warehouseId: number): ZoneSection[] {
   ]
 }
 
+// A demo pending proposal so an admin landing on warehouse 1 has something to
+// review immediately (mock store is empty on load otherwise). One batch, two
+// changes: nudge shelf S3 and relabel Receiving Rack 2.
+const seedRequests: ZoneChangeRequest[] = [
+  {
+    id: 1,
+    warehouseId: 1,
+    requestedBy: "Aung Htoo Pyae",
+    items: [
+      {
+        actionType: "update",
+        sectionId: 11, // S3 "Shipping Rack 3"
+        previousData: { code: "S3", name: "Shipping Rack 3", x: 350, y: 190, width: 110, height: 90, capacity: 120 },
+        proposedData: { code: "S3", name: "Shipping Rack 3", x: 350, y: 300, width: 110, height: 90, capacity: 120 },
+      },
+      {
+        actionType: "update",
+        sectionId: 7, // R2 "Receiving Rack 2"
+        previousData: { code: "R2", name: "Receiving Rack 2", capacity: 150 },
+        proposedData: { code: "R2", name: "Receiving Rack 2 (Fast-movers)", capacity: 200 },
+      },
+    ],
+    requestNote: "Re-layout: move S3 clear of the aisle and bump R2 capacity for fast-movers.",
+    status: "pending",
+    reviewedBy: null,
+    reviewedAt: null,
+    reviewNote: null,
+  },
+]
+
 const store = {
   zones: [...seedZones],
   stock: [...seedStock],
-  requests: [] as ZoneChangeRequest[],
+  requests: [...seedRequests],
   seededWarehouses: new Set(seedZones.map((z) => z.warehouseId)),
   nextZoneId: 1000,
-  nextRequestId: 1,
+  nextRequestId: seedRequests.length + 1,
 }
 
 function ensureWarehouse(warehouseId: number) {
@@ -122,28 +151,33 @@ function ensureWarehouse(warehouseId: number) {
 const clone = <T>(v: T): T => structuredClone(v)
 const now = () => new Date().toISOString()
 
-function applyToSections(req: ZoneChangeRequest) {
-  if (req.actionType === "create") {
+function applyItem(warehouseId: number, item: ZoneChangeItem) {
+  if (item.actionType === "create") {
     const id = store.nextZoneId++
     store.zones.push({
       id,
-      warehouseId: req.warehouseId,
-      kind: req.proposedData?.kind ?? "shelf",
-      code: req.proposedData?.code ?? "NEW",
-      name: req.proposedData?.name ?? "",
-      x: req.proposedData?.x ?? 40,
-      y: req.proposedData?.y ?? 40,
-      width: req.proposedData?.width ?? 150,
-      height: req.proposedData?.height ?? 150,
-      capacity: req.proposedData?.capacity ?? 100,
+      warehouseId,
+      kind: item.proposedData?.kind ?? "shelf",
+      code: item.proposedData?.code ?? "NEW",
+      name: item.proposedData?.name ?? "",
+      x: item.proposedData?.x ?? 40,
+      y: item.proposedData?.y ?? 40,
+      width: item.proposedData?.width ?? 150,
+      height: item.proposedData?.height ?? 150,
+      capacity: item.proposedData?.capacity ?? 100,
     })
-  } else if (req.actionType === "update" && req.sectionId != null) {
-    const zone = store.zones.find((z) => z.id === req.sectionId)
-    if (zone && req.proposedData) Object.assign(zone, req.proposedData)
-  } else if (req.actionType === "delete" && req.sectionId != null) {
-    store.zones = store.zones.filter((z) => z.id !== req.sectionId)
-    store.stock = store.stock.filter((s) => s.sectionId !== req.sectionId)
+  } else if (item.actionType === "update" && item.sectionId != null) {
+    const zone = store.zones.find((z) => z.id === item.sectionId)
+    if (zone && item.proposedData) Object.assign(zone, item.proposedData)
+  } else if (item.actionType === "delete" && item.sectionId != null) {
+    store.zones = store.zones.filter((z) => z.id !== item.sectionId)
+    store.stock = store.stock.filter((s) => s.sectionId !== item.sectionId)
   }
+}
+
+/** Apply every change in a batch, in submitted order. */
+function applyRequest(req: ZoneChangeRequest) {
+  for (const item of req.items) applyItem(req.warehouseId, item)
 }
 
 // ---------------------------------------------------------------------------
@@ -195,26 +229,31 @@ export async function getPendingRequests(warehouseId: number): Promise<ZoneChang
 
 export interface ZoneChangeInput {
   warehouseId: number
-  actionType: ZoneChangeAction
-  sectionId: number | null
-  proposedData: ZoneFields | null
-  previousData: ZoneFields | null
+  items: ZoneChangeItem[]
   requestNote: string
   requestedBy: string
 }
 
-/** Admin path: live immediately, logged as a self-approved request. */
-export async function applyDirectChange(input: ZoneChangeInput): Promise<ZoneChangeRequest> {
+/**
+ * Admin path: apply a single change live immediately, logged as a self-approved
+ * one-item batch. Admins edit per-change (no batching), so this takes one item.
+ */
+export async function applyDirectChange(
+  input: { warehouseId: number; item: ZoneChangeItem; requestedBy: string },
+): Promise<ZoneChangeRequest> {
   if (config.useMock) {
     const req: ZoneChangeRequest = {
       id: store.nextRequestId++,
-      ...input,
+      warehouseId: input.warehouseId,
+      requestedBy: input.requestedBy,
+      items: [input.item],
+      requestNote: "",
       status: "approved",
       reviewedBy: input.requestedBy,
       reviewedAt: now(),
       reviewNote: null,
     }
-    applyToSections(req)
+    applyRequest(req)
     store.requests.push(req)
     return clone(req)
   }
@@ -224,15 +263,24 @@ export async function applyDirectChange(input: ZoneChangeInput): Promise<ZoneCha
   })
 }
 
-/** Manager path: pending proposal only — sections untouched until review. */
+/**
+ * Manager path: pending proposal batching several changes under one note —
+ * sections untouched until review.
+ */
 export async function proposeChange(input: ZoneChangeInput): Promise<ZoneChangeRequest> {
   if (!input.requestNote.trim()) {
     throw new Error("A message describing the change is required for proposals.")
   }
+  if (input.items.length === 0) {
+    throw new Error("A proposal must contain at least one change.")
+  }
   if (config.useMock) {
     const req: ZoneChangeRequest = {
       id: store.nextRequestId++,
-      ...input,
+      warehouseId: input.warehouseId,
+      requestedBy: input.requestedBy,
+      items: input.items,
+      requestNote: input.requestNote,
       status: "pending",
       reviewedBy: null,
       reviewedAt: null,
@@ -251,7 +299,7 @@ export async function approveRequest(requestId: number, reviewedBy: string): Pro
   if (config.useMock) {
     const req = store.requests.find((r) => r.id === requestId && r.status === "pending")
     if (!req) return
-    applyToSections(req)
+    applyRequest(req)
     req.status = "approved"
     req.reviewedBy = reviewedBy
     req.reviewedAt = now()

@@ -1,9 +1,12 @@
-import { orders } from "@/data/orders-data";
+import { getOrders } from "@/services/orders-service";
+import { Badge } from "@/components/ui";
 import { ArrowUpDown, MoreHorizontal } from "lucide-react";
 
-const headers = ["S No", "Order ID", "Order Name", "Stock Value", "Quantity", "Status"];
+const headers = ["S No", "Order ID", "Customer", "Total", "Quantity", "Status"];
 
-export default function OrdersTable() {
+export default async function OrdersTable() {
+  const orders = await getOrders();
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <table className="min-w-full">
@@ -22,29 +25,19 @@ export default function OrdersTable() {
         </thead>
 
         <tbody>
-          {orders.map((order) => (
+          {orders.map((order, i) => (
             <tr key={order.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-              <td className="px-6 py-4 text-slate-500">{order.id}</td>
+              <td className="px-6 py-4 text-slate-500">{i + 1}</td>
               <td className="px-6 py-4">
                 <span className="inline-flex px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-xs font-mono font-medium whitespace-nowrap">
-                  {order.orderId}
+                  {order.id}
                 </span>
               </td>
-              <td className="px-6 py-4 font-medium">{order.orderName}</td>
-              <td className="px-6 py-4">{order.stockValue}</td>
-              <td className="px-6 py-4">{order.quantity}</td>
+              <td className="px-6 py-4 font-medium">{order.customer}</td>
+              <td className="px-6 py-4">{order.total.toLocaleString()}</td>
+              <td className="px-6 py-4">{order.quantity.toLocaleString()}</td>
               <td className="px-6 py-4">
-                <span
-                  className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap ${
-                    order.status === "Delivered"
-                      ? "bg-green-100 text-green-700"
-                      : order.status === "Cancelled"
-                      ? "bg-red-100 text-red-700"
-                      : "bg-yellow-100 text-yellow-700"
-                  }`}
-                >
-                  {order.status}
-                </span>
+                <Badge status={order.status} />
               </td>
               <td className="px-6 py-4">
                 <button className="hover:bg-slate-100 p-2 rounded-lg">

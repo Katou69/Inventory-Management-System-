@@ -1,4 +1,5 @@
 "use client"
+import Image from "next/image"
 import { useState } from "react"
 import { Eye, ChevronDown, X } from "lucide-react"
 import type { Product } from "@/types/dashboard"
@@ -67,7 +68,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
               <td className="px-5 py-3 text-slate-400 text-xs">{p.id}</td>
               <td className="px-3 py-3">
                 <div className="flex items-center gap-2">
-                  <img src={p.image} alt="" className="size-6 rounded-full object-cover ring-1 ring-slate-200" />
+                  <Image src={p.image} alt="" width={24} height={24} className="size-6 rounded-full object-cover ring-1 ring-slate-200" />
                   <span className="font-medium text-slate-800 text-xs leading-tight">{p.name}</span>
                 </div>
               </td>
@@ -97,7 +98,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
               <X className="size-4 text-slate-400" />
             </button>
             <div className="flex items-center gap-3 mb-5">
-              <img src={selected.image} alt="" className="size-12 rounded-full object-cover ring-1 ring-slate-200" />
+              <Image src={selected.image} alt="" width={48} height={48} className="size-12 rounded-full object-cover ring-1 ring-slate-200" />
               <div>
                 <h3 className="text-base font-semibold text-slate-900 leading-tight">{selected.name}</h3>
                 <span className={`inline-flex mt-1 px-2 py-0.5 rounded-md text-xs font-medium ${categoryColors[selected.category] ?? "bg-slate-100 text-slate-600"}`}>

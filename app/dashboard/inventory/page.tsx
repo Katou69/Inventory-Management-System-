@@ -23,7 +23,6 @@ export default function InventoryPage() {
 
       </div>
       <StatsCards />
-      <Filters />
       <InventoryTable />
     </div>
   );

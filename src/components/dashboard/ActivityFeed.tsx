@@ -1,4 +1,5 @@
 "use client"
+import Image from "next/image"
 import { useState } from "react"
 import { ArrowRight, X } from "lucide-react"
 import type { ActivityEntry } from "@/types/dashboard"
@@ -6,7 +7,7 @@ import type { ActivityEntry } from "@/types/dashboard"
 function ActivityRow({ a }: { a: ActivityEntry }) {
   return (
     <div className="flex items-start gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors">
-      <img src={a.avatar} alt="" className="size-8 rounded-full object-cover ring-1 ring-slate-200 shrink-0 mt-0.5" />
+      <Image src={a.avatar} alt="" width={32} height={32} className="size-8 rounded-full object-cover ring-1 ring-slate-200 shrink-0 mt-0.5" />
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <div>

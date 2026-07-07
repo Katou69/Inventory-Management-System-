@@ -142,15 +142,28 @@ export type ZoneChangeStatus = "pending" | "approved" | "rejected"
 /** Editable zone fields carried in proposed/previous snapshots. */
 export type ZoneFields = Partial<Pick<ZoneSection, "kind" | "code" | "name" | "x" | "y" | "width" | "height" | "capacity">>
 
-export interface ZoneChangeRequest {
-  id: number
-  warehouseId: number
-  requestedBy: string
+/**
+ * One change inside a proposal batch. A move/resize/field-edit is an "update",
+ * a drawn box is a "create", a removal is a "delete".
+ */
+export interface ZoneChangeItem {
   actionType: ZoneChangeAction
   /** null when actionType = "create" */
   sectionId: number | null
   proposedData: ZoneFields | null
   previousData: ZoneFields | null
+}
+
+/**
+ * A layout proposal. Managers accumulate several edits into one batch submitted
+ * with a single note; admin direct edits are stored as one-item, self-approved
+ * batches. Approve/reject act on the whole batch atomically.
+ */
+export interface ZoneChangeRequest {
+  id: number
+  warehouseId: number
+  requestedBy: string
+  items: ZoneChangeItem[]
   requestNote: string
   status: ZoneChangeStatus
   reviewedBy: string | null
