@@ -1,5 +1,5 @@
 import type {
-  StatusCard, Warehouse, Product, ActivityEntry, InventoryMonth, InventoryDataPoint,
+  StatusCard, Warehouse, Product, ActivityEntry, InventoryDataPoint,
   WarehouseDetail, WarehouseStatus, StockMovement, WarehouseProduct, WarehouseActivity,
   NotificationItem,
 } from "@/types/dashboard"
@@ -94,18 +94,6 @@ export const notifications: NotificationItem[] = [
   { id: 3, type: "stock", title: "Stock transfer approved",description: "30 units moved from WH-001 to WH-003.",                 time: "3 hours ago", unread: true },
   { id: 4, type: "user",  title: "Inspection completed",   description: "Mandalay Cold Store passed its safety inspection.",      time: "Yesterday",  unread: false },
   { id: 5, type: "order", title: "Shipment dispatched",    description: "220 units sent out from Yangon Cold Store 2.",           time: "Yesterday",  unread: false },
-]
-
-export const inventoryData: InventoryMonth[] = [
-  { month: "Jan", stockIn: 23000, stockOut: 17000, stockValue: 23500 },
-  { month: "Feb", stockIn: 32000, stockOut: 21000, stockValue: 25000 },
-  { month: "Mar", stockIn: 19000, stockOut: 28000, stockValue: 23500 },
-  { month: "Apr", stockIn: 14000, stockOut: 20000, stockValue: 10500 },
-  { month: "May", stockIn: 37000, stockOut: 28000, stockValue: 23000 },
-  { month: "Jun", stockIn: 17000, stockOut: 22000, stockValue: 37534 },
-  { month: "Jul", stockIn: 16000, stockOut: 28000, stockValue: 13500 },
-  { month: "Aug", stockIn: 18000, stockOut: 24000, stockValue: 14000 },
-  { month: "Sep", stockIn: 26000, stockOut: 19000, stockValue: 29500 },
 ]
 
 export const inventoryByPeriod: Record<"days" | "months" | "years", InventoryDataPoint[]> = {

@@ -1,9 +1,11 @@
 "use client"
 import Link from "next/link"
 import { useState, useMemo } from "react"
-import { Bell, Search, Package, Warehouse as WarehouseIcon, X, LogOut, User, Settings } from "lucide-react"
+import { Bell, Search, Package, Warehouse as WarehouseIcon, X, LogOut, Settings, Sun, Moon } from "lucide-react"
 import { markAllNotificationsRead, markNotificationRead } from "@/services/dashboard-service"
 import type { NotificationType, Product, Warehouse, NotificationItem } from "@/types/dashboard"
+import { useAuth } from "@/lib/auth/auth-context"
+import { initials } from "@/lib/format"
 
 const notifTone: Record<NotificationType, string> = {
   stock: "bg-indigo-100 text-indigo-600",
@@ -26,6 +28,7 @@ export default function Header({
   const [bellOpen, setBellOpen] = useState(false)
   const [userOpen, setUserOpen] = useState(false)
   const [notifs, setNotifs] = useState(initialNotifications)
+  const { user, logout, theme, setTheme } = useAuth()
 
   const unread = notifs.filter((n) => n.unread).length
 
@@ -36,7 +39,7 @@ export default function Header({
       products: products.filter((p) => p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)).slice(0, 4),
       warehouses: warehouses.filter((w) => w.name.toLowerCase().includes(q) || w.location.toLowerCase().includes(q) || w.warehouseId.toLowerCase().includes(q)).slice(0, 4),
     }
-  }, [query])
+  }, [query, products, warehouses])
 
   const hasResults = results.products.length > 0 || results.warehouses.length > 0
   const showDropdown = searchFocused && query.trim().length > 0
@@ -112,6 +115,15 @@ export default function Header({
       </div>
 
       <div className="flex items-center gap-3">
+        {/* Theme toggle */}
+        <button
+          onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+          className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
+          title={theme === "light" ? "Switch to dark" : "Switch to light"}
+        >
+          {theme === "light" ? <Moon className="size-5 text-slate-500" /> : <Sun className="size-5 text-slate-500" />}
+        </button>
+
         {/* Notifications */}
         <div className="relative">
           <button
@@ -170,25 +182,30 @@ export default function Header({
             className="flex items-center gap-2.5 rounded-lg hover:bg-slate-100 transition-colors py-1 px-1.5"
           >
             <div className="size-9 bg-indigo-100 rounded-full flex items-center justify-center ring-2 ring-indigo-200">
-              <span className="text-indigo-700 text-sm font-semibold">U</span>
+              <span className="text-indigo-700 text-sm font-semibold">{user ? initials(user.name) : "U"}</span>
             </div>
             <div className="hidden sm:block text-left">
-              <p className="text-sm font-medium text-slate-800 leading-tight">User</p>
-              <p className="text-xs text-slate-400 leading-tight">Admin</p>
+              <p className="text-sm font-medium text-slate-800 leading-tight">{user?.name ?? "User"}</p>
+              <p className="text-xs text-slate-400 leading-tight capitalize">{user?.role ?? "Admin"}</p>
             </div>
           </button>
           {userOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setUserOpen(false)} />
-              <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl border border-slate-200 shadow-lg py-1 z-30">
-                <Link href="/dashboard/settings" onClick={() => setUserOpen(false)} className="flex items-center gap-2.5 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
-                  <User className="size-4 text-slate-400" /> Profile
-                </Link>
-                <Link href="/dashboard/settings" onClick={() => setUserOpen(false)} className="flex items-center gap-2.5 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
-                  <Settings className="size-4 text-slate-400" /> Settings
-                </Link>
+              <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl border border-slate-200 shadow-lg py-1 z-30">
+                {user && (
+                  <div className="px-3 py-2.5 border-b border-slate-100">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{user.name}</p>
+                    <p className="text-xs text-slate-400 truncate">{user.email}</p>
+                  </div>
+                )}
+                {user?.role !== "staff" && (
+                  <Link href="/dashboard/settings" onClick={() => setUserOpen(false)} className="flex items-center gap-2.5 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                    <Settings className="size-4 text-slate-400" /> Settings
+                  </Link>
+                )}
                 <div className="my-1 border-t border-slate-100" />
-                <button onClick={() => setUserOpen(false)} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                <button onClick={() => { setUserOpen(false); logout() }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
                   <LogOut className="size-4" /> Sign out
                 </button>
               </div>

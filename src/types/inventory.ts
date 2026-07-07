@@ -1,11 +1,16 @@
+export type InventoryStatus = "in-stock" | "low-stock" | "out-of-stock"
+
 export interface InventoryItem {
-  id: string;
-  name: string;
-  sku: string;
-  price: number;
-  category: string;
-  supplier: string;
-  supplierId: string;
-  stock: number;
-  status: string;
+  id: string
+  sku: string
+  name: string
+  category: string
+  supplier: string
+  supplierId: string
+  warehouseId: number
+  price: number
+  stock: number
+  minStock: number
+  status: InventoryStatus
+  lastUpdated: string
 }

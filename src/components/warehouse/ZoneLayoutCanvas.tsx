@@ -112,7 +112,10 @@ export default function ZoneLayoutCanvas({
   const [tool, setTool] = useState<Tool>("select")
   const [view, setView] = useState<View>({ zoom: 1, x: 40, y: 40 })
   const viewRef = useRef(view)
-  viewRef.current = view
+  // Mirror `view` into a ref for async handlers (wheel/pointer) that need the
+  // latest value without being re-created. Synced in an effect rather than
+  // during render.
+  useEffect(() => { viewRef.current = view }, [view])
 
   // Live geometry overrides while dragging/resizing (before commit)
   const [draftGeom, setDraftGeom] = useState<Record<number, ZoneFields>>({})
@@ -123,6 +126,7 @@ export default function ZoneLayoutCanvas({
   const panRef = useRef<PanState | null>(null)
   const drawRef = useRef<DrawState | null>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
+  const [isPanning, setIsPanning] = useState(false)
 
   const [noteDraft, setNoteDraft] = useState("")
   const [commitDraft, setCommitDraft] = useState<CommitDraft | null>(null)
@@ -133,6 +137,9 @@ export default function ZoneLayoutCanvas({
   const [busy, setBusy] = useState(false)
 
   const canEdit = role === "admin" || role === "manager"
+  // A role that can't draw is never left on a draw tool. Derived (instead of a
+  // correcting effect) so it stays in sync without an extra render pass.
+  const activeTool: Tool = !canEdit && isDrawTool(tool) ? "select" : tool
 
   const refresh = useCallback(async () => {
     const [z, s, p] = await Promise.all([
@@ -147,17 +154,20 @@ export default function ZoneLayoutCanvas({
     setLoading(false)
   }, [warehouseId])
 
+  // Load layout data on mount / when the warehouse changes. setState happens
+  // inside the async `refresh` after awaits (the accepted data-fetch pattern).
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void refresh() }, [refresh])
-
-  // If a role can't draw, never leave them stuck on a draw tool
-  useEffect(() => { if (!canEdit && isDrawTool(tool)) setTool("select") }, [canEdit, tool])
 
   const pendingForZone = (zoneId: number) => pending.find((r) => r.sectionId === zoneId)
   const selectedZone = zones.find((z) => z.id === selectedZoneId) ?? null
   const selectedRequest = pending.find((r) => r.id === selectedRequestId) ?? null
 
+  // Populate the edit form when the selected zone changes. Intentional
+  // sync-from-selection effect.
   useEffect(() => {
     if (selectedZone) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormCode(selectedZone.code)
       setFormName(selectedZone.name)
       setFormCapacity(String(selectedZone.capacity))
@@ -273,8 +283,8 @@ export default function ZoneLayoutCanvas({
   // Pointer handling
   // -------------------------------------------------------------------------
   function onZonePointerDown(e: React.PointerEvent, zone: ZoneSection, mode: "move" | "resize") {
-    if (!canEdit || tool === "pan" || pendingForZone(zone.id)) return
-    if (isDrawTool(tool) && mode === "move") return // draw tools don't move zones
+    if (!canEdit || activeTool === "pan" || pendingForZone(zone.id)) return
+    if (isDrawTool(activeTool) && mode === "move") return // draw tools don't move zones
     e.preventDefault()
     e.stopPropagation()
     ;(e.target as Element).setPointerCapture(e.pointerId)
@@ -284,13 +294,14 @@ export default function ZoneLayoutCanvas({
 
   function onCanvasPointerDown(e: React.PointerEvent) {
     // background press: pan (select/pan tools) or start drawing (draw tools)
-    if (isDrawTool(tool) && canEdit) {
+    if (isDrawTool(activeTool) && canEdit) {
       const w = screenToWorld(e.clientX, e.clientY)
       const start = { x0: w.x, y0: w.y, x1: w.x, y1: w.y }
       drawRef.current = start
       setDrawRect(start)
     } else {
       panRef.current = { startX: e.clientX, startY: e.clientY, ox: view.x, oy: view.y, moved: false }
+      setIsPanning(true)
     }
     ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
   }
@@ -338,7 +349,7 @@ export default function ZoneLayoutCanvas({
       if (!dragMovedRef.current || !zone || !geom) {
         setSelectedZoneId(drag.zoneId)
         setSelectedRequestId(null)
-        setDraftGeom((g) => { const { [drag.zoneId]: _omit, ...rest } = g; return rest })
+        setDraftGeom((g) => { const rest = { ...g }; delete rest[drag.zoneId]; return rest })
         return
       }
       const previous = snapshot(zone)
@@ -356,7 +367,7 @@ export default function ZoneLayoutCanvas({
       const width = snap(Math.abs(d.x1 - d.x0))
       const height = snap(Math.abs(d.y1 - d.y0))
       if (width >= MIN_DRAW && height >= MIN_DRAW) {
-        const kind = tool === "draw-zone" ? "zone" : "shelf"
+        const kind = activeTool === "draw-zone" ? "zone" : "shelf"
         const code = kind === "zone" ? nextCode("ZONE") : nextCode("S")
         void submitChange({
           actionType: "create",
@@ -378,6 +389,7 @@ export default function ZoneLayoutCanvas({
     if (panRef.current) {
       if (!panRef.current.moved) { setSelectedZoneId(null); setSelectedRequestId(null) }
       panRef.current = null
+      setIsPanning(false)
     }
   }
 
@@ -433,8 +445,8 @@ export default function ZoneLayoutCanvas({
   const commitCreatePreview = commitDraft?.actionType === "create" ? commitDraft.proposed : null
 
   const cursor =
-    tool === "pan"    ? (panRef.current ? "grabbing" : "grab") :
-    isDrawTool(tool)  ? "crosshair" : "default"
+    activeTool === "pan"    ? (isPanning ? "grabbing" : "grab") :
+    isDrawTool(activeTool)  ? "crosshair" : "default"
 
   const tools: { key: Tool; label: string; icon: React.ElementType; editorOnly?: boolean }[] = [
     { key: "select",     label: "Select / move",   icon: MousePointer2 },
@@ -450,8 +462,8 @@ export default function ZoneLayoutCanvas({
           <h3 className="text-base font-semibold text-slate-900">Warehouse Map</h3>
           <p className="text-xs text-slate-400 mt-0.5">
             {role === "staff" ? "Live layout (view only) — drag to pan, scroll to zoom" :
-             tool === "draw-shelf" ? "Drag on the map to draw a shelf block" :
-             tool === "draw-zone" ? "Drag on the map to draw a zone box (grouping)" :
+             activeTool === "draw-shelf" ? "Drag on the map to draw a shelf block" :
+             activeTool === "draw-zone" ? "Drag on the map to draw a zone box (grouping)" :
              role === "manager" ? "Move/resize/draw boxes — changes are submitted for approval" :
              "Edits are live immediately and logged"}
           </p>
@@ -487,7 +499,7 @@ export default function ZoneLayoutCanvas({
               title={t.label}
               onClick={() => setTool(t.key)}
               className={`size-8 rounded-md flex items-center justify-center transition-colors ${
-                tool === t.key ? "bg-indigo-600 text-white" : "text-slate-500 hover:bg-slate-100"
+                activeTool === t.key ? "bg-indigo-600 text-white" : "text-slate-500 hover:bg-slate-100"
               }`}
             >
               <t.icon className="size-4" />
@@ -567,7 +579,7 @@ export default function ZoneLayoutCanvas({
                       isZone ? "border-dashed border-slate-400 bg-slate-500/[0.04]" : `bg-transparent ${occupancyBorder[occ]}`
                     } ${liveIsDashed ? "border-dashed opacity-60" : ""} ${
                       selected ? "ring-2 ring-indigo-400 ring-offset-1" : ""
-                    } ${canEdit && !req && tool !== "pan" ? "cursor-move" : ""}`}
+                    } ${canEdit && !req && activeTool !== "pan" ? "cursor-move" : ""}`}
                     style={{ left: x, top: y, width: w, height: h }}
                   >
                     {isZone ? (
@@ -588,7 +600,7 @@ export default function ZoneLayoutCanvas({
                         )}
                       </div>
                     )}
-                    {canEdit && !req && tool !== "pan" && (
+                    {canEdit && !req && activeTool !== "pan" && (
                       <div
                         onPointerDown={(e) => onZonePointerDown(e, zone, "resize")}
                         className="absolute -bottom-1 -right-1 size-3 rounded-sm bg-white border-2 border-slate-400 cursor-se-resize"

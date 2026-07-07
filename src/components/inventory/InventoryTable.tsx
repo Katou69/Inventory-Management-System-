@@ -1,7 +1,10 @@
-import { inventory } from "@/data/inventory-data";
+import { getInventory } from "@/services/inventory-service";
+import { Badge } from "@/components/ui";
 import { MoreHorizontal } from "lucide-react";
 
-export default function InventoryTable() {
+export default async function InventoryTable() {
+  const inventory = await getInventory();
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
 
@@ -51,29 +54,8 @@ export default function InventoryTable() {
 
               <td className="px-6 py-4">{item.stock}</td>
 
-              <td className="px-6 py-4"> 
-                <span
-                  className={`
-                    inline-flex
-                    items-center
-                    rounded-full
-                    px-3
-                    py-1
-                    text-xs
-                    font-semibold
-                    whitespace-nowrap
-
-                    ${
-                      item.status === "In Stock"
-                        ? "bg-green-100 text-green-700"
-                        : item.status === "Low Stock"
-                        ? "bg-yellow-100 text-yellow-700"
-                        : "bg-red-100 text-red-700"
-                    }
-                  `}
-                >
-                  {item.status}
-                </span>
+              <td className="px-6 py-4">
+                <Badge status={item.status} />
               </td>
 
               <td className="px-6 py-4">

@@ -1,7 +1,11 @@
-import { useState } from "react";
+"use client"
+
+import { useEffect, useState } from "react";
 import { Warehouse, Package, Building2, Shield, TrendingUp, User, Mail, Lock, Eye, EyeOff, Sun, Moon } from "lucide-react";
-import { UserType, Theme, Role } from "../types";
-import { MOCK_USERS, WAREHOUSES } from "../constants";
+import { UserType, Theme, Role } from "@/types/user";
+import type { Warehouse as WarehouseEntity } from "@/types/dashboard";
+import { MOCK_USERS } from "@/data/users-data";
+import { getWarehouses } from "@/services/dashboard-service";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -27,7 +31,10 @@ export default function AuthPage({
 }) {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [showPw, setShowPw] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", password: "", role: "staff" as Role, warehouse: "North Depot" });
+  const [warehouses, setWarehouses] = useState<WarehouseEntity[]>([]);
+  const [form, setForm] = useState({ name: "", email: "", password: "", role: "staff" as Role, warehouseId: 1 });
+
+  useEffect(() => { void getWarehouses().then(setWarehouses); }, []);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,9 +43,9 @@ export default function AuthPage({
       name: form.name || "Morgan Lee",
       email: form.email || "morgan.lee@grandroyal.com",
       role: form.role,
-      warehouse: form.role === "admin" ? "All" : form.warehouse,
+      warehouseId: form.role === "admin" ? "all" : form.warehouseId,
       status: "active",
-      joinedDate: "Jun 27, 2024",
+      joinedDate: new Date().toISOString().slice(0, 10),
     });
   };
 
@@ -185,19 +192,19 @@ export default function AuthPage({
                     <div>
                       <label className="block text-sm font-medium mb-1.5">Warehouse</label>
                       <div className="grid grid-cols-2 gap-2">
-                        {WAREHOUSES.map(w => (
+                        {warehouses.map(w => (
                           <button
-                            key={w}
+                            key={w.id}
                             type="button"
-                            onClick={() => setForm(f => ({ ...f, warehouse: w }))}
+                            onClick={() => setForm(f => ({ ...f, warehouseId: w.id }))}
                             className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs border transition-all ${
-                              form.warehouse === w
+                              form.warehouseId === w.id
                                 ? "border-primary bg-primary/10 text-primary font-medium"
                                 : "border-border hover:border-primary/40 text-muted-foreground"
                             }`}
                           >
                             <Building2 className="w-3 h-3 shrink-0" />
-                            {w}
+                            {w.name}
                           </button>
                         ))}
                       </div>

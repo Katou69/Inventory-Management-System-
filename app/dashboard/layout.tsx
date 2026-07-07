@@ -1,4 +1,5 @@
 import DashboardLayout from "@/components/dashboard/DashboardLayout"
+import { AuthGate } from "@/components/auth"
 import { getSearchIndex, getNotifications } from "@/services/dashboard-service"
 
 export default async function DashboardLayoutWrapper({ children }: { children: React.ReactNode }) {
@@ -8,12 +9,14 @@ export default async function DashboardLayoutWrapper({ children }: { children: R
   ])
 
   return (
-    <DashboardLayout
-      searchProducts={searchIndex.products}
-      searchWarehouses={searchIndex.warehouses}
-      notifications={notifications}
-    >
-      {children}
-    </DashboardLayout>
+    <AuthGate>
+      <DashboardLayout
+        searchProducts={searchIndex.products}
+        searchWarehouses={searchIndex.warehouses}
+        notifications={notifications}
+      >
+        {children}
+      </DashboardLayout>
+    </AuthGate>
   )
 }

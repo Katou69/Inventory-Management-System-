@@ -1,20 +1,11 @@
-export type OrderStatus = "Delivered" | "Cancelled" | "Pending";
-
-export interface Order {
-  id: number;
-  orderId: string;
-  orderName: string;
-  stockValue: string;
-  quantity: string;
-  status: OrderStatus;
-}
+import { Order } from "@/types/orders";
 
 export const orders: Order[] = [
-  { id: 1, orderId: "83IHKDH", orderName: "Grand Royal Black", stockValue: "343K", quantity: "23K", status: "Delivered" },
-  { id: 2, orderId: "83IKDH", orderName: "Grand Royal Signature", stockValue: "834K", quantity: "20K", status: "Cancelled" },
-  { id: 3, orderId: "83IHKDH", orderName: "Grand Royal Smooth", stockValue: "73K", quantity: "14K", status: "Delivered" },
-  { id: 4, orderId: "63IHDH", orderName: "Grand Royal SRW", stockValue: "28K", quantity: "11K", status: "Delivered" },
-  { id: 5, orderId: "63IHKH", orderName: "Grand Royal Sherry Cask", stockValue: "23K", quantity: "7K", status: "Cancelled" },
-  { id: 6, orderId: "83IK2DH", orderName: "Glan Master Double Smooth", stockValue: "63K", quantity: "3.5K", status: "Delivered" },
-  { id: 7, orderId: "13IH0H", orderName: "Glan Master Finest", stockValue: "38K", quantity: "1000K", status: "Cancelled" },
+  { id: "83IHKDH", customer: "The Grand Hotel", warehouseId: 1, items: "Grand Royal Black", quantity: 23000, total: 343000, status: "delivered", date: "2026-06-10" },
+  { id: "83IKDH", customer: "City Bar & Grill", warehouseId: 2, items: "Grand Royal Signature", quantity: 20000, total: 834000, status: "cancelled", date: "2026-06-11" },
+  { id: "83IHKDH2", customer: "Metro Supermarket", warehouseId: 3, items: "Grand Royal Smooth", quantity: 14000, total: 73000, status: "delivered", date: "2026-06-12" },
+  { id: "63IHDH", customer: "Riverside Restaurant", warehouseId: 4, items: "Grand Royal SRW", quantity: 11000, total: 28000, status: "delivered", date: "2026-06-13" },
+  { id: "63IHKH", customer: "Downtown Café", warehouseId: 5, items: "Grand Royal Sherry Cask", quantity: 7000, total: 23000, status: "cancelled", date: "2026-06-14" },
+  { id: "83IK2DH", customer: "The Lounge Club", warehouseId: 6, items: "Glan Master Double Smooth", quantity: 3500, total: 63000, status: "delivered", date: "2026-06-15" },
+  { id: "13IH0H", customer: "Park Inn Hotel", warehouseId: 7, items: "Glan Master Finest", quantity: 1000000, total: 38000, status: "cancelled", date: "2026-06-16" },
 ];

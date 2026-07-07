@@ -1,4 +1,4 @@
-import { Search, LayoutGrid, List } from "lucide-react";
+import { Search } from "lucide-react";
 
 export default function Filters() {
   return (

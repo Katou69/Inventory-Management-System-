@@ -1,11 +1,15 @@
-import { useState } from "react";
-import { Building2, Package, Bell, Settings as SettingsIcon, Trash2, Plus, X, RefreshCw, PackageCheck, Globe } from "lucide-react";
-import { Role } from "../types";
-import { WAREHOUSES, CATEGORIES } from "../constants";
+"use client"
 
-export default function SettingsPage({ role, userWarehouse }: { role: Role; userWarehouse: string }) {
+import { useEffect, useState } from "react";
+import { Building2, Package, Bell, Trash2, Plus, X, RefreshCw, PackageCheck, Globe } from "lucide-react";
+import { Role } from "@/types/user";
+import { CATEGORIES } from "@/data/users-data";
+import { getWarehouses } from "@/services/dashboard-service";
+
+export default function SettingsView({ role }: { role: Role; userWarehouseId: number | "all" }) {
   // System configuration state
-  const [warehouses, setWarehouses] = useState<string[]>([...WAREHOUSES]);
+  const [warehouses, setWarehouses] = useState<string[]>([]);
+  useEffect(() => { void getWarehouses().then((w) => setWarehouses(w.map((wh) => wh.name))); }, []);
   const [categories, setCategories] = useState<string[]>([...CATEGORIES]);
   const [newWarehouse, setNewWarehouse] = useState("");
   const [newCategory, setNewCategory] = useState("");

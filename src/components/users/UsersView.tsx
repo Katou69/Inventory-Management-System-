@@ -1,38 +1,50 @@
-import { useState } from "react";
-import { Search, UserPlus, Edit2, Trash2, Building2, Shield, User, Mail } from "lucide-react";
-import { UserType, Role } from "../types";
-import { MOCK_USERS, WAREHOUSES } from "../constants";
-import { initials, avatarColor } from "../utils";
-import Badge from "../components/Badge";
-import ActionBtn from "../components/ActionBtn";
-import Modal from "../components/Modal";
-import ModalFooter from "../components/ModalFooter";
-import FormField from "../components/FormField";
+"use client"
 
-export default function UsersPage({ role, userWarehouse }: { role: Role; userWarehouse: string }) {
-  const [users, setUsers] = useState<UserType[]>(MOCK_USERS);
+import { useEffect, useState } from "react";
+import { Search, UserPlus, Edit2, Trash2, Building2, Shield, User, Mail } from "lucide-react";
+import { UserType, Role } from "@/types/user";
+import type { Warehouse } from "@/types/dashboard";
+import { getUsers } from "@/services/users-service";
+import { getWarehouses } from "@/services/dashboard-service";
+import { initials, avatarColor } from "@/lib/format";
+import { Badge, ActionBtn, Modal, ModalFooter, FormField } from "@/components/ui";
+
+export default function UsersView({ role, userWarehouseId }: { role: Role; userWarehouseId: number | "all" }) {
+  const [users, setUsers] = useState<UserType[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [showAdd, setShowAdd] = useState(false);
-  const [wf, setWf] = useState("All");
+  const [wf, setWf] = useState<number | "All">("All");
   const [rf, setRf] = useState("All");
   const [search, setSearch] = useState("");
-  const [nu, setNu] = useState({ name: "", email: "", role: "staff" as Role, warehouse: "North Depot", status: "active" as "active" | "inactive" });
+  const [nu, setNu] = useState({ name: "", email: "", role: "staff" as Role, warehouseId: 0 as number | "all", status: "active" as "active" | "inactive" });
+
+  useEffect(() => {
+    void getUsers().then(setUsers);
+    void getWarehouses().then((w) => {
+      setWarehouses(w);
+      if (w.length > 0) setNu((p) => ({ ...p, warehouseId: w[0].id }));
+    });
+  }, []);
+
+  const warehouseName = (id: number | "all") =>
+    id === "all" ? "All" : warehouses.find((w) => w.id === id)?.name ?? String(id);
 
   const filtered = users.filter(u =>
-    (role === "admin" ? (wf === "All" || u.warehouse === wf || u.warehouse === "All") : u.warehouse === userWarehouse || (role === "manager" && u.warehouse === userWarehouse)) &&
+    (role === "admin" ? (wf === "All" || u.warehouseId === wf || u.warehouseId === "all") : u.warehouseId === userWarehouseId || (role === "manager" && u.warehouseId === userWarehouseId)) &&
     (rf === "All" || u.role === rf) &&
     (u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase()))
   );
 
   const addUser = () => {
-    setUsers(p => [...p, { ...nu, id: `u${p.length + 1}`, warehouse: nu.role === "admin" ? "All" : nu.warehouse, joinedDate: "Jun 27, 2024" }]);
+    setUsers(p => [...p, { ...nu, id: `u${p.length + 1}`, warehouseId: nu.role === "admin" ? "all" : nu.warehouseId, joinedDate: new Date().toISOString().slice(0, 10) }]);
     setShowAdd(false);
-    setNu({ name: "", email: "", role: "staff", warehouse: "North Depot", status: "active" });
+    setNu({ name: "", email: "", role: "staff", warehouseId: warehouses[0]?.id ?? 0, status: "active" });
   };
 
   const roleDesc: Record<Role, string> = {
     admin: "Full access to all warehouses, users, and system settings.",
-    manager: `Can manage inventory and staff at ${nu.warehouse}. Read-only for other warehouses.`,
-    staff: `Can view and update inventory at ${nu.warehouse}. Read-only access to orders.`,
+    manager: `Can manage inventory and staff at ${warehouseName(nu.warehouseId)}. Read-only for other warehouses.`,
+    staff: `Can view and update inventory at ${warehouseName(nu.warehouseId)}. Read-only access to orders.`,
   };
 
   const counts = {
@@ -51,9 +63,9 @@ export default function UsersPage({ role, userWarehouse }: { role: Role; userWar
           <input type="text" placeholder="Search by name or email…" value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-8 pr-4 py-2 text-sm bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition" />
         </div>
         {role === "admin" && (
-          <select value={wf} onChange={e => setWf(e.target.value)} className="select-sm">
+          <select value={wf} onChange={e => setWf(e.target.value === "All" ? "All" : Number(e.target.value))} className="select-sm">
             <option value="All">All Warehouses</option>
-            {WAREHOUSES.map(w => <option key={w} value={w}>{w}</option>)}
+            {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
           </select>
         )}
         <select value={rf} onChange={e => setRf(e.target.value)} className="select-sm">
@@ -112,9 +124,9 @@ export default function UsersPage({ role, userWarehouse }: { role: Role; userWar
             <div className="flex flex-wrap gap-1.5 mb-2.5">
               <Badge status={u.role} />
               <Badge status={u.status} />
-              {u.warehouse === "All"
+              {u.warehouseId === "all"
                 ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono bg-secondary text-secondary-foreground"><Shield className="w-2.5 h-2.5" />All Warehouses</span>
-                : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono bg-secondary text-secondary-foreground"><Building2 className="w-2.5 h-2.5" />{u.warehouse}</span>
+                : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono bg-secondary text-secondary-foreground"><Building2 className="w-2.5 h-2.5" />{warehouseName(u.warehouseId)}</span>
               }
             </div>
             <p className="text-[11px] text-muted-foreground font-mono">Joined {u.joinedDate}</p>
@@ -160,14 +172,14 @@ export default function UsersPage({ role, userWarehouse }: { role: Role; userWar
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-2">Warehouse Assignment</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {WAREHOUSES.map(w => (
+                  {warehouses.map(w => (
                     <button
-                      key={w}
+                      key={w.id}
                       type="button"
-                      onClick={() => setNu(p => ({ ...p, warehouse: w }))}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs border transition-all ${nu.warehouse === w ? "border-primary bg-primary/10 text-primary font-medium" : "border-border hover:border-primary/40 text-muted-foreground"}`}
+                      onClick={() => setNu(p => ({ ...p, warehouseId: w.id }))}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs border transition-all ${nu.warehouseId === w.id ? "border-primary bg-primary/10 text-primary font-medium" : "border-border hover:border-primary/40 text-muted-foreground"}`}
                     >
-                      <Building2 className="w-3 h-3 shrink-0" />{w}
+                      <Building2 className="w-3 h-3 shrink-0" />{w.name}
                     </button>
                   ))}
                 </div>

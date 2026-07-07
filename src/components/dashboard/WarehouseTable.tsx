@@ -1,4 +1,5 @@
 "use client"
+import Image from "next/image"
 import Link from "next/link"
 import { useState } from "react"
 import { Plus, ArrowUpRight, X } from "lucide-react"
@@ -83,7 +84,7 @@ export default function WarehouseTable({ initialWarehouses }: { initialWarehouse
                 <td className="px-5 py-3 text-slate-400 text-xs">{wh.id}</td>
                 <td className="px-3 py-3">
                   <div className="flex items-center gap-2.5">
-                    <img src={wh.image} alt="" className="size-7 rounded-full object-cover ring-1 ring-slate-200" />
+                    <Image src={wh.image} alt="" width={28} height={28} className="size-7 rounded-full object-cover ring-1 ring-slate-200" />
                     <span className="font-medium text-slate-800">{wh.name}</span>
                   </div>
                 </td>

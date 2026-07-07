@@ -1,20 +1,11 @@
-export type PurchaseStatus = "Received" | "Cancelled" | "Pending";
+import { PurchaseOrder } from "@/types/purchases";
 
-export interface Purchase {
-  id: number;
-  poId: string;
-  itemName: string;
-  cost: string;
-  quantity: string;
-  status: PurchaseStatus;
-}
-
-export const purchases: Purchase[] = [
-  { id: 1, poId: "PO-2001", itemName: "Grand Royal Black", cost: "343K", quantity: "23K", status: "Received" },
-  { id: 2, poId: "PO-2002", itemName: "Grand Royal Signature", cost: "834K", quantity: "20K", status: "Cancelled" },
-  { id: 3, poId: "PO-2003", itemName: "Grand Royal Smooth", cost: "73K", quantity: "14K", status: "Received" },
-  { id: 4, poId: "PO-2004", itemName: "Grand Royal SRW", cost: "28K", quantity: "11K", status: "Received" },
-  { id: 5, poId: "PO-2005", itemName: "Grand Royal Sherry Cask", cost: "23K", quantity: "7K", status: "Cancelled" },
-  { id: 6, poId: "PO-2006", itemName: "Glan Master Double Smooth", cost: "63K", quantity: "3.5K", status: "Received" },
-  { id: 7, poId: "PO-2007", itemName: "Glan Master Finest", cost: "38K", quantity: "1000K", status: "Cancelled" },
+export const purchases: PurchaseOrder[] = [
+  { id: "PO-2001", supplier: "Grand Royal Group International", warehouseId: 1, items: "Grand Royal Black", quantity: 23000, total: 343000, status: "received", date: "2026-06-08" },
+  { id: "PO-2002", supplier: "Grand Royal Group International", warehouseId: 2, items: "Grand Royal Signature", quantity: 20000, total: 834000, status: "draft", date: "2026-06-09" },
+  { id: "PO-2003", supplier: "Grand Royal Group International", warehouseId: 3, items: "Grand Royal Smooth", quantity: 14000, total: 73000, status: "received", date: "2026-06-10" },
+  { id: "PO-2004", supplier: "Grand Royal Group International", warehouseId: 4, items: "Grand Royal SRW", quantity: 11000, total: 28000, status: "received", date: "2026-06-11" },
+  { id: "PO-2005", supplier: "Grand Royal Group International", warehouseId: 5, items: "Grand Royal Sherry Cask", quantity: 7000, total: 23000, status: "draft", date: "2026-06-12" },
+  { id: "PO-2006", supplier: "Grand Royal Group International", warehouseId: 6, items: "Glan Master Double Smooth", quantity: 3500, total: 63000, status: "approved", date: "2026-06-13" },
+  { id: "PO-2007", supplier: "Grand Royal Group International", warehouseId: 7, items: "Glan Master Finest", quantity: 1000000, total: 38000, status: "submitted", date: "2026-06-14" },
 ];

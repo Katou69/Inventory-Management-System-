@@ -1,4 +1,4 @@
-import { STATUS_CONFIG } from "../constants";
+import { STATUS_CONFIG } from "@/data/users-data";
 
 export default function Badge({ status }: { status: string }) {
   const cfg = STATUS_CONFIG[status] ?? { label: status, cls: "bg-secondary text-muted-foreground" };
