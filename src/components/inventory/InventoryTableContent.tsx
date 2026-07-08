@@ -67,10 +67,10 @@ export default function InventoryTableContent({
 
 
       <div className="
-        bg-white
+        bg-card
         rounded-xl
         border
-        border-slate-200
+        border-border
         shadow-sm
         overflow-visible
       ">
@@ -79,47 +79,47 @@ export default function InventoryTableContent({
         <table className="min-w-full">
 
 
-          <thead className="bg-slate-50 border-b border-slate-200">
+          <thead className="bg-accent border-b border-border">
 
             <tr className="text-left">
 
 
-              <th className="px-6 py-4 text-sm font-semibold text-slate-600">
+              <th className="px-6 py-4 text-sm font-semibold text-muted-foreground">
                 Name
               </th>
 
 
-              <th className="px-6 py-4 text-sm font-semibold text-slate-600">
+              <th className="px-6 py-4 text-sm font-semibold text-muted-foreground">
                 SKU
               </th>
 
 
-              <th className="px-6 py-4 text-sm font-semibold text-slate-600">
+              <th className="px-6 py-4 text-sm font-semibold text-muted-foreground">
                 Price
               </th>
 
 
-              <th className="px-6 py-4 text-sm font-semibold text-slate-600">
+              <th className="px-6 py-4 text-sm font-semibold text-muted-foreground">
                 Category
               </th>
 
 
-              <th className="px-6 py-4 text-sm font-semibold text-slate-600">
+              <th className="px-6 py-4 text-sm font-semibold text-muted-foreground">
                 Supplier
               </th>
 
 
-              <th className="px-6 py-4 text-sm font-semibold text-slate-600">
+              <th className="px-6 py-4 text-sm font-semibold text-muted-foreground">
                 Supplier ID
               </th>
 
 
-              <th className="px-6 py-4 text-sm font-semibold text-slate-600">
+              <th className="px-6 py-4 text-sm font-semibold text-muted-foreground">
                 Stock
               </th>
 
 
-              <th className="px-6 py-4 text-sm font-semibold text-slate-600">
+              <th className="px-6 py-4 text-sm font-semibold text-muted-foreground">
                 Status
               </th>
 
@@ -133,7 +133,8 @@ export default function InventoryTableContent({
 
 
 
-          <tbody>
+
+          <tbody className="divide-y divide-border">
 
 
           {filteredInventory.map((item)=>(
@@ -141,16 +142,15 @@ export default function InventoryTableContent({
             <tr
               key={item.id}
               className="
-                border-b
-                border-slate-100
-                hover:bg-slate-50
+                hover:bg-accent
               "
             >
 
 
-              <td className="px-6 py-4 font-medium ">
+              <td className="px-6 py-4 font-medium text-foreground">
                 {item.name}
               </td>
+
 
 
 
@@ -162,8 +162,8 @@ export default function InventoryTableContent({
                     px-2
                     py-0.5
                     rounded-md
-                    bg-slate-100
-                    text-slate-600
+                    bg-accent
+                    text-muted-foreground
                     text-xs
                     font-mono
                   "
@@ -175,21 +175,25 @@ export default function InventoryTableContent({
 
 
 
-              <td className="px-6 py-4 whitespace-nowrap">
+
+              <td className="px-6 py-4 whitespace-nowrap text-foreground">
                 {item.price.toLocaleString()}
               </td>
 
 
 
-              <td className="px-6 py-4 whitespace-nowrap">
+
+              <td className="px-6 py-4 whitespace-nowrap text-foreground">
                 {item.category}
               </td>
 
 
 
-              <td className="px-6 py-4 ">
+
+              <td className="px-6 py-4 text-foreground">
                 {item.supplier}
               </td>
+
 
 
 
@@ -201,8 +205,8 @@ export default function InventoryTableContent({
                     px-2
                     py-0.5
                     rounded-md
-                    bg-slate-100
-                    text-slate-600
+                    bg-accent
+                    text-muted-foreground
                     text-xs
                     font-mono
                   "
@@ -214,15 +218,18 @@ export default function InventoryTableContent({
 
 
 
-              <td className="px-6 py-4 whitespace-nowrap">
+
+              <td className="px-6 py-4 whitespace-nowrap text-foreground">
                 {item.stock}
               </td>
+
 
 
 
               <td className="px-6 py-4 whitespace-nowrap">
                 <Badge status={item.status}/>
               </td>
+
 
 
 
@@ -252,6 +259,7 @@ export default function InventoryTableContent({
 
 
 
+
           {filteredInventory.length === 0 && (
 
             <tr>
@@ -261,7 +269,7 @@ export default function InventoryTableContent({
                 className="
                   text-center
                   py-8
-                  text-slate-500
+                  text-muted-foreground
                 "
               >
                 No products found
@@ -283,6 +291,7 @@ export default function InventoryTableContent({
 
 
 
+
       <EditProductModal
         open={editOpen}
         product={selectedProduct}
@@ -291,6 +300,7 @@ export default function InventoryTableContent({
           setSelectedProduct(null);
         }}
       />
+
 
 
 

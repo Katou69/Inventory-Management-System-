@@ -177,7 +177,7 @@ export default function InventoryStatisticsChart({
                 onClick={() => setPeriod(key)}
                 className={`text-xs px-3 py-1.5 transition-colors ${
                   period === key
-                    ? "bg-indigo-600 text-white font-medium"
+                    ? "bg-[#1A6B8A] text-white font-medium"
                     : "text-slate-500 hover:bg-slate-50"
                 }`}
               >

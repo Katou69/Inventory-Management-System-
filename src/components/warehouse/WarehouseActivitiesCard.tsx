@@ -43,8 +43,8 @@ export default function WarehouseActivitiesCard({
         )}
         {shown.map((a) => (
           <div key={a.id} className="flex items-start gap-3.5 py-3.5">
-            <div className="size-10 rounded-full bg-indigo-50 flex items-center justify-center shrink-0">
-              <span className="text-indigo-600 text-xs font-semibold">{a.initials}</span>
+            <div className="size-10 rounded-full bg-[#E5F0F5] flex items-center justify-center shrink-0">
+              <span className="text-[#1A6B8A] text-xs font-semibold">{a.initials}</span>
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">

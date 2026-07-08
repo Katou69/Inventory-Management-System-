@@ -17,8 +17,8 @@ export default function Filters() {
             onClick={() => setActiveTab(tab)}
             className={`text-sm font-medium pb-1 border-b-2 transition-colors ${
               activeTab === tab
-                ? "text-indigo-600 border-indigo-600"
-                : "text-slate-500 border-transparent hover:text-slate-700"
+                ? "text-primary border-primary"
+                : "text-muted-foreground border-transparent hover:text-foreground"
             }`}
           >
             {tab}
@@ -27,13 +27,13 @@ export default function Filters() {
       </div>
 
       <div className="flex items-center gap-3">
-        <button className="flex items-center gap-2 border border-slate-200 rounded-lg px-4 py-2 text-sm text-slate-600 bg-white">
-          <Calendar className="w-4 h-4 text-slate-400" />
+        <button className="flex items-center gap-2 border border-border rounded-lg px-4 py-2 text-sm text-muted-foreground bg-card">
+          <Calendar className="w-4 h-4 text-muted-foreground" />
           13-03-2023
         </button>
-        <span className="text-sm text-slate-400">To</span>
-        <button className="flex items-center gap-2 border border-slate-200 rounded-lg px-4 py-2 text-sm text-slate-600 bg-white">
-          <Calendar className="w-4 h-4 text-slate-400" />
+        <span className="text-sm text-muted-foreground">To</span>
+        <button className="flex items-center gap-2 border border-border rounded-lg px-4 py-2 text-sm text-muted-foreground bg-card">
+          <Calendar className="w-4 h-4 text-muted-foreground" />
           13-03-2023
         </button>
       </div>

@@ -36,7 +36,7 @@ export default function WarehouseHeader({ name }: { name: string }) {
           <Download className="size-4" />
           <span className="hidden sm:inline">Export</span>
         </button>
-        <button className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-2 text-sm font-medium transition-colors">
+        <button className="flex items-center gap-1.5 bg-[#1A6B8A] hover:bg-[#145570] text-white rounded-lg px-3 py-2 text-sm font-medium transition-colors">
           <Pencil className="size-4" />
           <span className="hidden sm:inline">Edit</span>
         </button>

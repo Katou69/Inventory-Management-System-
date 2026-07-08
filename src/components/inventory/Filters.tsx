@@ -12,7 +12,7 @@ export default function Filters({
   setSearch,
 }: FiltersProps) {
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 flex flex-wrap items-center gap-4">
+    <div className="bg-card border border-border rounded-xl shadow-sm p-4 flex flex-wrap items-center gap-4">
 
       <div className="relative flex-1 min-w-[280px]">
 
@@ -22,7 +22,7 @@ export default function Filters({
             left-3
             top-1/2
             -translate-y-1/2
-            text-slate-400
+            text-muted-foreground
             w-4
             h-4
           "
@@ -41,7 +41,10 @@ export default function Filters({
             py-2.5
             rounded-lg
             border
-            border-slate-200
+            border-border
+            bg-input-background
+            text-foreground
+            placeholder:text-muted-foreground
             outline-none
             focus:ring-2
             focus:ring-primary/30

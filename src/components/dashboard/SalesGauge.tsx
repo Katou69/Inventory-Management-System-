@@ -152,12 +152,12 @@ export default function SalesGauge({
                   inputMode="numeric"
                   value={draft}
                   onChange={(e) => setDraft(e.target.value.replace(/[^0-9]/g, ""))}
-                  className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
+                  className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1A6B8A]/30 focus:border-[#1A6B8A]"
                 />
               </label>
               <div className="flex items-center justify-end gap-2">
                 <button type="button" onClick={() => setEditing(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
-                <button type="submit" disabled={!(Number(draft) > 0)} className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed">Save</button>
+                <button type="submit" disabled={!(Number(draft) > 0)} className="px-4 py-2 text-sm font-medium text-white bg-[#1A6B8A] hover:bg-[#145570] rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed">Save</button>
               </div>
             </form>
           </div>

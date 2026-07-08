@@ -7,8 +7,8 @@ export default function WarehouseProfileCard({ wh }: { wh: WarehouseDetail }) {
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
       <div className="flex flex-col sm:flex-row gap-6">
         {/* Photo / icon */}
-        <div className="size-32 rounded-2xl bg-indigo-50 ring-1 ring-indigo-100 flex items-center justify-center shrink-0 mx-auto sm:mx-0">
-          <WarehouseIcon className="size-14 text-indigo-500" />
+        <div className="size-32 rounded-2xl bg-[#E5F0F5] ring-1 ring-[#1A6B8A]/20 flex items-center justify-center shrink-0 mx-auto sm:mx-0">
+          <WarehouseIcon className="size-14 text-[#1A6B8A]" />
         </div>
 
         {/* Info */}
@@ -48,7 +48,7 @@ function InfoRow({
       </div>
       <div className="min-w-0">
         <p className="text-xs text-slate-400 leading-tight">{label}</p>
-        <p className={`text-sm font-medium leading-tight truncate ${highlight ? "text-indigo-600" : "text-slate-800"}`}>
+        <p className={`text-sm font-medium leading-tight truncate ${highlight ? "text-[#1A6B8A]" : "text-slate-800"}`}>
           {value}
         </p>
       </div>

@@ -11,9 +11,9 @@ export default function Pagination({ totalPages = 12 }: { totalPages?: number })
     <div className="flex items-center justify-center gap-2">
       <button
         onClick={() => setPage((p) => Math.max(1, p - 1))}
-        className="p-2 rounded-full border border-slate-200 hover:bg-slate-50"
+        className="p-2 rounded-full border border-border hover:bg-accent"
       >
-        <ChevronLeft className="w-4 h-4 text-slate-500" />
+        <ChevronLeft className="w-4 h-4 text-muted-foreground" />
       </button>
 
       {pages.map((p) => (
@@ -21,29 +21,29 @@ export default function Pagination({ totalPages = 12 }: { totalPages?: number })
           key={p}
           onClick={() => setPage(p)}
           className={`w-8 h-8 rounded-full text-sm font-medium ${
-            page === p ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-100"
+            page === p ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"
           }`}
         >
           {p}
         </button>
       ))}
 
-      <span className="text-slate-400 text-sm px-1">...</span>
+      <span className="text-muted-foreground text-sm px-1">...</span>
 
       <button
         onClick={() => setPage(totalPages)}
         className={`w-8 h-8 rounded-full text-sm font-medium ${
-          page === totalPages ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-100"
-        }`}
+        page === totalPages ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"
+      }`}
       >
         {totalPages}
       </button>
 
       <button
         onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-        className="p-2 rounded-full border border-slate-200 hover:bg-slate-50"
+        className="p-2 rounded-full border border-border hover:bg-accent"
       >
-        <ChevronRight className="w-4 h-4 text-slate-500" />
+        <ChevronRight className="w-4 h-4 text-muted-foreground" />
       </button>
     </div>
   );

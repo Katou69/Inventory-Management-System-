@@ -26,6 +26,12 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-[30px]">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">Overview of your inventory and sales</p>
+        </div>
+      </div>
       <StatusCardGrid cards={statusCards} />
       <ChartsSection inventory={inventory} salesOverview={salesOverview} />
       <WarehouseTable initialWarehouses={warehouses} />

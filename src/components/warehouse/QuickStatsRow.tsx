@@ -3,7 +3,7 @@ import type { WarehouseDetail } from "@/types/dashboard"
 
 export default function QuickStatsRow({ wh }: { wh: WarehouseDetail }) {
   const stats = [
-    { label: "Total SKUs stored", value: wh.totalSkus.toLocaleString(), icon: Boxes,         tone: "bg-indigo-100 text-indigo-600" },
+    { label: "Total SKUs stored", value: wh.totalSkus.toLocaleString(), icon: Boxes,         tone: "bg-[#E5F0F5] text-[#1A6B8A]" },
     { label: "Low stock items",   value: String(wh.lowStockCount),      icon: AlertTriangle,  tone: "bg-amber-100 text-amber-600", alert: wh.lowStockCount > 0 },
     { label: "Pending inbound",   value: String(wh.pendingInbound),     icon: Truck,          tone: "bg-sky-100 text-sky-600" },
     { label: "Throughput (mo.)",  value: `${wh.throughput.toLocaleString()} u`, icon: Activity, tone: "bg-teal-100 text-teal-600" },

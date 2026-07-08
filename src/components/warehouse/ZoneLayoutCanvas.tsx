@@ -579,7 +579,7 @@ export default function ZoneLayoutCanvas({
             </span>
           </div>
           {pending.length > 0 && showPendingOverlays && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-xs font-medium ring-1 ring-indigo-200">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[#E5F0F5] text-[#1A6B8A] text-xs font-medium ring-1 ring-[#1A6B8A]/20">
               {pending.length} pending
             </span>
           )}
@@ -596,7 +596,7 @@ export default function ZoneLayoutCanvas({
               title={t.label}
               onClick={() => setTool(t.key)}
               className={`size-8 rounded-md flex items-center justify-center transition-colors ${
-                activeTool === t.key ? "bg-indigo-600 text-white" : "text-slate-500 hover:bg-slate-100"
+                activeTool === t.key ? "bg-[#1A6B8A] text-white" : "text-slate-500 hover:bg-slate-100"
               }`}
             >
               <t.icon className="size-4" />
@@ -681,7 +681,7 @@ export default function ZoneLayoutCanvas({
                     } ${liveIsDashed ? "border-dashed opacity-60" : ""} ${
                       stagedEdit ? "border-amber-500 border-dashed" : ""
                     } ${
-                      selected ? "ring-2 ring-indigo-400 ring-offset-1" : ""
+                      selected ? "ring-2 ring-[#1A6B8A] ring-offset-1" : ""
                     } ${canEdit && !req && activeTool !== "pan" ? "cursor-move" : ""}`}
                     style={{ left: x, top: y, width: w, height: h }}
                   >
@@ -721,8 +721,8 @@ export default function ZoneLayoutCanvas({
                     <div
                       onPointerDown={(e) => e.stopPropagation()}
                       onClick={(e) => { e.stopPropagation(); setSelectedRequestId(req!.id); setSelectedZoneId(null) }}
-                      className={`absolute rounded-md border-2 bg-transparent border-indigo-500 cursor-pointer ${
-                        selectedRequestId === req!.id ? "ring-2 ring-indigo-400 ring-offset-1" : ""
+                      className={`absolute rounded-md border-2 bg-transparent border-[#1A6B8A] cursor-pointer ${
+                        selectedRequestId === req!.id ? "ring-2 ring-[#1A6B8A] ring-offset-1" : ""
                       }`}
                       style={{
                         left:   pItem.proposedData.x ?? zone.x,
@@ -732,9 +732,9 @@ export default function ZoneLayoutCanvas({
                       }}
                     >
                       <div className="absolute top-1 left-1.5 leading-tight pointer-events-none">
-                        <p className="text-xs font-bold text-indigo-700">{pItem.proposedData.code ?? zone.code}</p>
+                        <p className="text-xs font-bold text-[#1A6B8A]">{pItem.proposedData.code ?? zone.code}</p>
                       </div>
-                      <span className="absolute -top-2.5 right-1 px-1.5 py-px rounded bg-indigo-600 text-white text-[10px] font-semibold pointer-events-none">Pending</span>
+                      <span className="absolute -top-2.5 right-1 px-1.5 py-px rounded bg-[#1A6B8A] text-white text-[10px] font-semibold pointer-events-none">Pending</span>
                     </div>
                   )}
 
@@ -753,15 +753,15 @@ export default function ZoneLayoutCanvas({
                 key={`create-${req.id}-${i}`}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => { e.stopPropagation(); setSelectedRequestId(req.id); setSelectedZoneId(null) }}
-                className={`absolute rounded-md border-2 bg-transparent border-indigo-500 cursor-pointer ${
-                  selectedRequestId === req.id ? "ring-2 ring-indigo-400 ring-offset-1" : ""
+                className={`absolute rounded-md border-2 bg-transparent border-[#1A6B8A] cursor-pointer ${
+                  selectedRequestId === req.id ? "ring-2 ring-[#1A6B8A] ring-offset-1" : ""
                 }`}
                 style={{ left: item.proposedData?.x ?? 20, top: item.proposedData?.y ?? 20, width: item.proposedData?.width ?? 160, height: item.proposedData?.height ?? 120 }}
               >
                 <div className="absolute top-1 left-1.5 leading-tight pointer-events-none">
-                  <p className="text-xs font-bold text-indigo-700">{item.proposedData?.code}</p>
+                  <p className="text-xs font-bold text-[#1A6B8A]">{item.proposedData?.code}</p>
                 </div>
-                <span className="absolute -top-2.5 right-1 px-1.5 py-px rounded bg-indigo-600 text-white text-[10px] font-semibold pointer-events-none">Pending</span>
+                <span className="absolute -top-2.5 right-1 px-1.5 py-px rounded bg-[#1A6B8A] text-white text-[10px] font-semibold pointer-events-none">Pending</span>
               </div>
             ))}
 
@@ -785,7 +785,7 @@ export default function ZoneLayoutCanvas({
             {/* Rubber-band while drawing */}
             {drawRect && (
               <div
-                className="absolute rounded-md border-2 border-dashed border-indigo-500 bg-indigo-100/30 pointer-events-none"
+                className="absolute rounded-md border-2 border-dashed border-[#1A6B8A] bg-[#E5F0F5]/50 pointer-events-none"
                 style={{
                   left: Math.min(drawRect.x0, drawRect.x1),
                   top: Math.min(drawRect.y0, drawRect.y1),
@@ -811,7 +811,7 @@ export default function ZoneLayoutCanvas({
             <button onClick={discardStaged} disabled={busy} className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-white/60 rounded-lg transition-colors disabled:opacity-50">
               Discard
             </button>
-            <button onClick={openSubmitModal} disabled={busy} className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-50">
+            <button onClick={openSubmitModal} disabled={busy} className="px-3 py-1.5 text-xs font-medium text-white bg-[#1A6B8A] hover:bg-[#145570] rounded-lg transition-colors disabled:opacity-50">
               Submit proposal ({staged.length})
             </button>
           </div>
@@ -855,20 +855,20 @@ export default function ZoneLayoutCanvas({
             <div className="flex flex-col gap-2.5 sm:w-64 shrink-0">
               <label className="flex flex-col gap-1">
                 <span className="text-xs font-medium text-slate-500">Code / label</span>
-                <input value={formCode} onChange={(e) => setFormCode(e.target.value)} className="px-2.5 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
+                <input value={formCode} onChange={(e) => setFormCode(e.target.value)} className="px-2.5 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A6B8A]/30" />
               </label>
               <label className="flex flex-col gap-1">
                 <span className="text-xs font-medium text-slate-500">{selectedZone.kind === "zone" ? "Zone name" : "Shelf name"}</span>
-                <input value={formName} onChange={(e) => setFormName(e.target.value)} className="px-2.5 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
+                <input value={formName} onChange={(e) => setFormName(e.target.value)} className="px-2.5 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A6B8A]/30" />
               </label>
               {selectedZone.kind === "shelf" && (
                 <label className="flex flex-col gap-1">
                   <span className="text-xs font-medium text-slate-500">Capacity (units)</span>
-                  <input value={formCapacity} inputMode="numeric" onChange={(e) => setFormCapacity(e.target.value.replace(/[^0-9]/g, ""))} className="px-2.5 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
+                  <input value={formCapacity} inputMode="numeric" onChange={(e) => setFormCapacity(e.target.value.replace(/[^0-9]/g, ""))} className="px-2.5 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A6B8A]/30" />
                 </label>
               )}
               <div className="flex items-center gap-2 mt-1">
-                <button onClick={saveZoneForm} disabled={busy} className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-50">
+                <button onClick={saveZoneForm} disabled={busy} className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-[#1A6B8A] hover:bg-[#145570] rounded-lg transition-colors disabled:opacity-50">
                   {role === "manager" ? "Add to proposal" : "Save"}
                 </button>
                 <button onClick={deleteZone} disabled={busy} className="px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50">Delete</button>
@@ -884,7 +884,7 @@ export default function ZoneLayoutCanvas({
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="inline-flex px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-xs font-medium ring-1 ring-indigo-200">Pending</span>
+                <span className="inline-flex px-2 py-0.5 rounded-full bg-[#E5F0F5] text-[#1A6B8A] text-xs font-medium ring-1 ring-[#1A6B8A]/20">Pending</span>
                 <h4 className="text-sm font-semibold text-slate-800">
                   Proposal · {selectedRequest.items.length} change{selectedRequest.items.length === 1 ? "" : "s"}
                 </h4>
@@ -941,11 +941,11 @@ export default function ZoneLayoutCanvas({
             <textarea
               autoFocus value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} rows={3}
               placeholder="e.g. Re-layout of the receiving bay for Q3 inbound"
-              className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 resize-none"
+              className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A6B8A]/30 resize-none"
             />
             <div className="flex items-center justify-end gap-2 mt-4">
               <button onClick={() => setShowSubmitModal(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
-              <button onClick={submitProposal} disabled={!noteDraft.trim() || busy} className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-40">
+              <button onClick={submitProposal} disabled={!noteDraft.trim() || busy} className="px-4 py-2 text-sm font-medium text-white bg-[#1A6B8A] hover:bg-[#145570] rounded-lg transition-colors disabled:opacity-40">
                 {busy ? "Submitting…" : "Submit proposal"}
               </button>
             </div>

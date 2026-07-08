@@ -14,7 +14,7 @@ export default function DashboardLayout({
   notifications: NotificationItem[]
 }) {
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col">
       <Header products={searchProducts} warehouses={searchWarehouses} notifications={notifications} />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />

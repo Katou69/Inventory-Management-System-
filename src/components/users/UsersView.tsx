@@ -55,7 +55,14 @@ export default function UsersView({ role, userWarehouseId }: { role: Role; userW
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {/* Page Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">User Management</h1>
+          <p className="text-muted-foreground mt-1">Manage your team members and their access</p>
+        </div>
+      </div>
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2.5">
         <div className="relative flex-1 min-w-[180px]">

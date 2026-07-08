@@ -28,8 +28,8 @@ export default function SettingsView({ role }: { role: Role; userWarehouseId: nu
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="font-semibold text-lg">System Settings</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">Manage system configurations and preferences</p>
+          <h1 className="text-2xl font-bold">System Settings</h1>
+          <p className="text-muted-foreground mt-1">Manage system configurations and preferences</p>
         </div>
         <button onClick={handleSave} className="btn-primary flex items-center gap-1.5">
           <RefreshCw className="w-3.5 h-3.5" /> Save Changes
