@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
@@ -8,11 +8,12 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.models.session import RefreshSession
 from app.models.user import User
-from app.schemas.user import LoginRequest, UserOut
+from app.schemas.user import LoginRequest, RegisterRequest, UserOut
 from app.security import (
     create_access_token,
     create_refresh_token,
     decode_token,
+    hash_password,
     hash_token,
     verify_password,
 )
@@ -65,6 +66,28 @@ def login(body: LoginRequest, response: Response, db: Session = Depends(get_db))
     user = db.query(User).filter(User.email == body.email).first()
     if user is None or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+
+    _issue_session(db, user, response)
+    return user
+
+
+@router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+def register(body: RegisterRequest, response: Response, db: Session = Depends(get_db)) -> User:
+    if db.query(User).filter(User.email == body.email).first() is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
+
+    user = User(
+        name=body.name,
+        email=body.email,
+        hashed_password=hash_password(body.password),
+        role="staff",
+        warehouse_id=str(body.warehouse_id),
+        status="active",
+        joined_date=date.today(),
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
 
     _issue_session(db, user, response)
     return user

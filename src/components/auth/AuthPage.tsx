@@ -25,15 +25,15 @@ function FieldIcon({ children }: { children: React.ReactNode }) {
 }
 
 export default function AuthPage() {
-  const { signIn, signInDemo, theme, setTheme } = useAuth();
+  const { signIn, signUp, signInDemo, theme, setTheme } = useAuth();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [showPw, setShowPw] = useState(false);
   const [warehouses, setWarehouses] = useState<WarehouseEntity[]>([]);
-  const [form, setForm] = useState({ name: "", email: "", password: "", role: "staff" as Role, warehouseId: 1 });
+  const [form, setForm] = useState({ name: "", email: "", password: "", warehouseId: 1 });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Demo affordances (quick-login buttons, signup mode) are mock-only.
+  // Quick-login demo buttons are mock-only.
   const isMock = config.useMockAuth;
 
   useEffect(() => { void getWarehouses().then(setWarehouses); }, []);
@@ -41,18 +41,33 @@ export default function AuthPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!form.email.trim() || !/\S+@\S+\.\S+/.test(form.email)) {
+      setError("Enter a valid email address");
+      return;
+    }
+    if (!form.password) {
+      setError("Password is required");
+      return;
+    }
+    if (mode === "signup" && !form.name.trim()) {
+      setError("Full name is required");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await signIn(form.email, form.password, {
-        name: form.name,
-        role: form.role,
-        warehouseId: form.role === "admin" ? "all" : form.warehouseId,
-      });
+      if (mode === "signup") {
+        await signUp(form.name, form.email, form.password, form.warehouseId);
+      } else {
+        await signIn(form.email, form.password);
+      }
     } catch (err) {
-      const message =
-        err instanceof ApiError && err.status === 401
-          ? "Invalid email or password"
-          : "Sign in failed. Please try again.";
+      let message = mode === "signup" ? "Sign up failed. Please try again." : "Sign in failed. Please try again.";
+      if (err instanceof ApiError) {
+        if (err.status === 401) message = "Invalid email or password";
+        else if (err.status === 409) message = "An account with this email already exists";
+      }
       setError(message);
     } finally {
       setSubmitting(false);
@@ -185,41 +200,26 @@ export default function AuthPage() {
               </Field>
 
               {mode === "signup" && (
-                <>
-                  <Field label="Role">
-                    <select
-                      value={form.role}
-                      onChange={e => setForm(f => ({ ...f, role: e.target.value as Role }))}
-                      className="field-input"
-                    >
-                      <option value="staff">Staff</option>
-                      <option value="manager">Manager</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                  </Field>
-                  {form.role !== "admin" && (
-                    <div>
-                      <label className="block text-sm font-medium mb-1.5">Warehouse</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {warehouses.map(w => (
-                          <button
-                            key={w.id}
-                            type="button"
-                            onClick={() => setForm(f => ({ ...f, warehouseId: w.id }))}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs border transition-all ${
-                              form.warehouseId === w.id
-                                ? "border-primary bg-primary/10 text-primary font-medium"
-                                : "border-border hover:border-primary/40 text-muted-foreground"
-                            }`}
-                          >
-                            <Building2 className="w-3 h-3 shrink-0" />
-                            {w.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Warehouse</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {warehouses.map(w => (
+                      <button
+                        key={w.id}
+                        type="button"
+                        onClick={() => setForm(f => ({ ...f, warehouseId: w.id }))}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs border transition-all ${
+                          form.warehouseId === w.id
+                            ? "border-primary bg-primary/10 text-primary font-medium"
+                            : "border-border hover:border-primary/40 text-muted-foreground"
+                        }`}
+                      >
+                        <Building2 className="w-3 h-3 shrink-0" />
+                        {w.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
 
               {error && (
@@ -234,22 +234,20 @@ export default function AuthPage() {
                 className="w-full py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 active:opacity-80 transition-opacity mt-1 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {submitting
-                  ? "Signing in…"
+                  ? (mode === "login" ? "Signing in…" : "Creating account…")
                   : mode === "login" ? "Sign In" : "Create Account"}
               </button>
             </form>
 
-            {isMock && (
-              <p className="text-center text-sm text-muted-foreground mt-5">
-                {mode === "login" ? "Don't have an account? " : "Already have an account? "}
-                <button
-                  onClick={() => setMode(m => m === "login" ? "signup" : "login")}
-                  className="text-primary font-medium hover:underline"
-                >
-                  {mode === "login" ? "Sign up" : "Sign in"}
-                </button>
-              </p>
-            )}
+            <p className="text-center text-sm text-muted-foreground mt-5">
+              {mode === "login" ? "Don't have an account? " : "Already have an account? "}
+              <button
+                onClick={() => { setMode(m => m === "login" ? "signup" : "login"); setError(null); }}
+                className="text-primary font-medium hover:underline"
+              >
+                {mode === "login" ? "Sign up" : "Sign in"}
+              </button>
+            </p>
 
             <div className={`lg:hidden mt-8 pt-6 border-t border-border${isMock ? "" : " hidden"}`}>
               <p className="text-[10px] text-muted-foreground text-center mb-3 font-mono uppercase tracking-widest">Quick Demo</p>

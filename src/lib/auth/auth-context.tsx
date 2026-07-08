@@ -3,12 +3,15 @@
 import { createContext, useContext, useEffect, useState } from "react"
 import type { UserType, Theme, Role } from "@/types/user"
 import { config } from "@/lib/config"
+import { setAuthExpiredHandler } from "@/lib/api-client"
 import * as authService from "@/services/auth-service"
 
 interface AuthContextValue {
   user: UserType | null
   /** Sign in with credentials. Live mode validates against the backend; throws ApiError on failure. */
-  signIn: (email: string, password: string, demo?: { name?: string; role?: Role; warehouseId?: number | "all" }) => Promise<void>
+  signIn: (email: string, password: string) => Promise<void>
+  /** Register a new account. Live mode always gets role "staff"; throws ApiError on failure (e.g. 409 duplicate email). */
+  signUp: (name: string, email: string, password: string, warehouseId: number) => Promise<void>
   /** Mock-only quick demo login (no-op affordance when live). */
   signInDemo: (role: Role) => void
   logout: () => void
@@ -69,6 +72,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [])
 
+  // Notify local state immediately if a session refresh fails (session truly
+  // expired), instead of waiting for the user to hit another dead request.
+  useEffect(() => {
+    setAuthExpiredHandler(() => {
+      setUser(null)
+      persistMockUser(null)
+    })
+    return () => setAuthExpiredHandler(null)
+  }, [])
+
   // Reflect theme on the document + persist it.
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark")
@@ -91,8 +104,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const signIn: AuthContextValue["signIn"] = async (email, password, demo) => {
-    const u = await authService.login(email, password, demo)
+  const signIn: AuthContextValue["signIn"] = async (email, password) => {
+    const u = await authService.login(email, password)
+    setUser(u)
+    persistMockUser(u)
+  }
+
+  const signUp: AuthContextValue["signUp"] = async (name, email, password, warehouseId) => {
+    const u = await authService.register(name, email, password, warehouseId)
     setUser(u)
     persistMockUser(u)
   }
@@ -114,7 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const setTheme = (t: Theme) => setThemeState(t)
 
   return (
-    <AuthContext.Provider value={{ user, signIn, signInDemo, logout, theme, setTheme, ready }}>
+    <AuthContext.Provider value={{ user, signIn, signUp, signInDemo, logout, theme, setTheme, ready }}>
       {children}
     </AuthContext.Provider>
   )

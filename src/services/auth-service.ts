@@ -16,19 +16,14 @@ import type { UserType, Role } from "@/types/user"
  * - Live mode: POST /auth/login; the backend sets httpOnly cookies and returns the user.
  *   A 401 surfaces as an ApiError for the form to display.
  */
-export async function login(
-  email: string,
-  password: string,
-  demo?: { name?: string; role?: Role; warehouseId?: number | "all" },
-): Promise<UserType> {
+export async function login(email: string, password: string): Promise<UserType> {
   if (config.useMockAuth) {
-    const role = demo?.role ?? "staff"
     return {
       id: "demo",
-      name: demo?.name || "Morgan Lee",
+      name: "Morgan Lee",
       email: email || "morgan.lee@grandroyal.com",
-      role,
-      warehouseId: role === "admin" ? "all" : (demo?.warehouseId ?? 1),
+      role: "staff",
+      warehouseId: 1,
       status: "active",
       joinedDate: new Date().toISOString().slice(0, 10),
     }
@@ -36,6 +31,36 @@ export async function login(
   return apiFetch<UserType>("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
+  })
+}
+
+/**
+ * Register a new account.
+ * - Mock mode: fabricates a demo user (no backend call).
+ * - Live mode: POST /auth/register; the backend forces role "staff" server-side
+ *   regardless of what the client sends, sets httpOnly cookies, and returns the user.
+ *   A 409 (email already registered) surfaces as an ApiError for the form to display.
+ */
+export async function register(
+  name: string,
+  email: string,
+  password: string,
+  warehouseId: number,
+): Promise<UserType> {
+  if (config.useMockAuth) {
+    return {
+      id: "demo",
+      name,
+      email,
+      role: "staff",
+      warehouseId,
+      status: "active",
+      joinedDate: new Date().toISOString().slice(0, 10),
+    }
+  }
+  return apiFetch<UserType>("/auth/register", {
+    method: "POST",
+    body: JSON.stringify({ name, email, password, warehouse_id: warehouseId }),
   })
 }
 

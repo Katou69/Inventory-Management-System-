@@ -44,3 +44,7 @@ backend/.venv/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local planning / learning notes (not shared)
+plan.md
+CONCEPTS.md
