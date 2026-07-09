@@ -40,14 +40,14 @@ const MIN_ZOOM   = 0.2
 const MAX_ZOOM   = 3
 
 const occupancyBorder: Record<ZoneOccupancy, string> = {
-  empty:   "border-slate-400",
+  empty:   "border-slate-400 dark:border-slate-600",
   partial: "border-amber-500",
   full:    "border-red-500",
 }
 const occupancyText: Record<ZoneOccupancy, string> = {
-  empty:   "text-slate-500",
-  partial: "text-amber-600",
-  full:    "text-red-600",
+  empty:   "text-muted-foreground",
+  partial: "text-amber-600 dark:text-amber-400",
+  full:    "text-red-600 dark:text-red-400",
 }
 const occupancyLabel: Record<ZoneOccupancy, string> = {
   empty: "Empty", partial: "Partial", full: "Full",
@@ -553,11 +553,11 @@ export default function ZoneLayoutCanvas({
   ]
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+    <div className="bg-card rounded-xl border border-border shadow-sm p-6">
       <div className="flex items-start justify-between flex-wrap gap-3 mb-4">
         <div>
-          <h3 className="text-base font-semibold text-slate-900">Warehouse Map</h3>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <h3 className="text-base font-semibold text-foreground">Warehouse Map</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
             {role === "staff" ? "Live layout (view only) — drag to pan, scroll to zoom" :
              activeTool === "draw-shelf" ? "Drag on the map to draw a shelf block" :
              activeTool === "draw-zone" ? "Drag on the map to draw a zone box (grouping)" :
@@ -568,18 +568,18 @@ export default function ZoneLayoutCanvas({
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             {(["empty", "partial", "full"] as const).map((o) => (
-              <span key={o} className="flex items-center gap-1.5 text-xs text-slate-500">
+              <span key={o} className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <span className={`size-2.5 rounded-sm border-2 ${occupancyBorder[o]}`} />
                 {occupancyLabel[o]}
               </span>
             ))}
-            <span className="flex items-center gap-1.5 text-xs text-slate-500">
-              <span className="size-2.5 rounded-sm border-2 border-dashed border-slate-400" />
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="size-2.5 rounded-sm border-2 border-dashed border-slate-400 dark:border-slate-600" />
               Zone
             </span>
           </div>
           {pending.length > 0 && showPendingOverlays && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[#E5F0F5] text-[#1A6B8A] text-xs font-medium ring-1 ring-[#1A6B8A]/20">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[#E5F0F5] dark:bg-primary/20 text-[#1A6B8A] dark:text-primary text-xs font-medium ring-1 ring-[#1A6B8A]/20 dark:ring-primary/30">
               {pending.length} pending
             </span>
           )}
@@ -589,14 +589,14 @@ export default function ZoneLayoutCanvas({
       {/* Map window */}
       <div className="relative">
         {/* Tool palette */}
-        <div className="absolute top-3 left-3 z-10 flex flex-col gap-1 bg-white/95 backdrop-blur rounded-lg border border-slate-200 shadow-sm p-1">
+        <div className="absolute top-3 left-3 z-10 flex flex-col gap-1 bg-card/95 backdrop-blur rounded-lg border border-border shadow-sm p-1">
           {tools.filter((t) => !t.editorOnly || canEdit).map((t) => (
             <button
               key={t.key}
               title={t.label}
               onClick={() => setTool(t.key)}
               className={`size-8 rounded-md flex items-center justify-center transition-colors ${
-                activeTool === t.key ? "bg-[#1A6B8A] text-white" : "text-slate-500 hover:bg-slate-100"
+                activeTool === t.key ? "bg-[#1A6B8A] dark:bg-primary text-white dark:text-primary-foreground" : "text-muted-foreground hover:bg-accent"
               }`}
             >
               <t.icon className="size-4" />
@@ -605,26 +605,26 @@ export default function ZoneLayoutCanvas({
         </div>
 
         {/* Zoom / view controls */}
-        <div className="absolute top-3 right-3 z-10 flex items-center gap-1 bg-white/95 backdrop-blur rounded-lg border border-slate-200 shadow-sm p-1">
-          <button title="Zoom out" onClick={() => zoomAt(view.zoom / 1.2, (canvasRef.current?.getBoundingClientRect().left ?? 0) + (canvasRef.current?.clientWidth ?? 0) / 2, (canvasRef.current?.getBoundingClientRect().top ?? 0) + VIEW_H / 2)} className="size-8 rounded-md flex items-center justify-center text-slate-500 hover:bg-slate-100">
+        <div className="absolute top-3 right-3 z-10 flex items-center gap-1 bg-card/95 backdrop-blur rounded-lg border border-border shadow-sm p-1">
+          <button title="Zoom out" onClick={() => zoomAt(view.zoom / 1.2, (canvasRef.current?.getBoundingClientRect().left ?? 0) + (canvasRef.current?.clientWidth ?? 0) / 2, (canvasRef.current?.getBoundingClientRect().top ?? 0) + VIEW_H / 2)} className="size-8 rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent">
             <Minus className="size-4" />
           </button>
-          <span className="text-xs text-slate-500 w-10 text-center tabular-nums">{Math.round(view.zoom * 100)}%</span>
-          <button title="Zoom in" onClick={() => zoomAt(view.zoom * 1.2, (canvasRef.current?.getBoundingClientRect().left ?? 0) + (canvasRef.current?.clientWidth ?? 0) / 2, (canvasRef.current?.getBoundingClientRect().top ?? 0) + VIEW_H / 2)} className="size-8 rounded-md flex items-center justify-center text-slate-500 hover:bg-slate-100">
+          <span className="text-xs text-muted-foreground w-10 text-center tabular-nums">{Math.round(view.zoom * 100)}%</span>
+          <button title="Zoom in" onClick={() => zoomAt(view.zoom * 1.2, (canvasRef.current?.getBoundingClientRect().left ?? 0) + (canvasRef.current?.clientWidth ?? 0) / 2, (canvasRef.current?.getBoundingClientRect().top ?? 0) + VIEW_H / 2)} className="size-8 rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent">
             <Plus className="size-4" />
           </button>
-          <div className="w-px h-5 bg-slate-200 mx-0.5" />
-          <button title="Fit to content" onClick={fitToContent} className="size-8 rounded-md flex items-center justify-center text-slate-500 hover:bg-slate-100">
+          <div className="w-px h-5 bg-border mx-0.5" />
+          <button title="Fit to content" onClick={fitToContent} className="size-8 rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent">
             <Maximize className="size-4" />
           </button>
-          <button title="Reset view" onClick={() => setView({ zoom: 1, x: 40, y: 40 })} className="size-8 rounded-md flex items-center justify-center text-slate-500 hover:bg-slate-100">
+          <button title="Reset view" onClick={() => setView({ zoom: 1, x: 40, y: 40 })} className="size-8 rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent">
             <LocateFixed className="size-4" />
           </button>
         </div>
 
         <div
           ref={canvasRef}
-          className="relative rounded-lg border border-slate-200 bg-slate-50 overflow-hidden touch-none"
+          className="relative rounded-lg border border-border bg-accent/50 overflow-hidden touch-none"
           style={{
             height: VIEW_H,
             cursor,
@@ -639,7 +639,7 @@ export default function ZoneLayoutCanvas({
           onPointerUp={onCanvasPointerUp}
         >
           {loading && (
-            <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm">
+            <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
               <Loader2 className="size-4 animate-spin mr-2" /> Loading map…
             </div>
           )}
@@ -677,24 +677,24 @@ export default function ZoneLayoutCanvas({
                       else { setSelectedZoneId(zone.id); setSelectedRequestId(null) }
                     }}
                     className={`absolute rounded-md border-2 ${
-                      isZone ? "border-dashed border-slate-400 bg-slate-500/[0.04]" : `bg-transparent ${occupancyBorder[occ]}`
+                      isZone ? "border-dashed border-slate-400 dark:border-slate-600 bg-slate-500/[0.04] dark:bg-slate-400/[0.06]" : `bg-transparent ${occupancyBorder[occ]}`
                     } ${liveIsDashed ? "border-dashed opacity-60" : ""} ${
                       stagedEdit ? "border-amber-500 border-dashed" : ""
                     } ${
-                      selected ? "ring-2 ring-[#1A6B8A] ring-offset-1" : ""
+                      selected ? "ring-2 ring-[#1A6B8A] dark:ring-primary ring-offset-1" : ""
                     } ${canEdit && !req && activeTool !== "pan" ? "cursor-move" : ""}`}
                     style={{ left: x, top: y, width: w, height: h }}
                   >
                     {isZone ? (
-                      <span className="absolute top-1.5 left-1.5 bg-white/80 text-slate-500 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-px rounded pointer-events-none">
+                      <span className="absolute top-1.5 left-1.5 bg-card/80 text-muted-foreground text-[10px] font-semibold uppercase tracking-wide px-1.5 py-px rounded pointer-events-none">
                         {zone.code} · {zone.name}
                       </span>
                     ) : (
                       <div className="absolute top-1 left-1.5 right-1 leading-tight pointer-events-none">
-                        <p className="text-xs font-bold text-slate-700">{zone.code}</p>
+                        <p className="text-xs font-bold text-foreground">{zone.code}</p>
                         {/* Drop lines that won't fit so small/narrow racks stay legible */}
                         {h >= 52 && w >= 90 && (
-                          <p className="text-[10px] font-medium text-slate-500 truncate">{zone.name}</p>
+                          <p className="text-[10px] font-medium text-muted-foreground truncate">{zone.name}</p>
                         )}
                         {h >= 40 && (
                           <p className={`text-[10px] font-medium ${occupancyText[occ]}`}>
@@ -706,7 +706,7 @@ export default function ZoneLayoutCanvas({
                     {canEdit && !req && activeTool !== "pan" && (
                       <div
                         onPointerDown={(e) => onZonePointerDown(e, zone, "resize")}
-                        className="absolute -bottom-1 -right-1 size-3 rounded-sm bg-white border-2 border-slate-400 cursor-se-resize"
+                        className="absolute -bottom-1 -right-1 size-3 rounded-sm bg-card border-2 border-slate-400 dark:border-slate-600 cursor-se-resize"
                       />
                     )}
                   </div>
@@ -721,8 +721,8 @@ export default function ZoneLayoutCanvas({
                     <div
                       onPointerDown={(e) => e.stopPropagation()}
                       onClick={(e) => { e.stopPropagation(); setSelectedRequestId(req!.id); setSelectedZoneId(null) }}
-                      className={`absolute rounded-md border-2 bg-transparent border-[#1A6B8A] cursor-pointer ${
-                        selectedRequestId === req!.id ? "ring-2 ring-[#1A6B8A] ring-offset-1" : ""
+                      className={`absolute rounded-md border-2 bg-transparent border-[#1A6B8A] dark:border-primary cursor-pointer ${
+                        selectedRequestId === req!.id ? "ring-2 ring-[#1A6B8A] dark:ring-primary ring-offset-1" : ""
                       }`}
                       style={{
                         left:   pItem.proposedData.x ?? zone.x,
@@ -732,9 +732,9 @@ export default function ZoneLayoutCanvas({
                       }}
                     >
                       <div className="absolute top-1 left-1.5 leading-tight pointer-events-none">
-                        <p className="text-xs font-bold text-[#1A6B8A]">{pItem.proposedData.code ?? zone.code}</p>
+                        <p className="text-xs font-bold text-[#1A6B8A] dark:text-primary">{pItem.proposedData.code ?? zone.code}</p>
                       </div>
-                      <span className="absolute -top-2.5 right-1 px-1.5 py-px rounded bg-[#1A6B8A] text-white text-[10px] font-semibold pointer-events-none">Pending</span>
+                      <span className="absolute -top-2.5 right-1 px-1.5 py-px rounded bg-[#1A6B8A] dark:bg-primary text-white dark:text-primary-foreground text-[10px] font-semibold pointer-events-none">Pending</span>
                     </div>
                   )}
 
@@ -753,15 +753,15 @@ export default function ZoneLayoutCanvas({
                 key={`create-${req.id}-${i}`}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => { e.stopPropagation(); setSelectedRequestId(req.id); setSelectedZoneId(null) }}
-                className={`absolute rounded-md border-2 bg-transparent border-[#1A6B8A] cursor-pointer ${
-                  selectedRequestId === req.id ? "ring-2 ring-[#1A6B8A] ring-offset-1" : ""
+                className={`absolute rounded-md border-2 bg-transparent border-[#1A6B8A] dark:border-primary cursor-pointer ${
+                  selectedRequestId === req.id ? "ring-2 ring-[#1A6B8A] dark:ring-primary ring-offset-1" : ""
                 }`}
                 style={{ left: item.proposedData?.x ?? 20, top: item.proposedData?.y ?? 20, width: item.proposedData?.width ?? 160, height: item.proposedData?.height ?? 120 }}
               >
                 <div className="absolute top-1 left-1.5 leading-tight pointer-events-none">
-                  <p className="text-xs font-bold text-[#1A6B8A]">{item.proposedData?.code}</p>
+                  <p className="text-xs font-bold text-[#1A6B8A] dark:text-primary">{item.proposedData?.code}</p>
                 </div>
-                <span className="absolute -top-2.5 right-1 px-1.5 py-px rounded bg-[#1A6B8A] text-white text-[10px] font-semibold pointer-events-none">Pending</span>
+                <span className="absolute -top-2.5 right-1 px-1.5 py-px rounded bg-[#1A6B8A] dark:bg-primary text-white dark:text-primary-foreground text-[10px] font-semibold pointer-events-none">Pending</span>
               </div>
             ))}
 
@@ -772,11 +772,11 @@ export default function ZoneLayoutCanvas({
               .map((d) => d.previous && (
                 <div
                   key={`staged-delete-${d.sectionId}`}
-                  className="absolute rounded-md border-2 border-dashed border-red-400 bg-red-50/30 opacity-60 pointer-events-none"
+                  className="absolute rounded-md border-2 border-dashed border-red-400 bg-red-50/30 dark:bg-red-950/20 opacity-60 pointer-events-none"
                   style={{ left: d.previous.x, top: d.previous.y, width: d.previous.width, height: d.previous.height }}
                 >
                   <div className="absolute top-1 left-1.5 leading-tight">
-                    <p className="text-xs font-bold text-red-600 line-through">{d.previous.code}</p>
+                    <p className="text-xs font-bold text-red-600 dark:text-red-400 line-through">{d.previous.code}</p>
                   </div>
                   <span className="absolute -top-2.5 right-1 px-1.5 py-px rounded bg-red-500 text-white text-[10px] font-semibold">Will delete</span>
                 </div>
@@ -785,7 +785,7 @@ export default function ZoneLayoutCanvas({
             {/* Rubber-band while drawing */}
             {drawRect && (
               <div
-                className="absolute rounded-md border-2 border-dashed border-[#1A6B8A] bg-[#E5F0F5]/50 pointer-events-none"
+                className="absolute rounded-md border-2 border-dashed border-[#1A6B8A] dark:border-primary bg-[#E5F0F5]/50 dark:bg-primary/10 pointer-events-none"
                 style={{
                   left: Math.min(drawRect.x0, drawRect.x1),
                   top: Math.min(drawRect.y0, drawRect.y1),
@@ -800,18 +800,18 @@ export default function ZoneLayoutCanvas({
 
       {/* Manager draft tray — accumulated edits submitted as one proposal */}
       {role === "manager" && staged.length > 0 && (
-        <div className="mt-4 flex items-center justify-between gap-3 flex-wrap rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+        <div className="mt-4 flex items-center justify-between gap-3 flex-wrap rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 px-4 py-3">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-medium ring-1 ring-amber-200">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400 text-xs font-medium ring-1 ring-amber-200 dark:ring-amber-800">
               {staged.length} unsubmitted change{staged.length === 1 ? "" : "s"}
             </span>
-            <span className="text-xs text-amber-700/80 truncate">Edits are held as a draft — submit them together as one proposal.</span>
+            <span className="text-xs text-amber-700/80 dark:text-amber-400/80 truncate">Edits are held as a draft — submit them together as one proposal.</span>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button onClick={discardStaged} disabled={busy} className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-white/60 rounded-lg transition-colors disabled:opacity-50">
+            <button onClick={discardStaged} disabled={busy} className="px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-card/60 rounded-lg transition-colors disabled:opacity-50">
               Discard
             </button>
-            <button onClick={openSubmitModal} disabled={busy} className="px-3 py-1.5 text-xs font-medium text-white bg-[#1A6B8A] hover:bg-[#145570] rounded-lg transition-colors disabled:opacity-50">
+            <button onClick={openSubmitModal} disabled={busy} className="px-3 py-1.5 text-xs font-medium text-white bg-[#1A6B8A] hover:bg-[#145570] dark:bg-primary dark:hover:bg-primary/90 dark:text-primary-foreground rounded-lg transition-colors disabled:opacity-50">
               Submit proposal ({staged.length})
             </button>
           </div>
@@ -820,31 +820,31 @@ export default function ZoneLayoutCanvas({
 
       {/* Selected box panel */}
       {selectedZone && !selectedRequest && (
-        <div className="mt-4 border-t border-slate-100 pt-4 flex flex-col sm:flex-row gap-6">
+        <div className="mt-4 border-t border-border pt-4 flex flex-col sm:flex-row gap-6">
           <div className="flex-1 min-w-0">
             {selectedZone.kind === "zone" ? (
               <div className="flex items-center gap-2 mb-1">
-                <h4 className="text-sm font-semibold text-slate-800">Zone box {selectedZone.code} · {selectedZone.name}</h4>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-xs font-medium">Grouping</span>
+                <h4 className="text-sm font-semibold text-foreground">Zone box {selectedZone.code} · {selectedZone.name}</h4>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-accent text-muted-foreground text-xs font-medium">Grouping</span>
               </div>
             ) : (
               <div className="flex items-center gap-2 mb-2">
-                <h4 className="text-sm font-semibold text-slate-800">Shelf {selectedZone.code} · {selectedZone.name}</h4>
+                <h4 className="text-sm font-semibold text-foreground">Shelf {selectedZone.code} · {selectedZone.name}</h4>
                 <span className={`text-xs font-medium ${occupancyText[zoneOccupancy(selectedZone, stock)]}`}>
                   {occupancyLabel[zoneOccupancy(selectedZone, stock)]} · {zoneStockTotal(selectedZone.id, stock).toLocaleString()} / {selectedZone.capacity.toLocaleString()} units
                 </span>
               </div>
             )}
             {selectedZone.kind === "zone" ? (
-              <p className="text-xs text-slate-400">A zone box groups shelf blocks — it carries no stock of its own.</p>
+              <p className="text-xs text-muted-foreground">A zone box groups shelf blocks — it carries no stock of its own.</p>
             ) : stock.filter((s) => s.sectionId === selectedZone.id).length === 0 ? (
-              <p className="text-xs text-slate-400">No stock in this shelf.</p>
+              <p className="text-xs text-muted-foreground">No stock in this shelf.</p>
             ) : (
               <ul className="space-y-1">
                 {stock.filter((s) => s.sectionId === selectedZone.id).map((s) => (
-                  <li key={s.id} className="flex items-center justify-between text-xs text-slate-600">
+                  <li key={s.id} className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>{s.itemName}</span>
-                    <span className="font-semibold">{s.quantity.toLocaleString()} units</span>
+                    <span className="font-semibold text-foreground">{s.quantity.toLocaleString()} units</span>
                   </li>
                 ))}
               </ul>
@@ -854,24 +854,24 @@ export default function ZoneLayoutCanvas({
           {canEdit && (
             <div className="flex flex-col gap-2.5 sm:w-64 shrink-0">
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-slate-500">Code / label</span>
-                <input value={formCode} onChange={(e) => setFormCode(e.target.value)} className="px-2.5 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A6B8A]/30" />
+                <span className="text-xs font-medium text-muted-foreground">Code / label</span>
+                <input value={formCode} onChange={(e) => setFormCode(e.target.value)} className="px-2.5 py-1.5 text-sm bg-input-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-slate-500">{selectedZone.kind === "zone" ? "Zone name" : "Shelf name"}</span>
-                <input value={formName} onChange={(e) => setFormName(e.target.value)} className="px-2.5 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A6B8A]/30" />
+                <span className="text-xs font-medium text-muted-foreground">{selectedZone.kind === "zone" ? "Zone name" : "Shelf name"}</span>
+                <input value={formName} onChange={(e) => setFormName(e.target.value)} className="px-2.5 py-1.5 text-sm bg-input-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
               </label>
               {selectedZone.kind === "shelf" && (
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-medium text-slate-500">Capacity (units)</span>
-                  <input value={formCapacity} inputMode="numeric" onChange={(e) => setFormCapacity(e.target.value.replace(/[^0-9]/g, ""))} className="px-2.5 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A6B8A]/30" />
+                  <span className="text-xs font-medium text-muted-foreground">Capacity (units)</span>
+                  <input value={formCapacity} inputMode="numeric" onChange={(e) => setFormCapacity(e.target.value.replace(/[^0-9]/g, ""))} className="px-2.5 py-1.5 text-sm bg-input-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
                 </label>
               )}
               <div className="flex items-center gap-2 mt-1">
-                <button onClick={saveZoneForm} disabled={busy} className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-[#1A6B8A] hover:bg-[#145570] rounded-lg transition-colors disabled:opacity-50">
+                <button onClick={saveZoneForm} disabled={busy} className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-[#1A6B8A] hover:bg-[#145570] dark:bg-primary dark:hover:bg-primary/90 dark:text-primary-foreground rounded-lg transition-colors disabled:opacity-50">
                   {role === "manager" ? "Add to proposal" : "Save"}
                 </button>
-                <button onClick={deleteZone} disabled={busy} className="px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50">Delete</button>
+                <button onClick={deleteZone} disabled={busy} className="px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors disabled:opacity-50">Delete</button>
               </div>
             </div>
           )}
@@ -880,25 +880,25 @@ export default function ZoneLayoutCanvas({
 
       {/* Selected pending request panel */}
       {selectedRequest && (
-        <div className="mt-4 border-t border-slate-100 pt-4">
+        <div className="mt-4 border-t border-border pt-4">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="inline-flex px-2 py-0.5 rounded-full bg-[#E5F0F5] text-[#1A6B8A] text-xs font-medium ring-1 ring-[#1A6B8A]/20">Pending</span>
-                <h4 className="text-sm font-semibold text-slate-800">
+                <span className="inline-flex px-2 py-0.5 rounded-full bg-[#E5F0F5] dark:bg-primary/20 text-[#1A6B8A] dark:text-primary text-xs font-medium ring-1 ring-[#1A6B8A]/20 dark:ring-primary/30">Pending</span>
+                <h4 className="text-sm font-semibold text-foreground">
                   Proposal · {selectedRequest.items.length} change{selectedRequest.items.length === 1 ? "" : "s"}
                 </h4>
               </div>
-              <p className="text-xs text-slate-400 mt-1">Requested by {selectedRequest.requestedBy}</p>
+              <p className="text-xs text-muted-foreground mt-1">Requested by {selectedRequest.requestedBy}</p>
               <ul className="mt-2 space-y-1">
                 {selectedRequest.items.map((item, i) => (
-                  <li key={i} className="flex items-start gap-1.5 text-xs text-slate-600">
-                    <span className="text-slate-400">•</span>
+                  <li key={i} className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                    <span className="text-muted-foreground">•</span>
                     <span>{actionSummary(item)}</span>
                   </li>
                 ))}
               </ul>
-              <p className="text-sm text-slate-600 mt-2 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">“{selectedRequest.requestNote}”</p>
+              <p className="text-sm text-muted-foreground mt-2 bg-accent border border-border rounded-lg px-3 py-2">"{selectedRequest.requestNote}"</p>
             </div>
 
             {role === "admin" ? (
@@ -907,14 +907,14 @@ export default function ZoneLayoutCanvas({
                   <Check className="size-4" /> Approve
                 </button>
                 <div className="flex flex-col gap-1.5">
-                  <input value={rejectNote} onChange={(e) => setRejectNote(e.target.value)} placeholder="Reason for rejection (required)" className="px-2.5 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30" />
-                  <button onClick={() => onReject(selectedRequest)} disabled={busy || !rejectNote.trim()} className="flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-red-600 border border-red-200 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40">
+                  <input value={rejectNote} onChange={(e) => setRejectNote(e.target.value)} placeholder="Reason for rejection (required)" className="px-2.5 py-1.5 text-sm bg-input-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-red-500/30" />
+                  <button onClick={() => onReject(selectedRequest)} disabled={busy || !rejectNote.trim()} className="flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors disabled:opacity-40">
                     <X className="size-4" /> Reject
                   </button>
                 </div>
               </div>
             ) : (
-              <p className="text-xs text-slate-400 shrink-0">Awaiting admin review</p>
+              <p className="text-xs text-muted-foreground shrink-0">Awaiting admin review</p>
             )}
           </div>
         </div>
@@ -924,16 +924,16 @@ export default function ZoneLayoutCanvas({
       {showSubmitModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowSubmitModal(false)} />
-          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
-            <h3 className="text-base font-semibold text-slate-900 mb-1">Describe this proposal</h3>
-            <p className="text-xs text-slate-400 mb-3">
+          <div className="relative bg-card rounded-2xl shadow-xl w-full max-w-sm p-6 border border-border">
+            <h3 className="text-base font-semibold text-foreground mb-1">Describe this proposal</h3>
+            <p className="text-xs text-muted-foreground mb-3">
               This covers {staged.length} change{staged.length === 1 ? "" : "s"}. A short message is
               required — the admin will see it when reviewing.
             </p>
-            <ul className="mb-4 max-h-32 overflow-y-auto space-y-1 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
+            <ul className="mb-4 max-h-32 overflow-y-auto space-y-1 bg-accent border border-border rounded-lg px-3 py-2">
               {staged.map((d, i) => (
-                <li key={i} className="flex items-start gap-1.5 text-xs text-slate-600">
-                  <span className="text-slate-400">•</span>
+                <li key={i} className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                  <span className="text-muted-foreground">•</span>
                   <span>{actionSummary(toChangeItem(d))}</span>
                 </li>
               ))}
@@ -941,11 +941,11 @@ export default function ZoneLayoutCanvas({
             <textarea
               autoFocus value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} rows={3}
               placeholder="e.g. Re-layout of the receiving bay for Q3 inbound"
-              className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1A6B8A]/30 resize-none"
+              className="w-full px-3 py-2 text-sm bg-input-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
             />
             <div className="flex items-center justify-end gap-2 mt-4">
-              <button onClick={() => setShowSubmitModal(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
-              <button onClick={submitProposal} disabled={!noteDraft.trim() || busy} className="px-4 py-2 text-sm font-medium text-white bg-[#1A6B8A] hover:bg-[#145570] rounded-lg transition-colors disabled:opacity-40">
+              <button onClick={() => setShowSubmitModal(false)} className="px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-accent rounded-lg transition-colors">Cancel</button>
+              <button onClick={submitProposal} disabled={!noteDraft.trim() || busy} className="px-4 py-2 text-sm font-medium text-white bg-[#1A6B8A] hover:bg-[#145570] dark:bg-primary dark:hover:bg-primary/90 dark:text-primary-foreground rounded-lg transition-colors disabled:opacity-40">
                 {busy ? "Submitting…" : "Submit proposal"}
               </button>
             </div>

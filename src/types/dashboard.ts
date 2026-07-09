@@ -185,6 +185,16 @@ export interface CreateWarehouseInput {
   location: string
   manager: string
   capacityTotal: number
+  image?: string
+}
+
+export interface UpdateWarehouseProfileInput {
+  manager: string
+  address: string
+  phone: string
+  email: string
+  nextInspection: string
+  image?: string
 }
 
 export interface SearchIndex {

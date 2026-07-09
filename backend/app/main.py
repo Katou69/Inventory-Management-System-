@@ -1,8 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
-from app.routers import auth
+from app.routers import auth, uploads
 
 app = FastAPI(title="Inventory Management API")
 
@@ -15,6 +16,9 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(uploads.router)
+
+app.mount("/uploads", StaticFiles(directory=uploads.UPLOAD_ROOT), name="uploads")
 
 
 @app.get("/health")
