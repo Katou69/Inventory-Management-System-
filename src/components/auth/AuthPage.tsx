@@ -24,6 +24,17 @@ function FieldIcon({ children }: { children: React.ReactNode }) {
   );
 }
 
+const PASSWORD_HINT = "At least 8 characters, with uppercase, lowercase, a number & a symbol";
+
+function validatePassword(password: string): string | null {
+  if (password.length < 8) return "Password must be at least 8 characters";
+  if (!/[A-Z]/.test(password)) return "Password must include an uppercase letter";
+  if (!/[a-z]/.test(password)) return "Password must include a lowercase letter";
+  if (!/[0-9]/.test(password)) return "Password must include a number";
+  if (!/[^A-Za-z0-9]/.test(password)) return "Password must include a symbol";
+  return null;
+}
+
 export default function AuthPage() {
   const { signIn, signUp, signInDemo, theme, setTheme } = useAuth();
   const [mode, setMode] = useState<"login" | "signup">("login");
@@ -51,6 +62,13 @@ export default function AuthPage() {
     if (!form.password) {
       setError("Password is required");
       return;
+    }
+    if (mode === "signup") {
+      const passwordError = validatePassword(form.password);
+      if (passwordError) {
+        setError(passwordError);
+        return;
+      }
     }
     if (mode === "signup" && !form.name.trim()) {
       setError("Full name is required");
@@ -204,6 +222,9 @@ export default function AuthPage() {
                   {showPw ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 </button>
               </Field>
+              {mode === "signup" && (
+                <p className="text-xs text-muted-foreground -mt-2">{PASSWORD_HINT}</p>
+              )}
 
               {mode === "signup" && (
                 <div>

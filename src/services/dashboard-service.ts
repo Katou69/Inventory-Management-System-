@@ -8,7 +8,7 @@
  * REST-style API, so the UI layer does not change.
  */
 import { config } from "@/lib/config"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, ApiError } from "@/lib/api-client"
 import {
   statusCards,
   inventoryByPeriod,
@@ -30,6 +30,7 @@ import type {
   SalesOverview,
   SearchIndex,
   CreateWarehouseInput,
+  UpdateWarehouseProfileInput,
 } from "@/types/dashboard"
 
 // Deep clone so callers can safely mutate their own copy of mock data.
@@ -101,7 +102,7 @@ export async function createWarehouse(input: CreateWarehouseInput): Promise<Ware
     return {
       id: nextId,
       name: input.name,
-      image: "/images/ellipse-2.png",
+      image: input.image ?? "/images/ellipse-2.png",
       lastInspection: new Date().toLocaleDateString("en-GB").replace(/\//g, "-"),
       warehouseId: `WH-${String(nextId).padStart(3, "0")}`,
       location: input.location,
@@ -114,6 +115,28 @@ export async function createWarehouse(input: CreateWarehouseInput): Promise<Ware
     method: "POST",
     body: JSON.stringify(input),
   })
+}
+
+/**
+ * Uploads a warehouse image and returns its URL.
+ *
+ * In mock mode there is no backend to store the file, so it's kept as a local
+ * object URL for this session's preview only (not persisted across reloads,
+ * same limitation as the rest of the mock layer).
+ */
+export async function uploadWarehouseImage(file: File): Promise<string> {
+  if (config.useMock) return URL.createObjectURL(file)
+
+  const form = new FormData()
+  form.append("file", file)
+  const res = await fetch(`${config.apiBaseUrl}/uploads/warehouse-image`, {
+    method: "POST",
+    credentials: "include",
+    body: form,
+  })
+  if (!res.ok) throw new ApiError(res.status, "Image upload failed")
+  const { url } = (await res.json()) as { url: string }
+  return `${config.apiBaseUrl}${url}`
 }
 
 export async function markAllNotificationsRead(): Promise<void> {
@@ -131,5 +154,16 @@ export async function updateSalesGoal(target: number): Promise<SalesOverview> {
   return apiFetch<SalesOverview>("/sales/goal", {
     method: "PUT",
     body: JSON.stringify({ target }),
+  })
+}
+
+export async function updateWarehouseProfile(
+  id: number,
+  input: UpdateWarehouseProfileInput,
+): Promise<UpdateWarehouseProfileInput> {
+  if (config.useMock) return input
+  return apiFetch<UpdateWarehouseProfileInput>(`/warehouses/${id}/profile`, {
+    method: "PUT",
+    body: JSON.stringify(input),
   })
 }

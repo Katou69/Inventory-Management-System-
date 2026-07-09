@@ -4,9 +4,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.database import Base, get_db
+from app.db.session import Base, get_db
 from app.main import app
-from app.models import session, user  # noqa: F401  (register tables on Base.metadata)
+from app.auth import models as auth_models  # noqa: F401  (register tables on Base.metadata)
+from app.users import models as user_models  # noqa: F401
 
 TEST_DATABASE_URL = "sqlite:///:memory:"
 

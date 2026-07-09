@@ -1,7 +1,7 @@
 from datetime import date
 
-from app.models.user import User
-from app.security import hash_password
+from app.users.models import User
+from app.auth.jwt import hash_password
 
 
 def _create_user(db_session, email="user@example.com", password="secret123"):

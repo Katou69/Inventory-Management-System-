@@ -24,14 +24,14 @@ export default function ZoneLayoutSection({ warehouseId }: { warehouseId: number
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-end gap-2">
-        <span className="text-xs text-slate-400">Viewing as (demo):</span>
-        <div className="flex items-center bg-slate-100 rounded-lg p-1 gap-1">
+        <span className="text-xs text-muted-foreground">Viewing as (demo):</span>
+        <div className="flex items-center bg-accent rounded-lg p-1 gap-1">
           {ROLES.map((r) => (
             <button
               key={r.key}
               onClick={() => setRole(r.key)}
               className={`text-xs px-3 py-1 rounded-md transition-colors ${
-                role === r.key ? "bg-white text-slate-800 shadow-sm font-medium" : "text-slate-500 hover:text-slate-700"
+                role === r.key ? "bg-card text-foreground shadow-sm font-medium" : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {r.label}

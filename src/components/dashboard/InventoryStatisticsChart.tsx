@@ -60,29 +60,29 @@ function CustomTooltip({ active, payload, label }: TooltipProps) {
     : v >= 1_000   ? `$${(v / 1_000).toFixed(0)}k`
     : `$${v}`
   return (
-    <div className="bg-white rounded-xl shadow-lg border border-slate-100 px-4 py-3 min-w-[160px]">
-      <p className="text-xs font-bold text-slate-800 mb-2">{label}</p>
+    <div className="bg-card rounded-xl shadow-lg border border-border px-4 py-3 min-w-[160px]">
+      <p className="text-xs font-bold text-foreground mb-2">{label}</p>
       <div className="space-y-1.5">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-1.5">
             <span className="size-2 rounded-sm shrink-0" style={{ background: "#f59e0b" }} />
-            <span className="text-xs text-slate-500">Stock In</span>
+            <span className="text-xs text-muted-foreground">Stock In</span>
           </div>
-          <span className="text-xs font-semibold text-slate-800">{fmt(stockIn)}</span>
+          <span className="text-xs font-semibold text-foreground">{fmt(stockIn)}</span>
         </div>
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-1.5">
             <span className="size-2 rounded-sm shrink-0" style={{ background: "#8b5cf6" }} />
-            <span className="text-xs text-slate-500">Stock Out</span>
+            <span className="text-xs text-muted-foreground">Stock Out</span>
           </div>
-          <span className="text-xs font-semibold text-slate-800">{fmt(stockOut)}</span>
+          <span className="text-xs font-semibold text-foreground">{fmt(stockOut)}</span>
         </div>
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-1.5">
-            <span className="size-2 rounded-full border-2 border-[#3b9eff] bg-white shrink-0" />
-            <span className="text-xs text-slate-500">Stock Value</span>
+            <span className="size-2 rounded-full border-2 border-[#3b9eff] bg-card shrink-0" />
+            <span className="text-xs text-muted-foreground">Stock Value</span>
           </div>
-          <span className="text-xs font-semibold text-slate-800">{fmt(stockValue)}</span>
+          <span className="text-xs font-semibold text-foreground">{fmt(stockValue)}</span>
         </div>
       </div>
     </div>
@@ -110,7 +110,7 @@ function AlternatingBackground({ xAxisMap, yAxisMap }: CustomizedAxisProps) {
             y={yAxis?.y ?? y}
             width={bandWidth || width / slots.length}
             height={yAxis?.height ?? height}
-            fill="#f8fafc"
+            className="fill-accent/50"
           />
         )
       })}
@@ -149,36 +149,36 @@ export default function InventoryStatisticsChart({
   const ticks = buildTicks(data)
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+    <div className="bg-card rounded-xl border border-border shadow-sm p-5">
       <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
-        <h3 className="text-base font-semibold text-slate-900">Inventory Statistics</h3>
+        <h3 className="text-base font-semibold text-foreground">Inventory Statistics</h3>
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <span className="size-2 rounded-full inline-block bg-[#f59e0b]" />
               Stock In
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <span className="size-2 rounded-full inline-block bg-[#8b5cf6]" />
               Stock Out
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <svg width="16" height="8" className="shrink-0">
                 <line x1="0" y1="4" x2="16" y2="4" stroke="#3b9eff" strokeWidth="2" strokeDasharray="4,2" />
               </svg>
-              <span className="size-2 rounded-full border-2 border-[#3b9eff] bg-white inline-block" />
+              <span className="size-2 rounded-full border-2 border-[#3b9eff] bg-card inline-block" />
               Stock Value
             </div>
           </div>
-          <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden">
+          <div className="flex items-center border border-border rounded-lg overflow-hidden">
             {PERIODS.map(({ key, label }) => (
               <button
                 key={key}
                 onClick={() => setPeriod(key)}
                 className={`text-xs px-3 py-1.5 transition-colors ${
                   period === key
-                    ? "bg-[#1A6B8A] text-white font-medium"
-                    : "text-slate-500 hover:bg-slate-50"
+                    ? "bg-primary text-primary-foreground font-medium"
+                    : "text-muted-foreground hover:bg-accent"
                 }`}
               >
                 {label}
@@ -201,14 +201,14 @@ export default function InventoryStatisticsChart({
             dataKey="label"
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 11, fill: "#94a3b8" }}
+            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
           />
           <YAxis
             tickFormatter={yTickFormatter}
             ticks={ticks}
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 11, fill: "#94a3b8" }}
+            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
             width={36}
           />
           <Tooltip
@@ -229,8 +229,8 @@ export default function InventoryStatisticsChart({
             stroke="#3b9eff"
             strokeWidth={2}
             strokeDasharray="5 3"
-            dot={{ r: 3.5, fill: "white", stroke: "#3b9eff", strokeWidth: 2 }}
-            activeDot={{ r: 5, fill: "white", stroke: "#3b9eff", strokeWidth: 2 }}
+            dot={{ r: 3.5, fill: "var(--card)", stroke: "#3b9eff", strokeWidth: 2 }}
+            activeDot={{ r: 5, fill: "var(--card)", stroke: "#3b9eff", strokeWidth: 2 }}
           />
         </ComposedChart>
       </ResponsiveContainer>

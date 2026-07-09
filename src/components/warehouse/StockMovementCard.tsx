@@ -17,15 +17,15 @@ export default function StockMovementCard({ wh }: { wh: WarehouseDetail }) {
   const barW = 8
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex-1 min-w-0">
+    <div className="bg-card rounded-xl border border-border shadow-sm p-6 flex-1 min-w-0">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-base font-semibold text-slate-900">Recent Stock Movement</h3>
-          <p className="text-xs text-slate-400 mt-0.5">Last 7 days</p>
+          <h3 className="text-base font-semibold text-foreground">Recent Stock Movement</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Last 7 days</p>
         </div>
         <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1 text-xs text-slate-500"><span className="size-2 rounded-full bg-emerald-500" />In</span>
-          <span className="flex items-center gap-1 text-xs text-slate-500"><span className="size-2 rounded-full bg-red-400" />Out</span>
+          <span className="flex items-center gap-1 text-xs text-muted-foreground"><span className="size-2 rounded-full bg-emerald-500" />In</span>
+          <span className="flex items-center gap-1 text-xs text-muted-foreground"><span className="size-2 rounded-full bg-red-400" />Out</span>
         </div>
       </div>
 
@@ -39,22 +39,22 @@ export default function StockMovementCard({ wh }: { wh: WarehouseDetail }) {
             <g key={d.day}>
               <rect x={cx - barW - 1} y={H - inH}  width={barW} height={inH}  rx={2} fill="#10b981" />
               <rect x={cx + 1}        y={H - outH} width={barW} height={outH} rx={2} fill="#f87171" />
-              <text x={cx} y={H + 14} textAnchor="middle" fontSize="10" fill="#94a3b8">{d.day}</text>
+              <text x={cx} y={H + 14} textAnchor="middle" fontSize="10" className="fill-muted-foreground">{d.day}</text>
             </g>
           )
         })}
       </svg>
 
       {/* Recent list */}
-      <div className="mt-4 pt-4 border-t border-slate-100 divide-y divide-slate-100">
+      <div className="mt-4 pt-4 border-t border-border divide-y divide-border">
         {wh.movements.slice(0, 4).map((m) => (
           <div key={m.id} className="flex items-center gap-3 py-2.5">
             <span className={`size-2 rounded-full shrink-0 ${movementDot[m.type]}`} />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-800 truncate">{m.item}</p>
-              <p className="text-xs text-slate-400">{m.type} • {m.date}</p>
+              <p className="text-sm font-medium text-foreground truncate">{m.item}</p>
+              <p className="text-xs text-muted-foreground">{m.type} • {m.date}</p>
             </div>
-            <span className={`text-sm font-bold shrink-0 ${m.qty >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+            <span className={`text-sm font-bold shrink-0 ${m.qty >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
               {m.qty >= 0 ? "+" : ""}{m.qty} units
             </span>
           </div>

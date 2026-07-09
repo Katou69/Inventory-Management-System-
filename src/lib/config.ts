@@ -26,6 +26,5 @@ export const config = {
     process.env.NEXT_PUBLIC_USE_MOCK_AUTH != null
       ? process.env.NEXT_PUBLIC_USE_MOCK_AUTH !== "false"
       : useMock,
-  /** Base URL of the backend API (used when a service is in live mode). */
   apiBaseUrl: process.env.NEXT_PUBLIC_API_URL ?? "",
 } as const

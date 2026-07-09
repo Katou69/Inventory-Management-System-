@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useState } from "react"
 import { Plus, ArrowUpRight, X } from "lucide-react"
 import { createWarehouse } from "@/services/dashboard-service"
+import WarehouseImagePicker from "@/components/warehouse/WarehouseImagePicker"
 import type { Warehouse } from "@/types/dashboard"
 
 function CapacityBar({ used, total }: { used: number; total: number }) {
@@ -26,8 +27,15 @@ export default function WarehouseTable({ initialWarehouses }: { initialWarehouse
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [submitting, setSubmitting] = useState(false)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
 
   const canSubmit = form.name.trim() && form.location.trim() && form.manager.trim() && Number(form.capacityTotal) > 0
+
+  function closeModal() {
+    setModalOpen(false)
+    setForm(emptyForm)
+    setImagePreview(null)
+  }
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
@@ -39,10 +47,10 @@ export default function WarehouseTable({ initialWarehouses }: { initialWarehouse
         location: form.location.trim(),
         manager: form.manager.trim(),
         capacityTotal: Number(form.capacityTotal),
+        image: imagePreview ?? undefined,
       })
       setWarehouses((prev) => [newWarehouse, ...prev])
-      setForm(emptyForm)
-      setModalOpen(false)
+      closeModal()
     } finally {
       setSubmitting(false)
     }
@@ -119,21 +127,22 @@ export default function WarehouseTable({ initialWarehouses }: { initialWarehouse
       {/* Add Warehouse modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setModalOpen(false)} />
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={closeModal} />
           <div className="relative bg-card rounded-2xl shadow-xl w-full max-w-md p-6 border border-border">
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-lg font-semibold text-foreground">Add Warehouse</h3>
-              <button onClick={() => setModalOpen(false)} className="p-1.5 rounded-lg hover:bg-accent transition-colors">
+              <button onClick={closeModal} className="p-1.5 rounded-lg hover:bg-accent transition-colors">
                 <X className="size-4 text-muted-foreground" />
               </button>
             </div>
             <form onSubmit={handleAdd} className="flex flex-col gap-4">
+              <WarehouseImagePicker value={imagePreview} onChange={setImagePreview} />
               <Field label="Warehouse name" value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="e.g. Yangon East Depot" />
               <Field label="Location" value={form.location} onChange={(v) => setForm((f) => ({ ...f, location: v }))} placeholder="e.g. Yangon" />
               <Field label="Manager" value={form.manager} onChange={(v) => setForm((f) => ({ ...f, manager: v }))} placeholder="e.g. Aung Aung" />
               <Field label="Total capacity (units)" value={form.capacityTotal} onChange={(v) => setForm((f) => ({ ...f, capacityTotal: v.replace(/[^0-9]/g, "") }))} placeholder="e.g. 5000" inputMode="numeric" />
               <div className="flex items-center justify-end gap-2 mt-2">
-                <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-accent rounded-lg transition-colors">
+                <button type="button" onClick={closeModal} className="px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-accent rounded-lg transition-colors">
                   Cancel
                 </button>
                 <button type="submit" disabled={!canSubmit || submitting} className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed">

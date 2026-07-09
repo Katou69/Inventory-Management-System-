@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation"
 import { getWarehouseDetail, getWarehouses } from "@/services/dashboard-service"
-import WarehouseHeader from "@/components/warehouse/WarehouseHeader"
-import WarehouseProfileCard from "@/components/warehouse/WarehouseProfileCard"
+import WarehouseProfileSection from "@/components/warehouse/WarehouseProfileSection"
 import QuickStatsRow from "@/components/warehouse/QuickStatsRow"
 import CapacityCard from "@/components/warehouse/CapacityCard"
 import StockMovementCard from "@/components/warehouse/StockMovementCard"
@@ -25,8 +24,7 @@ export default async function WarehouseDetailPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <WarehouseHeader name={wh.name} />
-      <WarehouseProfileCard wh={wh} />
+      <WarehouseProfileSection wh={wh} />
       <QuickStatsRow wh={wh} />
       <ZoneLayoutSection warehouseId={wh.id} />
       <div className="flex flex-col lg:flex-row gap-6 items-stretch">

@@ -4,22 +4,27 @@ import { warehouseStatusStyle, warehouseStatusDot } from "./statusStyles"
 
 export default function WarehouseProfileCard({ wh }: { wh: WarehouseDetail }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+    <div className="bg-card rounded-xl border border-border shadow-sm p-6">
       <div className="flex flex-col sm:flex-row gap-6">
         {/* Photo / icon */}
-        <div className="size-32 rounded-2xl bg-[#E5F0F5] ring-1 ring-[#1A6B8A]/20 flex items-center justify-center shrink-0 mx-auto sm:mx-0">
-          <WarehouseIcon className="size-14 text-[#1A6B8A]" />
+        <div className="relative size-32 rounded-2xl overflow-hidden bg-[#E5F0F5] dark:bg-primary/20 ring-1 ring-[#1A6B8A]/20 dark:ring-primary/30 flex items-center justify-center shrink-0 mx-auto sm:mx-0">
+          {wh.image ? (
+            // eslint-disable-next-line @next/next/no-img-element -- may be a blob:/local preview URL, which next/image can't optimize
+            <img src={wh.image} alt="" className="absolute inset-0 size-full object-cover" />
+          ) : (
+            <WarehouseIcon className="size-14 text-[#1A6B8A] dark:text-primary" />
+          )}
         </div>
 
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 flex-wrap mb-1">
-            <h2 className="text-xl font-bold text-slate-900">{wh.name}</h2>
+            <h2 className="text-xl font-bold text-foreground">{wh.name}</h2>
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${warehouseStatusStyle[wh.status]}`}>
               <span className={`size-1.5 rounded-full ${warehouseStatusDot[wh.status]}`} />
               {wh.status}
             </span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-xs font-mono font-medium">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-accent text-muted-foreground text-xs font-mono font-medium">
               {wh.warehouseId}
             </span>
           </div>
@@ -43,12 +48,12 @@ function InfoRow({
 }: { icon: React.ElementType; label: string; value: string; highlight?: boolean }) {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="size-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
-        <Icon className="size-4 text-slate-400" />
+      <div className="size-8 rounded-lg bg-accent border border-border flex items-center justify-center shrink-0">
+        <Icon className="size-4 text-muted-foreground" />
       </div>
       <div className="min-w-0">
-        <p className="text-xs text-slate-400 leading-tight">{label}</p>
-        <p className={`text-sm font-medium leading-tight truncate ${highlight ? "text-[#1A6B8A]" : "text-slate-800"}`}>
+        <p className="text-xs text-muted-foreground leading-tight">{label}</p>
+        <p className={`text-sm font-medium leading-tight truncate ${highlight ? "text-[#1A6B8A] dark:text-primary" : "text-foreground"}`}>
           {value}
         </p>
       </div>
