@@ -3,9 +3,9 @@ from collections.abc import Callable
 from fastapi import Cookie, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.database import get_db
-from app.models.user import User
-from app.security import decode_token
+from app.auth.jwt import decode_token
+from app.db.session import get_db
+from app.users.models import User
 
 
 def get_current_user(

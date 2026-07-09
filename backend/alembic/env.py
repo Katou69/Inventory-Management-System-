@@ -6,8 +6,9 @@ from sqlalchemy import pool
 from alembic import context
 
 from app.config import settings
-from app.database import Base
-from app.models import session, user  # noqa: F401  (ensures models are registered on Base.metadata)
+from app.db.session import Base
+from app.auth import models as auth_models  # noqa: F401  (ensures models are registered on Base.metadata)
+from app.users import models as user_models  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

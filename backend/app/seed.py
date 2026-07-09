@@ -1,8 +1,8 @@
 from datetime import date
 
-from app.database import SessionLocal
-from app.models.user import User
-from app.security import hash_password
+from app.auth.jwt import hash_password
+from app.db.session import SessionLocal
+from app.users.models import User
 
 DEV_USERS = [
     {
