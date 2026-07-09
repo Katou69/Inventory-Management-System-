@@ -31,6 +31,7 @@ export default function AuthPage() {
   const [warehouses, setWarehouses] = useState<WarehouseEntity[]>([]);
   const [form, setForm] = useState({ name: "", email: "", password: "", warehouseId: 1 });
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Quick-login demo buttons are mock-only.
@@ -41,6 +42,7 @@ export default function AuthPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccess(null);
 
     if (!form.email.trim() || !/\S+@\S+\.\S+/.test(form.email)) {
       setError("Enter a valid email address");
@@ -59,14 +61,18 @@ export default function AuthPage() {
     try {
       if (mode === "signup") {
         await signUp(form.name, form.email, form.password, form.warehouseId);
+        setSuccess("Account created successfully! Please wait for admin approval.");
+        // Reset form
+        setForm({ name: "", email: "", password: "", warehouseId: 1 });
       } else {
         await signIn(form.email, form.password);
       }
     } catch (err) {
       let message = mode === "signup" ? "Sign up failed. Please try again." : "Sign in failed. Please try again.";
       if (err instanceof ApiError) {
-        if (err.status === 401) message = "Invalid email or password";
+        if (err.status === 401) message = err.message || "Invalid email or password";
         else if (err.status === 409) message = "An account with this email already exists";
+        else if (err.status === 429) message = err.message || "Too many login attempts. Please try again later.";
       }
       setError(message);
     } finally {
@@ -228,6 +234,12 @@ export default function AuthPage() {
                 </p>
               )}
 
+              {success && (
+                <p className="text-sm text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 rounded-lg px-3 py-2">
+                  {success}
+                </p>
+              )}
+
               <button
                 type="submit"
                 disabled={submitting}
@@ -242,7 +254,7 @@ export default function AuthPage() {
             <p className="text-center text-sm text-muted-foreground mt-5">
               {mode === "login" ? "Don't have an account? " : "Already have an account? "}
               <button
-                onClick={() => { setMode(m => m === "login" ? "signup" : "login"); setError(null); }}
+                onClick={() => { setMode(m => m === "login" ? "signup" : "login"); setError(null); setSuccess(null); }}
                 className="text-primary font-medium hover:underline"
               >
                 {mode === "login" ? "Sign up" : "Sign in"}

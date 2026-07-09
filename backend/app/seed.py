@@ -6,8 +6,8 @@ from app.security import hash_password
 
 DEV_USERS = [
     {
-        "name": "Admin User",
-        "email": "admin@example.com",
+        "name": "Morgan Lee",
+        "email": "admin@grandroyal.com",
         "password": "password123",
         "role": "admin",
         "warehouse_id": "all",
@@ -16,7 +16,7 @@ DEV_USERS = [
     },
     {
         "name": "Manager User",
-        "email": "manager@example.com",
+        "email": "manager@grandroyal.com",
         "password": "password123",
         "role": "manager",
         "warehouse_id": "1",

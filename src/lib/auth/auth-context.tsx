@@ -112,8 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp: AuthContextValue["signUp"] = async (name, email, password, warehouseId) => {
     const u = await authService.register(name, email, password, warehouseId)
-    setUser(u)
-    persistMockUser(u)
+    // Don't log in automatically - user needs admin approval first
   }
 
   const signInDemo = (role: Role) => {

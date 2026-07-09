@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime, timezone
 
-from sqlalchemy import Date, DateTime, String
+from sqlalchemy import Date, DateTime, String, Integer
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -20,8 +20,10 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)
     role: Mapped[str] = mapped_column(String, nullable=False)  # "admin" | "manager" | "staff"
     warehouse_id: Mapped[str] = mapped_column(String, nullable=False)  # numeric id as string, or "all"
-    status: Mapped[str] = mapped_column(String, nullable=False, default="active")  # "active" | "inactive"
+    status: Mapped[str] = mapped_column(String, nullable=False, default="pending")  # "pending" | "active" | "inactive"
     joined_date: Mapped[date] = mapped_column(Date, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+    login_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    lockout_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

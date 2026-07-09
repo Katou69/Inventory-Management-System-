@@ -18,15 +18,16 @@ import type { UserType, Role } from "@/types/user"
  */
 export async function login(email: string, password: string): Promise<UserType> {
   if (config.useMockAuth) {
-    return {
-      id: "demo",
-      name: "Morgan Lee",
-      email: email || "morgan.lee@grandroyal.com",
-      role: "staff",
-      warehouseId: 1,
-      status: "active",
-      joinedDate: new Date().toISOString().slice(0, 10),
+    // Find user in mock data
+    const user = MOCK_USERS.find(u => u.email.toLowerCase() === email.toLowerCase())
+    if (!user) {
+      throw new ApiError("Invalid email or password", 401)
     }
+    // Check if user is active
+    if (user.status !== "active") {
+      throw new ApiError("Your account is not activated yet. Please wait for admin approval.", 401)
+    }
+    return user
   }
   return apiFetch<UserType>("/auth/login", {
     method: "POST",
@@ -48,15 +49,25 @@ export async function register(
   warehouseId: number,
 ): Promise<UserType> {
   if (config.useMockAuth) {
-    return {
-      id: "demo",
+    // Check if email already exists
+    const existingUser = MOCK_USERS.find(u => u.email.toLowerCase() === email.toLowerCase())
+    if (existingUser) {
+      throw new ApiError("Email already registered", 409)
+    }
+    // Create new pending user
+    const newUser: UserType = {
+      id: `u${MOCK_USERS.length + 1}`,
       name,
       email,
       role: "staff",
       warehouseId,
-      status: "active",
+      status: "pending",
       joinedDate: new Date().toISOString().slice(0, 10),
+      loginAttempts: 0,
+      lockoutUntil: null,
     }
+    MOCK_USERS.push(newUser)
+    return newUser
   }
   return apiFetch<UserType>("/auth/register", {
     method: "POST",
