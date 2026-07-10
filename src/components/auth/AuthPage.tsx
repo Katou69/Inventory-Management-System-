@@ -8,6 +8,7 @@ import { getWarehouses } from "@/services/dashboard-service";
 import { useAuth } from "@/lib/auth/auth-context";
 import { config } from "@/lib/config";
 import { ApiError } from "@/lib/api-client";
+import { loginSchema, registerSchema } from "@/schemas/auth";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -25,15 +26,6 @@ function FieldIcon({ children }: { children: React.ReactNode }) {
 }
 
 const PASSWORD_HINT = "At least 8 characters, with uppercase, lowercase, a number & a symbol";
-
-function validatePassword(password: string): string | null {
-  if (password.length < 8) return "Password must be at least 8 characters";
-  if (!/[A-Z]/.test(password)) return "Password must include an uppercase letter";
-  if (!/[a-z]/.test(password)) return "Password must include a lowercase letter";
-  if (!/[0-9]/.test(password)) return "Password must include a number";
-  if (!/[^A-Za-z0-9]/.test(password)) return "Password must include a symbol";
-  return null;
-}
 
 export default function AuthPage() {
   const { signIn, signUp, signInDemo, theme, setTheme } = useAuth();
@@ -55,23 +47,9 @@ export default function AuthPage() {
     setError(null);
     setSuccess(null);
 
-    if (!form.email.trim() || !/\S+@\S+\.\S+/.test(form.email)) {
-      setError("Enter a valid email address");
-      return;
-    }
-    if (!form.password) {
-      setError("Password is required");
-      return;
-    }
-    if (mode === "signup") {
-      const passwordError = validatePassword(form.password);
-      if (passwordError) {
-        setError(passwordError);
-        return;
-      }
-    }
-    if (mode === "signup" && !form.name.trim()) {
-      setError("Full name is required");
+    const result = mode === "signup" ? registerSchema.safeParse(form) : loginSchema.safeParse(form);
+    if (!result.success) {
+      setError(result.error.issues[0].message);
       return;
     }
 
