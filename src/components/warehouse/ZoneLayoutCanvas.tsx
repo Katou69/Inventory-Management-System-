@@ -16,12 +16,30 @@
  *     or the ± controls, zoom-to-cursor). Fit + Reset recentre the view.
  *   - Draw tool: managers/admins drag on empty space to draw a new rectangular
  *     zone at real map coordinates.
+ *   - Select tool: click selects; shift-click toggles a box into/out of a
+ *     multi-selection; dragging on empty space rubber-band selects. A
+ *     multi-selection can be dragged together, duplicated, or deleted as one.
+ *   - Resize: 8 handles (4 corners + 4 edge midpoints) per box, each anchoring
+ *     the opposite side — same mental model as Figma/PowerPoint.
+ *   - Undo/redo: manager edits are pure local state until submitted, so
+ *     undo/redo there just rewinds the local `staged` list. Admin edits are
+ *     already persisted (applyDirectChange runs immediately), so admin
+ *     undo/redo replays the *inverse* edit as a new logged direct change —
+ *     it does not rewrite history, it corrects it, same as a human would.
+ *   - Floors + blueprint + real-world scale are presentational aids layered
+ *     on top of one warehouse's zones — see the "Floors" section below for
+ *     why they're client-only for now.
  *
  * Zones are hollow rectangles; border color = live occupancy derived from
- * zone_stock vs capacity (gray empty / amber partial / red full).
+ * zone_stock vs capacity (gray empty / amber partial / red full). A thin fill
+ * bar under the quantity line shows the exact %, independent of that 3-tier
+ * color.
  */
-import { useCallback, useEffect, useRef, useState } from "react"
-import { MousePointer2, Hand, Boxes, SquareDashed, Plus, Minus, Maximize, LocateFixed, X, Check, Loader2 } from "lucide-react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  MousePointer2, Hand, Boxes, SquareDashed, Plus, Minus, Maximize, LocateFixed,
+  X, Check, Loader2, Undo2, Redo2, Copy, Trash2, ImagePlus, Eye, EyeOff,
+} from "lucide-react"
 import {
   getZones, getZoneStock, getPendingRequests,
   applyDirectChange, proposeChange, approveRequest, rejectRequest,
@@ -31,13 +49,13 @@ import type {
   ViewerRole, ZoneSection, ZoneStockEntry, ZoneChangeRequest, ZoneChangeItem,
   ZoneChangeAction, ZoneFields, ZoneOccupancy,
 } from "@/types/dashboard"
-
 const VIEW_H     = 560   // canvas window height (px)
 const GRID       = 20    // world units per grid cell
 const MIN_SIZE   = 40    // smallest zone (world units)
 const MIN_DRAW   = 24    // min drag to count as a drawn zone (world units)
 const MIN_ZOOM   = 0.2
 const MAX_ZOOM   = 3
+const EDGE_SNAP  = 10    // world units — snap a dragged box to a neighbor's edge within this range
 
 const occupancyBorder: Record<ZoneOccupancy, string> = {
   empty:   "border-slate-400 dark:border-slate-600",
@@ -49,16 +67,61 @@ const occupancyText: Record<ZoneOccupancy, string> = {
   partial: "text-amber-600 dark:text-amber-400",
   full:    "text-red-600 dark:text-red-400",
 }
+const occupancyBar: Record<ZoneOccupancy, string> = {
+  empty:   "bg-slate-400 dark:bg-slate-600",
+  partial: "bg-amber-500",
+  full:    "bg-red-500",
+}
 const occupancyLabel: Record<ZoneOccupancy, string> = {
   empty: "Empty", partial: "Partial", full: "Full",
 }
 
 type Tool = "select" | "pan" | "draw-shelf" | "draw-zone"
 type View = { zoom: number; x: number; y: number }
+/** Resize handle directions — which edge(s) of the box that handle anchors. */
+type ResizeDir = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw"
+type DragMode = "move" | ResizeDir
 
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max)
 const snap = (v: number) => Math.round(v / GRID) * GRID
 const isDrawTool = (t: Tool) => t === "draw-shelf" || t === "draw-zone"
+
+const HANDLES: { dir: ResizeDir; cursor: string }[] = [
+  { dir: "nw", cursor: "nwse-resize" }, { dir: "n", cursor: "ns-resize" }, { dir: "ne", cursor: "nesw-resize" }, { dir: "e", cursor: "ew-resize" },
+  { dir: "se", cursor: "nwse-resize" }, { dir: "s", cursor: "ns-resize" }, { dir: "sw", cursor: "nesw-resize" }, { dir: "w", cursor: "ew-resize" },
+]
+function handleOffset(dir: ResizeDir, w: number, h: number) {
+  if (dir === "nw") return { left: -4, top: -4 }
+  if (dir === "n")  return { left: w / 2 - 4, top: -4 }
+  if (dir === "ne") return { left: w - 4, top: -4 }
+  if (dir === "e")  return { left: w - 4, top: h / 2 - 4 }
+  if (dir === "se") return { left: w - 4, top: h - 4 }
+  if (dir === "s")  return { left: w / 2 - 4, top: h - 4 }
+  if (dir === "sw") return { left: -4, top: h - 4 }
+  return { left: -4, top: h / 2 - 4 } // w
+}
+/** Resize a box from any of the 8 handles, anchoring the opposite edge(s). */
+function computeResize(dir: ResizeDir, o: { x: number; y: number; width: number; height: number }, dx: number, dy: number) {
+  let { x, y, width, height } = o
+  if (dir.includes("e")) width = Math.max(MIN_SIZE, snap(o.width + dx))
+  if (dir.includes("w")) { const right = o.x + o.width; width = Math.max(MIN_SIZE, snap(o.width - dx)); x = right - width }
+  if (dir.includes("s")) height = Math.max(MIN_SIZE, snap(o.height + dy))
+  if (dir.includes("n")) { const bottom = o.y + o.height; height = Math.max(MIN_SIZE, snap(o.height - dy)); y = bottom - height }
+  return { x, y, width, height }
+}
+/** Snap a dragged box's top-left to the nearest edge of any other box, within EDGE_SNAP. */
+function snapToEdges(x: number, y: number, w: number, h: number, others: { x: number; y: number; width: number; height: number }[]) {
+  let bestDx: number | null = null, bestDy: number | null = null
+  for (const o of others) {
+    for (const c of [o.x - x, o.x + o.width - x, o.x - w - x, o.x + o.width - w - x]) {
+      if (Math.abs(c) <= EDGE_SNAP && (bestDx === null || Math.abs(c) < Math.abs(bestDx))) bestDx = c
+    }
+    for (const c of [o.y - y, o.y + o.height - y, o.y - h - y, o.y + o.height - h - y]) {
+      if (Math.abs(c) <= EDGE_SNAP && (bestDy === null || Math.abs(c) < Math.abs(bestDy))) bestDy = c
+    }
+  }
+  return { x: x + (bestDx ?? 0), y: y + (bestDy ?? 0) }
+}
 
 function snapshot(z: ZoneSection): ZoneFields {
   return { kind: z.kind, code: z.code, name: z.name, x: z.x, y: z.y, width: z.width, height: z.height, capacity: z.capacity }
@@ -82,17 +145,20 @@ function actionSummary(item: ZoneChangeItem): string {
 
 type DragState = {
   zoneId: number
-  mode: "move" | "resize"
+  mode: DragMode
   startX: number   // client px
   startY: number
-  orig: ZoneSection
+  /** Every box being dragged together (a multi-selection), each with its own starting geometry. */
+  groupIds: number[]
+  origByZoneId: Record<number, { x: number; y: number; width: number; height: number }>
 }
 type PanState = { startX: number; startY: number; ox: number; oy: number; moved: boolean }
 type DrawState = { x0: number; y0: number; x1: number; y1: number } // world coords
+type MarqueeState = DrawState & { shiftKey: boolean; moved: boolean }
 
 type CommitDraft = {
   actionType: ZoneChangeAction
-  /** Live section id for update/delete; a negative temp id for a staged create. */
+  /** Live section id for update/delete; a negative temp id for a staged create; null for an admin create not yet resolved. */
   sectionId: number | null
   proposed: ZoneFields | null
   previous: ZoneFields | null
@@ -105,6 +171,29 @@ const toChangeItem = (d: CommitDraft): ZoneChangeItem => ({
   previousData: d.previous,
 })
 
+/** The inverse of a committed draft — what undoing it means to apply next. */
+function inverseDraft(d: CommitDraft): CommitDraft {
+  if (d.actionType === "update") return { actionType: "update", sectionId: d.sectionId, proposed: d.previous, previous: d.proposed }
+  if (d.actionType === "create") return { actionType: "delete", sectionId: d.sectionId, proposed: null, previous: d.proposed }
+  return { actionType: "create", sectionId: null, proposed: d.previous, previous: null } // delete -> recreate (gets a new id)
+}
+
+// ---------------------------------------------------------------------------
+// Floors
+// ---------------------------------------------------------------------------
+// A warehouse building can span multiple physical floors, but `ZoneSection`
+// (and the mock backend) has no floor concept yet — only `warehouseId`.
+// Rather than block this on a schema/API change, floors are modeled here as a
+// client-side grouping over the existing flat zone list: `floorAssignment`
+// maps each zone id to a floor id (defaulting to the first floor for any zone
+// that predates floors). Blueprint images and the grid-to-real-world scale
+// are floor-scoped the same way. None of this is sent to the server yet —
+// TODO once the backend grows a `floors` table: swap `floorAssignment` for a
+// real `zone.floorId` column and persist floors/blueprints server-side.
+type Floor = { id: number; name: string }
+type BlueprintImage = { dataUrl: string; x: number; y: number; width: number; height: number }
+type Scale = { pxPerUnit: number; unit: "ft" | "m" }
+
 export default function ZoneLayoutCanvas({
   warehouseId, role, viewerName,
 }: { warehouseId: number; role: ViewerRole; viewerName: string }) {
@@ -113,26 +202,26 @@ export default function ZoneLayoutCanvas({
   const [pending, setPending] = useState<ZoneChangeRequest[]>([])
   const [loading, setLoading] = useState(true)
 
-  const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null)
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const selectedZoneId = selectedIds.length === 1 ? selectedIds[0] : null
   const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null)
 
   // Map viewport
   const [tool, setTool] = useState<Tool>("select")
   const [view, setView] = useState<View>({ zoom: 1, x: 40, y: 40 })
   const viewRef = useRef(view)
-  // Mirror `view` into a ref for async handlers (wheel/pointer) that need the
-  // latest value without being re-created. Synced in an effect rather than
-  // during render.
   useEffect(() => { viewRef.current = view }, [view])
 
   // Live geometry overrides while dragging/resizing (before commit)
   const [draftGeom, setDraftGeom] = useState<Record<number, ZoneFields>>({})
   const [drawRect, setDrawRect] = useState<DrawState | null>(null)
+  const [marquee, setMarquee] = useState<MarqueeState | null>(null)
 
   const dragRef = useRef<DragState | null>(null)
   const dragMovedRef = useRef(false)
   const panRef = useRef<PanState | null>(null)
   const drawRef = useRef<DrawState | null>(null)
+  const marqueeRef = useRef<MarqueeState | null>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
   const [isPanning, setIsPanning] = useState(false)
 
@@ -140,8 +229,6 @@ export default function ZoneLayoutCanvas({
   // Manager's uncommitted edits, accumulated until "Submit proposal".
   const [staged, setStaged] = useState<CommitDraft[]>([])
   const [showSubmitModal, setShowSubmitModal] = useState(false)
-  // Staged creates get a negative temp id (used as their sectionId) so they
-  // render as first-class editable zones until the batch is submitted.
   const nextStagedIdRef = useRef(-1)
   const [formCode, setFormCode] = useState("")
   const [formName, setFormName] = useState("")
@@ -149,9 +236,37 @@ export default function ZoneLayoutCanvas({
   const [rejectNote, setRejectNote] = useState("")
   const [busy, setBusy] = useState(false)
 
+  // Undo/redo — manager rewinds local `staged` snapshots; admin replays the
+  // inverse edit as a new direct change (see file header + inverseDraft()).
+  const [managerHistory, setManagerHistory] = useState<CommitDraft[][]>([])
+  const [managerFuture, setManagerFuture] = useState<CommitDraft[][]>([])
+  const [adminHistory, setAdminHistory] = useState<CommitDraft[]>([])
+  const [adminFuture, setAdminFuture] = useState<CommitDraft[]>([])
+
+  // Floors (client-side grouping — see the "Floors" comment above)
+  const [floors, setFloors] = useState<Floor[]>([{ id: 1, name: "Floor 1" }])
+  const [activeFloorId, setActiveFloorId] = useState(1)
+  const activeFloorIdRef = useRef(activeFloorId)
+  useEffect(() => { activeFloorIdRef.current = activeFloorId }, [activeFloorId])
+  const [floorAssignment, setFloorAssignment] = useState<Record<number, number>>({})
+  const floorAssignmentRef = useRef(floorAssignment)
+  useEffect(() => { floorAssignmentRef.current = floorAssignment }, [floorAssignment])
+  const [renamingFloorId, setRenamingFloorId] = useState<number | null>(null)
+  const [floorNameDraft, setFloorNameDraft] = useState("")
+  const zoneFloorId = useCallback((zoneId: number) => floorAssignment[zoneId] ?? floors[0]?.id ?? 1, [floorAssignment, floors])
+
+  // Blueprint image + real-world scale, per floor
+  const [blueprints, setBlueprints] = useState<Record<number, BlueprintImage>>({})
+  const [bgOpacity, setBgOpacity] = useState(0.55)
+  const [bgVisible, setBgVisible] = useState(true)
+  const [bgEditing, setBgEditing] = useState(false)
+  const bgDragRef = useRef<{ mode: "move" | ResizeDir; startX: number; startY: number; orig: BlueprintImage } | null>(null)
+  const bgImgElRef = useRef<HTMLImageElement | null>(null)
+  const [scale, setScale] = useState<Scale | null>(null)
+  const [scaleUnit, setScaleUnit] = useState<"ft" | "m">("ft")
+  const [gridUnitInput, setGridUnitInput] = useState("")
+
   const canEdit = role === "admin" || role === "manager"
-  // A role that can't draw is never left on a draw tool. Derived (instead of a
-  // correcting effect) so it stays in sync without an extra render pass.
   const activeTool: Tool = !canEdit && isDrawTool(tool) ? "select" : tool
 
   const refresh = useCallback(async () => {
@@ -166,31 +281,41 @@ export default function ZoneLayoutCanvas({
     setDraftGeom({})
     setStaged([])
     setLoading(false)
+    return z
   }, [warehouseId])
 
-  // Load layout data on mount / when the warehouse changes. setState happens
-  // inside the async `refresh` after awaits (the accepted data-fetch pattern).
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void refresh() }, [refresh])
 
-  // A pending batch "touches" a zone if any of its items targets that section.
+  // Any zone id that shows up after a mutation and has no floor yet belongs
+  // to whichever floor was active when the edit was made.
+  const adoptNewZoneFloors = useCallback((beforeIds: Set<number>, afterZones: ZoneSection[]) => {
+    const newIds = afterZones.map((z) => z.id).filter((id) => !beforeIds.has(id) && !(id in floorAssignmentRef.current))
+    if (newIds.length === 0) return
+    setFloorAssignment((prev) => {
+      const next = { ...prev }
+      for (const id of newIds) next[id] = activeFloorIdRef.current
+      return next
+    })
+  }, [])
+
   const pendingForZone = (zoneId: number) =>
     pending.find((r) => r.items.some((it) => it.sectionId === zoneId))
   const pendingItemForZone = (zoneId: number): ZoneChangeItem | undefined =>
     pending.flatMap((r) => r.items).find((it) => it.sectionId === zoneId)
+  /** Which floor a pending item concerns — used to scope the map to one floor at a time. */
+  const itemFloorId = (item: ZoneChangeItem): number => {
+    if (item.actionType === "create") return activeFloorIdRef.current // no live zone yet; assume current floor
+    const z = zones.find((zz) => zz.id === item.sectionId)
+    return z ? zoneFloorId(z.id) : activeFloorIdRef.current
+  }
 
-  // Manager staging lookups
   const stagedFor = (zoneId: number) => staged.find((d) => d.sectionId === zoneId) ?? null
   const stagedDeleteIds = new Set(
     staged.filter((d) => d.actionType === "delete").map((d) => d.sectionId),
   )
 
-  /**
-   * What the manager sees on the canvas: live zones with their own staged edits
-   * folded in (updates applied, deletes removed) plus not-yet-submitted creates
-   * (negative temp ids). Admin/staff see the plain live zones.
-   */
-  const displayZones: ZoneSection[] =
+  const allDisplayZones: ZoneSection[] =
     role === "manager"
       ? [
           ...zones
@@ -216,11 +341,15 @@ export default function ZoneLayoutCanvas({
         ]
       : zones
 
+  // The map only ever shows the active floor's zones.
+  const displayZones = useMemo(
+    () => allDisplayZones.filter((z) => zoneFloorId(z.id) === activeFloorId),
+    [allDisplayZones, zoneFloorId, activeFloorId],
+  )
+
   const selectedZone = displayZones.find((z) => z.id === selectedZoneId) ?? null
   const selectedRequest = pending.find((r) => r.id === selectedRequestId) ?? null
 
-  // Populate the edit form when the selected zone changes. Intentional
-  // sync-from-selection effect.
   useEffect(() => {
     if (selectedZone) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -252,7 +381,6 @@ export default function ZoneLayoutCanvas({
     setView({ zoom: z, x: sx - wx * z, y: sy - wy * z })
   }, [])
 
-  // Native wheel listener so we can preventDefault (map-style zoom-to-cursor)
   useEffect(() => {
     const el = canvasRef.current
     if (!el) return
@@ -267,10 +395,10 @@ export default function ZoneLayoutCanvas({
 
   function fitToContent() {
     const boxes = [
-      ...zones.map((z) => ({ x: z.x, y: z.y, w: z.width, h: z.height })),
+      ...zones.filter((z) => zoneFloorId(z.id) === activeFloorId).map((z) => ({ x: z.x, y: z.y, w: z.width, h: z.height })),
       ...pending
         .flatMap((r) => r.items)
-        .filter((it) => it.actionType === "create")
+        .filter((it) => it.actionType === "create" && itemFloorId(it) === activeFloorId)
         .map((it) => ({
           x: it.proposedData?.x ?? 0, y: it.proposedData?.y ?? 0,
           w: it.proposedData?.width ?? 0, h: it.proposedData?.height ?? 0,
@@ -292,34 +420,46 @@ export default function ZoneLayoutCanvas({
   }
 
   // -------------------------------------------------------------------------
-  // Commit flow: admin applies directly; manager attaches a required note
+  // Commit flow: admin applies directly (+ records history); manager stages
   // -------------------------------------------------------------------------
+  async function applyDirectAndRecord(draft: CommitDraft, { recordHistory }: { recordHistory: boolean }) {
+    const beforeIds = new Set(zones.map((z) => z.id))
+    setBusy(true)
+    try {
+      await applyDirectChange({ warehouseId, item: toChangeItem(draft), requestedBy: viewerName })
+      const afterZones = await refresh()
+      adoptNewZoneFloors(beforeIds, afterZones)
+      let resolved = draft
+      if (draft.actionType === "create") {
+        const newId = afterZones.map((z) => z.id).find((id) => !beforeIds.has(id)) ?? null
+        resolved = { ...draft, sectionId: newId }
+      }
+      if (recordHistory) {
+        setAdminHistory((h) => [...h, resolved])
+        setAdminFuture([])
+      }
+    } finally { setBusy(false) }
+  }
+
   async function submitChange(draft: CommitDraft) {
     if (role === "admin") {
-      setBusy(true)
-      try {
-        await applyDirectChange({
-          warehouseId,
-          item: toChangeItem(draft),
-          requestedBy: viewerName,
-        })
-        await refresh()
-      } finally { setBusy(false) }
+      await applyDirectAndRecord(draft, { recordHistory: true })
     } else {
       stageChange(draft)
     }
   }
 
-  /** Add a manager edit to the local staging set (no server call yet). */
   function stageChange(draft: CommitDraft) {
+    setManagerHistory((h) => [...h, staged.map((d) => ({ ...d }))])
+    setManagerFuture([])
+    if (draft.actionType === "create" && draft.sectionId != null) {
+      setFloorAssignment((prev) => ({ ...prev, [draft.sectionId as number]: activeFloorId }))
+    }
     setStaged((prev) => {
-      // Deleting a still-unsubmitted create just drops it from staging.
       if (draft.actionType === "delete" && draft.sectionId != null && draft.sectionId < 0) {
         return prev.filter((d) => d.sectionId !== draft.sectionId)
       }
-      // Collapse repeated edits to the same zone into one entry.
       const rest = prev.filter((d) => d.sectionId !== draft.sectionId)
-      // An update to a staged create stays a create, carrying the new fields.
       const existing = prev.find((d) => d.sectionId === draft.sectionId)
       if (existing?.actionType === "create" && draft.actionType === "update") {
         return [...rest, { ...existing, proposed: { ...existing.proposed, ...draft.proposed } }]
@@ -329,7 +469,61 @@ export default function ZoneLayoutCanvas({
     setDraftGeom({})
   }
 
-  /** Submit the whole staged set as ONE proposal batch sharing a single note. */
+  async function undo() {
+    if (busy) return
+    if (role === "admin") {
+      const last = adminHistory[adminHistory.length - 1]
+      if (!last) return
+      setAdminHistory((h) => h.slice(0, -1))
+      await applyDirectAndRecord(inverseDraft(last), { recordHistory: false })
+      setAdminFuture((f) => [...f, last])
+    } else {
+      const last = managerHistory[managerHistory.length - 1]
+      if (!last) return
+      setManagerHistory((h) => h.slice(0, -1))
+      setManagerFuture((f) => [...f, staged.map((d) => ({ ...d }))])
+      setStaged(last)
+    }
+    setSelectedIds([])
+  }
+  async function redo() {
+    if (busy) return
+    if (role === "admin") {
+      const next = adminFuture[adminFuture.length - 1]
+      if (!next) return
+      setAdminFuture((f) => f.slice(0, -1))
+      await applyDirectAndRecord(next, { recordHistory: false })
+      setAdminHistory((h) => [...h, next])
+    } else {
+      const next = managerFuture[managerFuture.length - 1]
+      if (!next) return
+      setManagerFuture((f) => f.slice(0, -1))
+      setManagerHistory((h) => [...h, staged.map((d) => ({ ...d }))])
+      setStaged(next)
+    }
+    setSelectedIds([])
+  }
+  const canUndo = role === "admin" ? adminHistory.length > 0 : managerHistory.length > 0
+  const canRedo = role === "admin" ? adminFuture.length > 0 : managerFuture.length > 0
+
+  // Keyboard shortcuts: undo/redo/duplicate/delete/escape. Skipped while
+  // typing in a form field.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase()
+      if (tag === "input" || tag === "textarea") return
+      const mod = e.metaKey || e.ctrlKey
+      if (mod && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) void redo(); else void undo(); return }
+      if (mod && e.key.toLowerCase() === "y") { e.preventDefault(); void redo(); return }
+      if (mod && e.key.toLowerCase() === "d") { e.preventDefault(); duplicateSelected(); return }
+      if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); deleteSelected(); return }
+      if (e.key === "Escape") { setSelectedIds([]); setSelectedRequestId(null); setMarquee(null) }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIds, staged, adminHistory, adminFuture, managerHistory, managerFuture, role])
+
   async function submitProposal() {
     if (staged.length === 0 || !noteDraft.trim()) return
     setBusy(true)
@@ -338,7 +532,6 @@ export default function ZoneLayoutCanvas({
         warehouseId,
         items: staged.map((d) => ({
           actionType: d.actionType,
-          // Staged creates use negative temp ids; the server assigns the real one.
           sectionId: d.sectionId != null && d.sectionId < 0 ? null : d.sectionId,
           proposedData: d.proposed,
           previousData: d.previous,
@@ -348,6 +541,7 @@ export default function ZoneLayoutCanvas({
       })
       setShowSubmitModal(false)
       await refresh()
+      setManagerHistory([]); setManagerFuture([])
     } finally { setBusy(false) }
   }
 
@@ -360,34 +554,53 @@ export default function ZoneLayoutCanvas({
   function discardStaged() {
     setStaged([])
     setDraftGeom({})
-    setSelectedZoneId(null)
+    setSelectedIds([])
     setShowSubmitModal(false)
+    setManagerHistory([]); setManagerFuture([])
   }
 
   // -------------------------------------------------------------------------
-  // Pointer handling
+  // Pointer handling — select / move / 8-point resize / marquee / pan / draw
   // -------------------------------------------------------------------------
-  function onZonePointerDown(e: React.PointerEvent, zone: ZoneSection, mode: "move" | "resize") {
-    // A pending box can't be dragged, but it's still selectable (admin review /
-    // manager status). Stop the press from bubbling to the canvas so it isn't
-    // treated as a background pan that would immediately clear the selection.
+  function onZonePointerDown(e: React.PointerEvent, zone: ZoneSection, mode: DragMode) {
     if (pendingForZone(zone.id)) { e.stopPropagation(); return }
     if (!canEdit || activeTool === "pan") return
-    if (isDrawTool(activeTool) && mode === "move") return // draw tools don't move zones
+    if (isDrawTool(activeTool) && mode === "move") return
     e.preventDefault()
     e.stopPropagation()
     ;(e.target as Element).setPointerCapture(e.pointerId)
-    dragRef.current = { zoneId: zone.id, mode, startX: e.clientX, startY: e.clientY, orig: { ...zone } }
+    const inMultiSelection = mode === "move" && selectedIds.includes(zone.id) && selectedIds.length > 1
+    const groupIds = inMultiSelection ? selectedIds.slice() : [zone.id]
+    const origByZoneId: DragState["origByZoneId"] = {}
+    for (const id of groupIds) {
+      const z = displayZones.find((zz) => zz.id === id)
+      if (z) origByZoneId[id] = { x: z.x, y: z.y, width: z.width, height: z.height }
+    }
+    dragRef.current = { zoneId: zone.id, mode, startX: e.clientX, startY: e.clientY, groupIds, origByZoneId }
     dragMovedRef.current = false
   }
 
+  function onBgPointerDown(e: React.PointerEvent, mode: "move" | ResizeDir) {
+    if (!bgEditing) return
+    const bg = blueprints[activeFloorId]
+    if (!bg) return
+    e.preventDefault()
+    e.stopPropagation()
+    ;(e.target as Element).setPointerCapture(e.pointerId)
+    bgDragRef.current = { mode, startX: e.clientX, startY: e.clientY, orig: { ...bg } }
+  }
+
   function onCanvasPointerDown(e: React.PointerEvent) {
-    // background press: pan (select/pan tools) or start drawing (draw tools)
     if (isDrawTool(activeTool) && canEdit) {
       const w = screenToWorld(e.clientX, e.clientY)
       const start = { x0: w.x, y0: w.y, x1: w.x, y1: w.y }
       drawRef.current = start
       setDrawRect(start)
+    } else if (activeTool === "select") {
+      const w = screenToWorld(e.clientX, e.clientY)
+      const start: MarqueeState = { x0: w.x, y0: w.y, x1: w.x, y1: w.y, shiftKey: e.shiftKey, moved: false }
+      marqueeRef.current = start
+      setMarquee(start)
     } else {
       panRef.current = { startX: e.clientX, startY: e.clientY, ox: view.x, oy: view.y, moved: false }
       setIsPanning(true)
@@ -401,14 +614,24 @@ export default function ZoneLayoutCanvas({
       const dx = (e.clientX - drag.startX) / view.zoom
       const dy = (e.clientY - drag.startY) / view.zoom
       if (Math.abs(e.clientX - drag.startX) + Math.abs(e.clientY - drag.startY) > 3) dragMovedRef.current = true
-      const { orig } = drag
+      const primaryOrig = drag.origByZoneId[drag.zoneId]
       if (drag.mode === "move") {
-        setDraftGeom((g) => ({ ...g, [drag.zoneId]: { x: snap(orig.x + dx), y: snap(orig.y + dy) } }))
+        let nx = snap(primaryOrig.x + dx), ny = snap(primaryOrig.y + dy)
+        const others = displayZones.filter((z) => !drag.groupIds.includes(z.id))
+        const snapped = snapToEdges(nx, ny, primaryOrig.width, primaryOrig.height, others)
+        nx = snapped.x; ny = snapped.y
+        const ddx = nx - primaryOrig.x, ddy = ny - primaryOrig.y
+        setDraftGeom((g) => {
+          const next = { ...g }
+          for (const id of drag.groupIds) {
+            const o = drag.origByZoneId[id]
+            next[id] = { x: o.x + ddx, y: o.y + ddy }
+          }
+          return next
+        })
       } else {
-        setDraftGeom((g) => ({ ...g, [drag.zoneId]: {
-          width:  Math.max(MIN_SIZE, snap(orig.width + dx)),
-          height: Math.max(MIN_SIZE, snap(orig.height + dy)),
-        } }))
+        const updated = computeResize(drag.mode, primaryOrig, dx, dy)
+        setDraftGeom((g) => ({ ...g, [drag.zoneId]: updated }))
       }
       return
     }
@@ -417,6 +640,24 @@ export default function ZoneLayoutCanvas({
       const next = { ...drawRef.current, x1: w.x, y1: w.y }
       drawRef.current = next
       setDrawRect(next)
+      return
+    }
+    if (bgDragRef.current) {
+      const bd = bgDragRef.current
+      const dx = (e.clientX - bd.startX) / view.zoom
+      const dy = (e.clientY - bd.startY) / view.zoom
+      const updated = bd.mode === "move"
+        ? { ...bd.orig, x: bd.orig.x + dx, y: bd.orig.y + dy }
+        : { ...bd.orig, ...computeResize(bd.mode, bd.orig, dx, dy) }
+      setBlueprints((prev) => ({ ...prev, [activeFloorId]: updated }))
+      return
+    }
+    if (marqueeRef.current) {
+      const w = screenToWorld(e.clientX, e.clientY)
+      const moved = marqueeRef.current.moved || Math.abs(w.x - marqueeRef.current.x0) + Math.abs(w.y - marqueeRef.current.y0) > 4
+      const next = { ...marqueeRef.current, x1: w.x, y1: w.y, moved }
+      marqueeRef.current = next
+      setMarquee(next)
       return
     }
     if (panRef.current) {
@@ -429,24 +670,21 @@ export default function ZoneLayoutCanvas({
   }
 
   function onCanvasPointerUp() {
-    // finish zone drag/resize
     const drag = dragRef.current
     if (drag) {
       dragRef.current = null
-      const zone = displayZones.find((z) => z.id === drag.zoneId)
-      const geom = draftGeom[drag.zoneId]
-      if (!dragMovedRef.current || !zone || !geom) {
-        setSelectedZoneId(drag.zoneId)
-        setSelectedRequestId(null)
-        setDraftGeom((g) => { const rest = { ...g }; delete rest[drag.zoneId]; return rest })
-        return
+      if (!dragMovedRef.current) { setDraftGeom({}); return }
+      for (const id of drag.groupIds) {
+        const zone = displayZones.find((z) => z.id === id)
+        const geom = draftGeom[id]
+        if (!zone || !geom) continue
+        const previous = snapshot(zone)
+        const proposed = { ...previous, ...geom }
+        void submitChange({ actionType: "update", sectionId: id, proposed, previous })
       }
-      const previous = snapshot(zone)
-      const proposed = { ...previous, ...geom }
-      void submitChange({ actionType: "update", sectionId: zone.id, proposed, previous })
+      setDraftGeom({})
       return
     }
-    // finish drawing a new zone
     if (drawRef.current) {
       const d = drawRef.current
       drawRef.current = null
@@ -458,30 +696,48 @@ export default function ZoneLayoutCanvas({
       if (width >= MIN_DRAW && height >= MIN_DRAW) {
         const kind = activeTool === "draw-zone" ? "zone" : "shelf"
         const code = kind === "zone" ? nextCode("ZONE") : nextCode("S")
-        // Managers stage creates under a negative temp id so the new box renders
-        // and stays editable until the batch is submitted; admins create directly.
         const sectionId = role === "manager" ? nextStagedIdRef.current-- : null
         void submitChange({
           actionType: "create",
           sectionId,
-          proposed: {
-            kind,
-            code,
-            name: kind === "zone" ? "New zone" : "New shelf",
-            x, y, width, height,
-            capacity: kind === "zone" ? 0 : 100,
-          },
+          proposed: { kind, code, name: kind === "zone" ? "New zone" : "New shelf", x, y, width, height, capacity: kind === "zone" ? 0 : 100 },
           previous: null,
         })
-        // stay on the draw tool so several boxes can be laid out in a row
       }
       return
     }
-    // finish pan (a click without movement deselects)
+    if (bgDragRef.current) { bgDragRef.current = null; return }
+    if (marqueeRef.current) {
+      const m = marqueeRef.current
+      marqueeRef.current = null
+      setMarquee(null)
+      if (!m.moved) {
+        if (!m.shiftKey) { setSelectedIds([]); setSelectedRequestId(null) }
+        return
+      }
+      const minX = Math.min(m.x0, m.x1), maxX = Math.max(m.x0, m.x1)
+      const minY = Math.min(m.y0, m.y1), maxY = Math.max(m.y0, m.y1)
+      const hits = displayZones.filter((z) => z.x < maxX && z.x + z.width > minX && z.y < maxY && z.y + z.height > minY).map((z) => z.id)
+      setSelectedIds((prev) => (m.shiftKey ? Array.from(new Set([...prev, ...hits])) : hits))
+      setSelectedRequestId(null)
+      return
+    }
     if (panRef.current) {
-      if (!panRef.current.moved) { setSelectedZoneId(null); setSelectedRequestId(null) }
+      if (!panRef.current.moved) { setSelectedIds([]); setSelectedRequestId(null) }
       panRef.current = null
       setIsPanning(false)
+    }
+  }
+
+  function onZoneClick(e: React.MouseEvent, zone: ZoneSection, req: ZoneChangeRequest | undefined) {
+    e.stopPropagation()
+    if (req) { setSelectedRequestId(req.id); setSelectedIds([]); return }
+    if (e.shiftKey) {
+      setSelectedIds((prev) => (prev.includes(zone.id) ? prev.filter((id) => id !== zone.id) : [...prev, zone.id]))
+      setSelectedRequestId(null)
+    } else {
+      setSelectedIds([zone.id])
+      setSelectedRequestId(null)
     }
   }
 
@@ -490,6 +746,41 @@ export default function ZoneLayoutCanvas({
     let n = 1
     while (codes.has(`${prefix}${n}`)) n++
     return `${prefix}${n}`
+  }
+  function nextDupeCode(base: string) {
+    const codes = new Set(displayZones.map((z) => z.code))
+    if (!codes.has(`${base}-copy`)) return `${base}-copy`
+    let n = 2
+    while (codes.has(`${base}-copy${n}`)) n++
+    return `${base}-copy${n}`
+  }
+
+  // -------------------------------------------------------------------------
+  // Multi-select actions
+  // -------------------------------------------------------------------------
+  function duplicateSelected() {
+    if (!canEdit || selectedIds.length === 0) return
+    for (const id of selectedIds) {
+      const z = displayZones.find((zz) => zz.id === id)
+      if (!z) continue
+      const sectionId = role === "manager" ? nextStagedIdRef.current-- : null
+      void submitChange({
+        actionType: "create",
+        sectionId,
+        proposed: { kind: z.kind, code: nextDupeCode(z.code), name: z.name, x: z.x + GRID * 2, y: z.y + GRID * 2, width: z.width, height: z.height, capacity: z.capacity },
+        previous: null,
+      })
+    }
+    setSelectedIds([])
+  }
+  function deleteSelected() {
+    if (!canEdit || selectedIds.length === 0) return
+    for (const id of selectedIds) {
+      const z = displayZones.find((zz) => zz.id === id)
+      if (!z || pendingForZone(id)) continue
+      void submitChange({ actionType: "delete", sectionId: id, proposed: null, previous: snapshot(z) })
+    }
+    setSelectedIds([])
   }
 
   // -------------------------------------------------------------------------
@@ -511,15 +802,109 @@ export default function ZoneLayoutCanvas({
   function deleteZone() {
     if (!selectedZone) return
     void submitChange({ actionType: "delete", sectionId: selectedZone.id, proposed: null, previous: snapshot(selectedZone) })
-    setSelectedZoneId(null)
+    setSelectedIds([])
+  }
+
+  // -------------------------------------------------------------------------
+  // Floors — add / rename / delete / switch (client-side; see header comment)
+  // -------------------------------------------------------------------------
+  function switchFloor(id: number) {
+    setActiveFloorId(id)
+    setSelectedIds([])
+    setSelectedRequestId(null)
+    setBgEditing(false)
+    requestAnimationFrame(fitToContent)
+  }
+  function addFloor() {
+    const id = Date.now()
+    setFloors((prev) => [...prev, { id, name: `Floor ${prev.length + 1}` }])
+    switchFloor(id)
+  }
+  function startRenameFloor(f: Floor) { setRenamingFloorId(f.id); setFloorNameDraft(f.name) }
+  function commitRenameFloor() {
+    const name = floorNameDraft.trim()
+    if (name) setFloors((prev) => prev.map((f) => (f.id === renamingFloorId ? { ...f, name } : f)))
+    setRenamingFloorId(null)
+  }
+  function deleteFloor(id: number) {
+    if (floors.length <= 1) return
+    const hasZones = zones.some((z) => zoneFloorId(z.id) === id)
+    if (hasZones && !window.confirm("This floor has zones/shelves on it. Delete the floor and everything on it?")) return
+    const idsOnFloor = zones.filter((z) => zoneFloorId(z.id) === id).map((z) => z.id)
+    for (const zid of idsOnFloor) {
+      const z = zones.find((zz) => zz.id === zid)
+      if (z) void submitChange({ actionType: "delete", sectionId: zid, proposed: null, previous: snapshot(z) })
+    }
+    setFloors((prev) => prev.filter((f) => f.id !== id))
+    setBlueprints((prev) => { const next = { ...prev }; delete next[id]; return next })
+    if (activeFloorId === id) {
+      const remaining = floors.filter((f) => f.id !== id)
+      if (remaining[0]) switchFloor(remaining[0].id)
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Blueprint import + grid scale
+  // -------------------------------------------------------------------------
+  function onBgFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const dataUrl = reader.result as string
+      const img = new Image()
+      img.onload = () => {
+        const maxDim = 1400
+        const f = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight))
+        setBlueprints((prev) => ({ ...prev, [activeFloorId]: { dataUrl, x: 0, y: 0, width: Math.round(img.naturalWidth * f), height: Math.round(img.naturalHeight * f) } }))
+        setBgEditing(true)
+        setBgVisible(true)
+      }
+      img.src = dataUrl
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ""
+  }
+  function removeBlueprint() {
+    setBlueprints((prev) => { const next = { ...prev }; delete next[activeFloorId]; return next })
+    setBgEditing(false)
+    setBgVisible(true)
+  }
+  // The blueprint <img> never gets a templated/derived `src` — it's set
+  // imperatively once real image data exists, so there's nothing for the
+  // browser to eagerly (and wrongly) fetch before that data is ready.
+  const currentBlueprint = blueprints[activeFloorId] ?? null
+  useEffect(() => {
+    if (bgImgElRef.current) {
+      if (currentBlueprint?.dataUrl) bgImgElRef.current.src = currentBlueprint.dataUrl
+      else bgImgElRef.current.removeAttribute("src")
+    }
+  }, [currentBlueprint?.dataUrl])
+
+  function onGridUnitChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const v = e.target.value.replace(/[^0-9.]/g, "")
+    setGridUnitInput(v)
+    const n = parseFloat(v)
+    setScale(n > 0 ? { pxPerUnit: GRID / n, unit: scaleUnit } : null)
+  }
+  function onScaleUnitChange(u: "ft" | "m") {
+    setScaleUnit(u)
+    const n = parseFloat(gridUnitInput)
+    if (n > 0) setScale({ pxPerUnit: GRID / n, unit: u })
   }
 
   // -------------------------------------------------------------------------
   // Admin review actions
   // -------------------------------------------------------------------------
   async function onApprove(req: ZoneChangeRequest) {
+    const beforeIds = new Set(zones.map((z) => z.id))
     setBusy(true)
-    try { await approveRequest(req.id, viewerName); setSelectedRequestId(null); await refresh() }
+    try {
+      await approveRequest(req.id, viewerName)
+      setSelectedRequestId(null)
+      const afterZones = await refresh()
+      adoptNewZoneFloors(beforeIds, afterZones)
+    }
     finally { setBusy(false) }
   }
   async function onReject(req: ZoneChangeRequest) {
@@ -533,20 +918,21 @@ export default function ZoneLayoutCanvas({
   // Rendering
   // -------------------------------------------------------------------------
   const showPendingOverlays = role !== "staff"
-  // Flatten pending batches into per-item overlays, tagging each with its parent
-  // batch so a click selects the whole proposal.
   type PendingOverlay = { req: ZoneChangeRequest; item: ZoneChangeItem }
   const pendingOverlays: PendingOverlay[] = showPendingOverlays
-    ? pending.flatMap((req) => req.items.map((item) => ({ req, item })))
+    ? pending.flatMap((req) => req.items.map((item) => ({ req, item }))).filter((o) => itemFloorId(o.item) === activeFloorId)
     : []
   const pendingCreates = pendingOverlays.filter((o) => o.item.actionType === "create")
+  const floorPendingCount = showPendingOverlays
+    ? pending.filter((r) => r.items.some((it) => itemFloorId(it) === activeFloorId)).length
+    : 0
 
   const cursor =
     activeTool === "pan"    ? (isPanning ? "grabbing" : "grab") :
     isDrawTool(activeTool)  ? "crosshair" : "default"
 
   const tools: { key: Tool; label: string; icon: React.ElementType; editorOnly?: boolean }[] = [
-    { key: "select",     label: "Select / move",   icon: MousePointer2 },
+    { key: "select",     label: "Select / multi-select (drag empty space to marquee-select)", icon: MousePointer2 },
     { key: "pan",        label: "Pan",             icon: Hand },
     { key: "draw-shelf", label: "Draw shelf block", icon: Boxes,       editorOnly: true },
     { key: "draw-zone",  label: "Draw zone box",   icon: SquareDashed, editorOnly: true },
@@ -554,7 +940,7 @@ export default function ZoneLayoutCanvas({
 
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm p-6">
-      <div className="flex items-start justify-between flex-wrap gap-3 mb-4">
+      <div className="flex items-start justify-between flex-wrap gap-3 mb-3">
         <div>
           <h3 className="text-base font-semibold text-foreground">Warehouse Map</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -578,17 +964,112 @@ export default function ZoneLayoutCanvas({
               Zone
             </span>
           </div>
-          {pending.length > 0 && showPendingOverlays && (
+          {floorPendingCount > 0 && showPendingOverlays && (
             <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[#E5F0F5] dark:bg-primary/20 text-[#1A6B8A] dark:text-primary text-xs font-medium ring-1 ring-[#1A6B8A]/20 dark:ring-primary/30">
-              {pending.length} pending
+              {floorPendingCount} pending
             </span>
           )}
         </div>
       </div>
 
+      <p className="text-[11px] text-muted-foreground mb-2">
+        Shift-click or drag-select to multi-select · Ctrl/Cmd+D duplicates · Delete removes · Ctrl/Cmd+Z undo
+      </p>
+
+      {/* Floor tabs */}
+      <div className="flex items-center gap-1.5 flex-wrap mb-2.5">
+        {floors.map((f) => {
+          const active = f.id === activeFloorId
+          return (
+            <div
+              key={f.id}
+              className={`flex items-center gap-1 rounded-lg pl-3 pr-1.5 py-1.5 cursor-pointer ${active ? "bg-[#1A6B8A] dark:bg-primary" : "bg-accent"}`}
+            >
+              {renamingFloorId === f.id ? (
+                <input
+                  autoFocus value={floorNameDraft} onChange={(e) => setFloorNameDraft(e.target.value)}
+                  onBlur={commitRenameFloor} onKeyDown={(e) => e.key === "Enter" && commitRenameFloor()}
+                  className="w-24 px-1.5 py-0.5 text-xs font-semibold rounded border border-border text-foreground bg-input-background focus:outline-none"
+                />
+              ) : (
+                <span
+                  onClick={() => switchFloor(f.id)}
+                  onDoubleClick={() => startRenameFloor(f)}
+                  className={`text-xs font-semibold select-none ${active ? "text-white dark:text-primary-foreground" : "text-foreground/80"}`}
+                >
+                  {f.name}
+                </span>
+              )}
+              {floors.length > 1 && (
+                <button
+                  title="Delete floor" onClick={(e) => { e.stopPropagation(); deleteFloor(f.id) }}
+                  className={`text-xs px-1 leading-none ${active ? "text-white/70 dark:text-primary-foreground/70" : "text-muted-foreground"}`}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          )
+        })}
+        <button onClick={addFloor} className="text-xs font-medium text-[#1A6B8A] dark:text-primary border border-dashed border-[#1A6B8A]/40 dark:border-primary/40 rounded-lg px-2.5 py-1.5 hover:bg-accent transition-colors">
+          + Add floor
+        </button>
+      </div>
+
+      {/* Actions bar: undo/redo, duplicate/delete, blueprint import, grid scale */}
+      <div className="flex items-center gap-2.5 flex-wrap mb-3 px-2.5 py-2 rounded-lg border border-border bg-accent/40">
+        <div className="flex items-center gap-1">
+          <button title="Undo (Ctrl/Cmd+Z)" onClick={() => void undo()} disabled={!canUndo || busy} className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-muted-foreground rounded-md hover:bg-accent disabled:opacity-40 transition-colors">
+            <Undo2 className="size-3.5" /> Undo
+          </button>
+          <button title="Redo (Ctrl/Cmd+Shift+Z)" onClick={() => void redo()} disabled={!canRedo || busy} className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-muted-foreground rounded-md hover:bg-accent disabled:opacity-40 transition-colors">
+            <Redo2 className="size-3.5" /> Redo
+          </button>
+        </div>
+        <div className="w-px h-4 bg-border" />
+        <div className="flex items-center gap-1">
+          <button title="Duplicate selection (Ctrl/Cmd+D)" onClick={duplicateSelected} disabled={!canEdit || selectedIds.length === 0} className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-[#1A6B8A] dark:text-primary bg-[#E5F0F5] dark:bg-primary/10 rounded-md disabled:opacity-40 disabled:bg-transparent disabled:text-muted-foreground transition-colors">
+            <Copy className="size-3.5" /> Duplicate
+          </button>
+          <button title="Delete selection (Del)" onClick={deleteSelected} disabled={!canEdit || selectedIds.length === 0} className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 rounded-md disabled:opacity-40 disabled:bg-transparent disabled:text-muted-foreground transition-colors">
+            <Trash2 className="size-3.5" /> Delete
+          </button>
+          {selectedIds.length > 1 && <span className="text-xs text-muted-foreground">{selectedIds.length} selected</span>}
+        </div>
+        <div className="w-px h-4 bg-border" />
+        <label className="flex items-center gap-1.5 text-xs font-medium text-[#1A6B8A] dark:text-primary bg-[#E5F0F5] dark:bg-primary/10 rounded-md px-2 py-1 cursor-pointer">
+          <ImagePlus className="size-3.5" /> Import blueprint
+          <input type="file" accept="image/*" onChange={onBgFileChange} className="hidden" />
+        </label>
+        {currentBlueprint && (
+          <div className="flex items-center gap-2">
+            <button onClick={() => setBgEditing((v) => !v)} className={`px-2 py-1 text-xs font-medium rounded-md transition-colors ${bgEditing ? "bg-[#1A6B8A] dark:bg-primary text-white dark:text-primary-foreground" : "bg-[#E5F0F5] dark:bg-primary/10 text-[#1A6B8A] dark:text-primary"}`}>
+              {bgEditing ? "Done positioning" : "Reposition"}
+            </button>
+            <button title={bgVisible ? "Hide blueprint" : "Show blueprint"} onClick={() => setBgVisible((v) => !v)} className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-muted-foreground bg-accent rounded-md">
+              {bgVisible ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />} {bgVisible ? "Hide" : "Show"}
+            </button>
+            <span className="text-xs text-muted-foreground">Opacity</span>
+            <input type="range" min={0.1} max={1} step={0.05} value={bgOpacity} onChange={(e) => setBgOpacity(Number(e.target.value))} className="w-20" />
+            <button onClick={removeBlueprint} className="px-2 py-1 text-xs font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 rounded-md">Remove</button>
+          </div>
+        )}
+        <div className="w-px h-4 bg-border" />
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-medium text-muted-foreground">Grid square =</span>
+          <input value={gridUnitInput} onChange={onGridUnitChange} placeholder="e.g. 5" className="w-14 px-2 py-1 text-xs font-semibold bg-input-background border border-border rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
+          <div className="flex items-center bg-accent rounded-md p-0.5">
+            {(["ft", "m"] as const).map((u) => (
+              <button key={u} onClick={() => onScaleUnitChange(u)} className={`px-2 py-0.5 text-xs font-medium rounded ${scaleUnit === u ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}`}>
+                {u}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* Map window */}
       <div className="relative">
-        {/* Tool palette */}
         <div className="absolute top-3 left-3 z-10 flex flex-col gap-1 bg-card/95 backdrop-blur rounded-lg border border-border shadow-sm p-1">
           {tools.filter((t) => !t.editorOnly || canEdit).map((t) => (
             <button
@@ -604,7 +1085,6 @@ export default function ZoneLayoutCanvas({
           ))}
         </div>
 
-        {/* Zoom / view controls */}
         <div className="absolute top-3 right-3 z-10 flex items-center gap-1 bg-card/95 backdrop-blur rounded-lg border border-border shadow-sm p-1">
           <button title="Zoom out" onClick={() => zoomAt(view.zoom / 1.2, (canvasRef.current?.getBoundingClientRect().left ?? 0) + (canvasRef.current?.clientWidth ?? 0) / 2, (canvasRef.current?.getBoundingClientRect().top ?? 0) + VIEW_H / 2)} className="size-8 rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent">
             <Minus className="size-4" />
@@ -644,17 +1124,43 @@ export default function ZoneLayoutCanvas({
             </div>
           )}
 
-          {/* World layer */}
           <div
             className="absolute top-0 left-0"
             style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`, transformOrigin: "0 0" }}
           >
+            {/* Blueprint backdrop — src is set imperatively via bgImgElRef, never templated */}
+            {currentBlueprint && (
+              <img
+                ref={bgImgElRef}
+                alt=""
+                className="absolute pointer-events-none select-none"
+                style={{ left: currentBlueprint.x, top: currentBlueprint.y, width: currentBlueprint.width, height: currentBlueprint.height, opacity: bgOpacity, display: bgVisible ? "block" : "none" }}
+              />
+            )}
+            {currentBlueprint && bgEditing && bgVisible && (
+              <div
+                onPointerDown={(e) => onBgPointerDown(e, "move")}
+                className="absolute rounded border-2 border-dashed border-[#1A6B8A] dark:border-primary cursor-move"
+                style={{ left: currentBlueprint.x, top: currentBlueprint.y, width: currentBlueprint.width, height: currentBlueprint.height }}
+              >
+                {HANDLES.map((h) => {
+                  const pos = handleOffset(h.dir, currentBlueprint.width, currentBlueprint.height)
+                  return (
+                    <div
+                      key={h.dir}
+                      onPointerDown={(e) => onBgPointerDown(e, h.dir)}
+                      className="absolute size-2.5 rounded-sm bg-card border-2 border-[#1A6B8A] dark:border-primary"
+                      style={{ left: pos.left, top: pos.top, cursor: h.cursor }}
+                    />
+                  )
+                })}
+              </div>
+            )}
+
             {/* zone-kind boxes render first so they sit behind shelf blocks */}
             {[...displayZones].sort((a, b) => (a.kind === "zone" ? 0 : 1) - (b.kind === "zone" ? 0 : 1)).map((zone) => {
               const req = showPendingOverlays ? pendingForZone(zone.id) : undefined
               const pItem = req ? pendingItemForZone(zone.id) : undefined
-              // Staged edit for this zone (manager only). displayZones already
-              // folds the geometry in; this just drives the "Draft" badge/border.
               const stagedEdit = stagedFor(zone.id)
               const geom = draftGeom[zone.id]
               const x = geom?.x ?? zone.x
@@ -664,18 +1170,17 @@ export default function ZoneLayoutCanvas({
               const isZone = zone.kind === "zone"
               const occ = isZone ? "empty" : zoneOccupancy(zone, stock)
               const total = isZone ? 0 : zoneStockTotal(zone.id, stock)
-              const selected = selectedZoneId === zone.id
+              const pct = isZone || zone.capacity <= 0 ? 0 : Math.min(100, Math.round((total / zone.capacity) * 100))
+              const selected = selectedIds.includes(zone.id)
               const liveIsDashed = !!req
+              const showHandles = canEdit && !req && activeTool !== "pan" && selectedIds.length <= 1
+              const realSize = scale ? `${(w / scale.pxPerUnit).toFixed(1)} × ${(h / scale.pxPerUnit).toFixed(1)} ${scale.unit}` : null
 
               return (
                 <div key={zone.id}>
                   <div
                     onPointerDown={(e) => onZonePointerDown(e, zone, "move")}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      if (req) { setSelectedRequestId(req.id); setSelectedZoneId(null) }
-                      else { setSelectedZoneId(zone.id); setSelectedRequestId(null) }
-                    }}
+                    onClick={(e) => onZoneClick(e, zone, req)}
                     className={`absolute rounded-md border-2 ${
                       isZone ? "border-dashed border-slate-400 dark:border-slate-600 bg-slate-500/[0.04] dark:bg-slate-400/[0.06]" : `bg-transparent ${occupancyBorder[occ]}`
                     } ${liveIsDashed ? "border-dashed opacity-60" : ""} ${
@@ -691,25 +1196,40 @@ export default function ZoneLayoutCanvas({
                       </span>
                     ) : (
                       <div className="absolute top-1 left-1.5 right-1 leading-tight pointer-events-none">
-                        <p className="text-xs font-bold text-foreground">{zone.code}</p>
-                        {/* Drop lines that won't fit so small/narrow racks stay legible */}
+                        <p className="text-xs font-bold font-mono text-foreground">{zone.code}</p>
                         {h >= 52 && w >= 90 && (
                           <p className="text-[10px] font-medium text-muted-foreground truncate">{zone.name}</p>
                         )}
                         {h >= 40 && (
-                          <p className={`text-[10px] font-medium ${occupancyText[occ]}`}>
-                            {total.toLocaleString()} / {zone.capacity.toLocaleString()}
-                          </p>
+                          <>
+                            <p className={`text-[10px] font-mono font-medium ${occupancyText[occ]}`}>
+                              {total.toLocaleString()} / {zone.capacity.toLocaleString()} · {pct}%
+                            </p>
+                            <div className="h-1 rounded-full bg-accent mt-0.5 overflow-hidden">
+                              <div className={`h-full rounded-full ${occupancyBar[occ]}`} style={{ width: `${pct}%` }} />
+                            </div>
+                          </>
                         )}
                       </div>
                     )}
-                    {canEdit && !req && activeTool !== "pan" && (
-                      <div
-                        onPointerDown={(e) => onZonePointerDown(e, zone, "resize")}
-                        className="absolute -bottom-1 -right-1 size-3 rounded-sm bg-card border-2 border-slate-400 dark:border-slate-600 cursor-se-resize"
-                      />
-                    )}
+                    {showHandles && HANDLES.map((hd) => {
+                      const pos = handleOffset(hd.dir, w, h)
+                      return (
+                        <div
+                          key={hd.dir}
+                          onPointerDown={(e) => onZonePointerDown(e, zone, hd.dir)}
+                          className="absolute size-2 rounded-sm bg-card border-2 border-slate-400 dark:border-slate-600"
+                          style={{ left: pos.left, top: pos.top, cursor: hd.cursor }}
+                        />
+                      )
+                    })}
                   </div>
+
+                  {realSize && selected && (
+                    <span className="absolute text-[10px] font-medium text-muted-foreground bg-card/90 px-1 rounded pointer-events-none" style={{ left: x, top: y + h + 3 }}>
+                      {realSize}
+                    </span>
+                  )}
 
                   {stagedEdit && (
                     <span className="absolute px-1.5 py-px rounded bg-amber-500 text-white text-[10px] font-semibold pointer-events-none" style={{ left: x + 4, top: y - 10 }}>
@@ -720,7 +1240,7 @@ export default function ZoneLayoutCanvas({
                   {pItem && pItem.actionType === "update" && pItem.proposedData && (
                     <div
                       onPointerDown={(e) => e.stopPropagation()}
-                      onClick={(e) => { e.stopPropagation(); setSelectedRequestId(req!.id); setSelectedZoneId(null) }}
+                      onClick={(e) => { e.stopPropagation(); setSelectedRequestId(req!.id); setSelectedIds([]) }}
                       className={`absolute rounded-md border-2 bg-transparent border-[#1A6B8A] dark:border-primary cursor-pointer ${
                         selectedRequestId === req!.id ? "ring-2 ring-[#1A6B8A] dark:ring-primary ring-offset-1" : ""
                       }`}
@@ -747,12 +1267,11 @@ export default function ZoneLayoutCanvas({
               )
             })}
 
-            {/* Pending creates (no live counterpart) */}
             {pendingCreates.map(({ req, item }, i) => (
               <div
                 key={`create-${req.id}-${i}`}
                 onPointerDown={(e) => e.stopPropagation()}
-                onClick={(e) => { e.stopPropagation(); setSelectedRequestId(req.id); setSelectedZoneId(null) }}
+                onClick={(e) => { e.stopPropagation(); setSelectedRequestId(req.id); setSelectedIds([]) }}
                 className={`absolute rounded-md border-2 bg-transparent border-[#1A6B8A] dark:border-primary cursor-pointer ${
                   selectedRequestId === req.id ? "ring-2 ring-[#1A6B8A] dark:ring-primary ring-offset-1" : ""
                 }`}
@@ -765,10 +1284,8 @@ export default function ZoneLayoutCanvas({
               </div>
             ))}
 
-            {/* Staged deletes: the box is removed from displayZones, so render a
-                faint "will delete" ghost at its live position until submitted. */}
             {role === "manager" && staged
-              .filter((d) => d.actionType === "delete" && d.sectionId != null && d.sectionId >= 0)
+              .filter((d) => d.actionType === "delete" && d.sectionId != null && d.sectionId >= 0 && zoneFloorId(d.sectionId) === activeFloorId)
               .map((d) => d.previous && (
                 <div
                   key={`staged-delete-${d.sectionId}`}
@@ -782,7 +1299,6 @@ export default function ZoneLayoutCanvas({
                 </div>
               ))}
 
-            {/* Rubber-band while drawing */}
             {drawRect && (
               <div
                 className="absolute rounded-md border-2 border-dashed border-[#1A6B8A] dark:border-primary bg-[#E5F0F5]/50 dark:bg-primary/10 pointer-events-none"
@@ -791,6 +1307,17 @@ export default function ZoneLayoutCanvas({
                   top: Math.min(drawRect.y0, drawRect.y1),
                   width: Math.abs(drawRect.x1 - drawRect.x0),
                   height: Math.abs(drawRect.y1 - drawRect.y0),
+                }}
+              />
+            )}
+            {marquee && marquee.moved && (
+              <div
+                className="absolute rounded-md border border-dashed border-[#1A6B8A] dark:border-primary bg-[#E5F0F5]/30 dark:bg-primary/5 pointer-events-none"
+                style={{
+                  left: Math.min(marquee.x0, marquee.x1),
+                  top: Math.min(marquee.y0, marquee.y1),
+                  width: Math.abs(marquee.x1 - marquee.x0),
+                  height: Math.abs(marquee.y1 - marquee.y0),
                 }}
               />
             )}
@@ -818,8 +1345,25 @@ export default function ZoneLayoutCanvas({
         </div>
       )}
 
+      {/* Multi-selection quick actions (replaces the single-box panel while 2+ boxes are selected) */}
+      {selectedIds.length > 1 && !selectedRequest && (
+        <div className="mt-4 border-t border-border pt-4 flex items-center justify-between gap-3 flex-wrap">
+          <h4 className="text-sm font-semibold text-foreground">{selectedIds.length} items selected</h4>
+          {canEdit && (
+            <div className="flex items-center gap-2">
+              <button onClick={duplicateSelected} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#1A6B8A] hover:bg-[#145570] dark:bg-primary dark:hover:bg-primary/90 dark:text-primary-foreground rounded-lg transition-colors">
+                <Copy className="size-3.5" /> Duplicate all
+              </button>
+              <button onClick={deleteSelected} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors">
+                <Trash2 className="size-3.5" /> Delete all
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Selected box panel */}
-      {selectedZone && !selectedRequest && (
+      {selectedZone && !selectedRequest && selectedIds.length === 1 && (
         <div className="mt-4 border-t border-border pt-4 flex flex-col sm:flex-row gap-6">
           <div className="flex-1 min-w-0">
             {selectedZone.kind === "zone" ? (
@@ -834,6 +1378,11 @@ export default function ZoneLayoutCanvas({
                   {occupancyLabel[zoneOccupancy(selectedZone, stock)]} · {zoneStockTotal(selectedZone.id, stock).toLocaleString()} / {selectedZone.capacity.toLocaleString()} units
                 </span>
               </div>
+            )}
+            {scale && (
+              <p className="text-xs font-medium text-muted-foreground mb-1.5">
+                Real size ≈ {(selectedZone.width / scale.pxPerUnit).toFixed(1)} × {(selectedZone.height / scale.pxPerUnit).toFixed(1)} {scale.unit}
+              </p>
             )}
             {selectedZone.kind === "zone" ? (
               <p className="text-xs text-muted-foreground">A zone box groups shelf blocks — it carries no stock of its own.</p>
@@ -955,3 +1504,4 @@ export default function ZoneLayoutCanvas({
     </div>
   )
 }
+
