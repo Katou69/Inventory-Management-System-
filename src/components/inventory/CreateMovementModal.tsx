@@ -4,11 +4,17 @@ import { useState } from "react";
 import Modal from "@/components/ui/Modal";
 import ModalFooter from "@/components/ui/ModalFooter";
 
-import { inventory } from "@/data/inventory-data";
 import { shelves } from "@/data/inventorymovement-data";
+import { InventoryItem } from "@/types/inventory";
 
 
-export default function CreateMovementModal() {
+interface Props{
+    inventory: InventoryItem[]
+}
+
+export default function CreateMovementModal({
+        inventory
+    }:Props){
 
     const [open, setOpen] = useState(false);
 
@@ -114,7 +120,9 @@ export default function CreateMovementModal() {
                             </option>
 
 
-                            {inventory.map(product => (
+                            {inventory
+                            .filter(product => product.stock > 0)
+                            .map(product => (
 
                                 <option
                                     key={product.id}
@@ -136,12 +144,21 @@ export default function CreateMovementModal() {
                             type="number"
                             className="border border-border rounded-lg p-2"
                             placeholder="Quantity"
-                            min={0}
+                            min={1}
                             max={selectedProduct?.stock}
-                            value={quantity}
-                            onChange={(e)=>
-                                setQuantity(Number(e.target.value))
-                            }
+                            value={quantity || ""}
+                            onChange={(e) => {
+                                const value = Number(e.target.value);
+
+                                if (!selectedProduct) return;
+
+                                setQuantity(
+                                    Math.min(
+                                        Math.max(value, 1),
+                                        selectedProduct.stock
+                                    )
+                                );
+                            }}
                         />
 
 
@@ -154,11 +171,11 @@ export default function CreateMovementModal() {
                             }
                         >
 
-                            <option value="">
+                            <option value="" disabled>
                                 From shelf
                             </option>
 
-
+                            
                             {warehouseShelves.map(shelf => (
 
                                 <option
@@ -185,12 +202,13 @@ export default function CreateMovementModal() {
                             }
                         >
 
-                            <option value="">
+                            <option value="" disabled>
                                 To shelf
                             </option>
 
 
-                            {warehouseShelves.map(shelf => (
+                            {warehouseShelves.filter((shelf) => shelf.name !== fromShelf)
+                            .map(shelf => (
 
                                 <option
                                     key={shelf.id}

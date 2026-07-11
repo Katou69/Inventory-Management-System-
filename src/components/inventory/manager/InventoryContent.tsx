@@ -1,3 +1,4 @@
+import { inventory } from "@/data/inventory-data";
 import {
     StatsCards,
     InventoryTable,
@@ -27,7 +28,7 @@ export default async function AdminInventoryContent() {
             </div>
 
             <StatsCards />
-            <CreateMovementModal />
+            <CreateMovementModal inventory={inventory} />
 
             <MovementInbox tasks={tasks} />
             <InventoryTable />

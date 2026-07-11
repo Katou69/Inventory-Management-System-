@@ -18,6 +18,9 @@ export default function MovementInbox({
     useState<MovementTask | null>(null);
 
   const [open, setOpen] = useState(false);
+  const pendingTasks = tasks.filter(
+      task => task.status === "pending"
+  );
 
   return (
     <>
@@ -26,14 +29,14 @@ export default function MovementInbox({
         <div className="px-5 py-4 border-b border-border">
 
           <h2 className="font-semibold">
-            Pending Inventory Tasks ({tasks.length})
+            Pending Inventory Tasks ({pendingTasks.length})
           </h2>
 
         </div>
 
         <div className="p-5 space-y-4">
 
-          {tasks.map((task) => (
+          {pendingTasks.map((task) => (
 
             <MovementCard
               key={task.id}

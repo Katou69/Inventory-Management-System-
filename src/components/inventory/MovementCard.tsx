@@ -19,7 +19,7 @@ export default function MovementCard({
         </h3>
 
         <p className="text-sm text-muted-foreground mt-1">
-          Move {task.quantity} bottles
+          Quantity: {task.quantity}
         </p>
 
         <p className="text-sm mt-2">
