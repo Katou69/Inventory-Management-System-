@@ -17,6 +17,7 @@ import {
   activities,
   notifications,
   buildWarehouseDetail,
+  staffStats,
 } from "@/data/dashboard-data"
 import type {
   StatusCard,
@@ -31,6 +32,7 @@ import type {
   SearchIndex,
   CreateWarehouseInput,
   UpdateWarehouseProfileInput,
+  StaffStat,
 } from "@/types/dashboard"
 
 // Deep clone so callers can safely mutate their own copy of mock data.
@@ -49,6 +51,11 @@ const defaultSalesOverview: SalesOverview = {
 export async function getStatusCards(): Promise<StatusCard[]> {
   if (config.useMock) return clone(statusCards)
   return apiFetch<StatusCard[]>("/status-cards")
+}
+
+export async function getStaffStats(): Promise<StaffStat[]> {
+  if (config.useMock) return clone(staffStats)
+  return apiFetch<StaffStat[]>("/staff/stats")
 }
 
 export async function getInventoryStatistics(): Promise<Record<InventoryPeriod, InventoryDataPoint[]>> {

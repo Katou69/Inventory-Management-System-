@@ -1,8 +1,10 @@
 import type {
   StatusCard, Warehouse, Product, ActivityEntry, InventoryDataPoint,
   WarehouseDetail, WarehouseStatus, StockMovement, WarehouseProduct, WarehouseActivity,
-  NotificationItem,
+  NotificationItem, StaffStat
 } from "@/types/dashboard"
+
+
 
 export const statusCards: StatusCard[] = [
   {
@@ -280,3 +282,34 @@ export function buildWarehouseDetail(id: number): WarehouseDetail | undefined {
     activities: buildActivities(rand, base.manager),
   }
 }
+
+export const staffStats: StaffStat[] = [
+  {
+    id: 1,
+    title: "Orders Pending",
+    value: 5,
+    description: "Orders waiting for completion",
+    color: "blue",
+  },
+  {
+    id: 2,
+    title: "Purchase Deliveries",
+    value: 3,
+    description: "Incoming purchase deliveries",
+    color: "green",
+  },
+  {
+    id: 3,
+    title: "Low Stock Alerts",
+    value: 7,
+    description: "Items requiring attention",
+    color: "amber",
+  },
+  {
+    id: 4,
+    title: "Today's Movements",
+    value: 42,
+    description: "Stock in & out today",
+    color: "red",
+  },
+]

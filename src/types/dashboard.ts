@@ -228,3 +228,12 @@ export interface WarehouseDetail extends Warehouse {
   products: WarehouseProduct[]
   activities: WarehouseActivity[]
 }
+
+export interface StaffStat {
+  id: number
+  title: string
+  value: number
+  description: string
+  color: "blue" | "green" | "amber" | "red"
+}
+
