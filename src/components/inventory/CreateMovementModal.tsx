@@ -176,7 +176,8 @@ export default function CreateMovementModal({
                             </option>
 
                             
-                            {warehouseShelves.map(shelf => (
+                            {warehouseShelves.filter(shelf => shelf.currentStock > 0)
+                            .map(shelf => (
 
                                 <option
                                     key={shelf.id}
