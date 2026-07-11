@@ -14,3 +14,11 @@ export interface InventoryItem {
   status: InventoryStatus
   lastUpdated: string
 }
+
+export interface Shelf {
+    id: string;
+    warehouseId: number;
+    name: string;
+    capacity: number;
+    currentStock: number;
+}

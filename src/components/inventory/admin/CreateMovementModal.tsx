@@ -1,0 +1,246 @@
+"use client";
+
+import { useState } from "react";
+import Modal from "@/components/ui/Modal";
+import ModalFooter from "@/components/ui/ModalFooter";
+
+import { inventory } from "@/data/inventory-data";
+import { shelves } from "@/data/inventorymovement-data";
+
+
+export default function CreateMovementModal() {
+
+    const [open, setOpen] = useState(false);
+
+    const [productId, setProductId] = useState("");
+    const [quantity, setQuantity] = useState(0);
+    const [fromShelf, setFromShelf] = useState("");
+    const [toShelf, setToShelf] = useState("");
+    const [reason, setReason] = useState("");
+
+
+    const selectedProduct = inventory.find(
+        product => product.id === productId
+    );
+
+
+    const warehouseShelves = shelves.filter(
+        shelf =>
+            shelf.warehouseId === selectedProduct?.warehouseId
+    );
+
+
+    function resetForm() {
+        setProductId("");
+        setQuantity(0);
+        setFromShelf("");
+        setToShelf("");
+        setReason("");
+    }
+
+
+    function handleClose() {
+        resetForm();
+        setOpen(false);
+    }
+
+
+    function handleSubmit() {
+
+        if (!selectedProduct) return;
+
+
+        const task = {
+            id: crypto.randomUUID(),
+
+            productId: selectedProduct.id,
+            productName: selectedProduct.name,
+
+            warehouseId: selectedProduct.warehouseId,
+
+            quantity,
+
+            fromShelf,
+            toShelf,
+
+            requestedBy: "Admin",
+
+            reason,
+
+            status: "pending",
+        };
+
+
+        console.log(task);
+
+        handleClose();
+    }
+
+
+
+    return (
+        <>
+
+            <button
+                onClick={() => setOpen(true)}
+                className="self-start bg-primary text-primary-foreground px-4 py-2 rounded-lg"
+            >
+                Create Movement Task
+            </button>
+
+
+            {open && (
+
+                <Modal
+                    title="Create Movement Task"
+                    subtitle="Move products between shelves"
+                    onClose={handleClose}
+                >
+
+
+                    <div className="p-5 flex flex-col gap-4">
+
+
+                        <select
+                            className="border border-border rounded-lg p-2"
+                            value={productId}
+                            onChange={(e) =>
+                                setProductId(e.target.value)
+                            }
+                        >
+
+                            <option value="">
+                                Select product
+                            </option>
+
+
+                            {inventory.map(product => (
+
+                                <option
+                                    key={product.id}
+                                    value={product.id}
+                                >
+                                    {product.name}
+                                    {" "}
+                                    ({product.stock} available)
+                                </option>
+
+                            ))}
+
+
+                        </select>
+
+
+
+                        <input
+                            type="number"
+                            className="border border-border rounded-lg p-2"
+                            placeholder="Quantity"
+                            min={0}
+                            max={selectedProduct?.stock}
+                            value={quantity}
+                            onChange={(e)=>
+                                setQuantity(Number(e.target.value))
+                            }
+                        />
+
+
+
+                        <select
+                            className="border border-border rounded-lg p-2"
+                            value={fromShelf}
+                            onChange={(e)=>
+                                setFromShelf(e.target.value)
+                            }
+                        >
+
+                            <option value="">
+                                From shelf
+                            </option>
+
+
+                            {warehouseShelves.map(shelf => (
+
+                                <option
+                                    key={shelf.id}
+                                    value={shelf.name}
+                                >
+                                    {shelf.name}
+                                    {" "}
+                                    ({shelf.currentStock})
+                                </option>
+
+                            ))}
+
+
+                        </select>
+
+
+
+                        <select
+                            className="border border-border rounded-lg p-2"
+                            value={toShelf}
+                            onChange={(e)=>
+                                setToShelf(e.target.value)
+                            }
+                        >
+
+                            <option value="">
+                                To shelf
+                            </option>
+
+
+                            {warehouseShelves.map(shelf => (
+
+                                <option
+                                    key={shelf.id}
+                                    value={shelf.name}
+                                >
+                                    {shelf.name}
+                                    {" "}
+                                    Free:
+                                    {" "}
+                                    {shelf.capacity - shelf.currentStock}
+                                </option>
+
+                            ))}
+
+
+                        </select>
+
+
+
+                        <textarea
+                            className="border border-border rounded-lg p-2"
+                            placeholder="Reason"
+                            value={reason}
+                            onChange={(e)=>
+                                setReason(e.target.value)
+                            }
+                        />
+
+
+                    </div>
+
+
+
+                    <ModalFooter
+                        onCancel={handleClose}
+                        onConfirm={handleSubmit}
+                        confirmLabel="Create Task"
+                        disabled={
+                            !productId ||
+                            !quantity ||
+                            !fromShelf ||
+                            !toShelf
+                        }
+                    />
+
+
+                </Modal>
+
+            )}
+
+        </>
+    );
+}

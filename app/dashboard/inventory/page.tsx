@@ -1,29 +1,22 @@
-import {
-  StatsCards,
-  Filters,
-  InventoryTable,
-} from "@/components/inventory";
+import {AdminInventoryContent,} from "@/components/inventory/admin";
+
+// temporary
+const role: string = "admin";
 
 export default function InventoryPage() {
-  return (
-    <div className="flex flex-col gap-[30px]">
-      <div className="flex items-center justify-between">
+  switch (role) {
+    case "admin":
+      return <AdminInventoryContent />;
 
-        <div>
-          <h1 className="text-2xl font-bold">
-            Inventory
-          </h1>
+    case "manager":
+      // return <ManagerInventoryContent />;
+      return null;
 
-          <p className="text-muted-foreground">
-            Manage and track all your stock items
-          </p>
+    case "staff":
+      // return <StaffInventoryContent />;
+      return null;
 
-        </div>
-
-
-      </div>
-      <StatsCards />
-      <InventoryTable />
-    </div>
-  );
+    default:
+      return null;
+  }
 }
