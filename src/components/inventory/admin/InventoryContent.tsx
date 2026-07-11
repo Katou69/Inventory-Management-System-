@@ -6,6 +6,7 @@ import {
 } from "..";
 import CreateMovementModal from "./CreateMovementModal";
 import { getMovementTasks } from "@/services/inventory-service";
+import WarehouseSelector from "./WarehouseSelector";
 
 
 export default async function AdminInventoryContent() {
@@ -27,12 +28,17 @@ export default async function AdminInventoryContent() {
             </div>
 
             <StatsCards />
-            <CreateMovementModal />
+            <div className="flex items-center justify-between">
 
-            {/* Warehouse selector later */}
+                <CreateMovementModal />
+                <WarehouseSelector /> 
+
+            </div>
+            
 
             <MovementInbox tasks={tasks} />
             <InventoryTable />
+            {/* Can add view history later for all roles*/}
 
         </div>
 

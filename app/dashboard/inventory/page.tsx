@@ -1,7 +1,8 @@
-import {AdminInventoryContent,} from "@/components/inventory/admin";
-
-// temporary
-const role: string = "admin";
+import {AdminInventoryContent} from "@/components/inventory/admin";
+import {StaffInventoryContent} from "@/components/inventory/staff";
+import {role} from "../page"; // import the role from dashboard/page.tsx (need to remove when backend is implemented)
+// temporary (change this later to get the role from auth/session)
+// const role: string = "admin";
 
 export default function InventoryPage() {
   switch (role) {
@@ -13,8 +14,8 @@ export default function InventoryPage() {
       return null;
 
     case "staff":
-      // return <StaffInventoryContent />;
-      return null;
+      return <StaffInventoryContent />;
+    
 
     default:
       return null;

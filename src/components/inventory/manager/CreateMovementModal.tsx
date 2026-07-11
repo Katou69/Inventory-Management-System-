@@ -109,7 +109,7 @@ export default function CreateMovementModal() {
                             }
                         >
 
-                            <option value="" disabled>
+                            <option value="">
                                 Select product
                             </option>
 
