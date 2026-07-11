@@ -32,7 +32,7 @@ export const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
   "pending": { label: "Pending", cls: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400" },
   "processing": { label: "Processing", cls: "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400" },
   "shipped": { label: "Shipped", cls: "bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-400" },
-  "delivered": { label: "Delivered", cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400" },
+  "completed": { label: "Completed", cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400" },
   "cancelled": { label: "Cancelled", cls: "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-400" },
   "draft": { label: "Draft", cls: "bg-secondary text-muted-foreground" },
   "submitted": { label: "Submitted", cls: "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400" },

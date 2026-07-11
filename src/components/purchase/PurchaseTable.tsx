@@ -2,7 +2,7 @@ import { getPurchaseOrders } from "@/services/purchase-service";
 import { Badge } from "@/components/ui";
 import { ArrowUpDown, MoreHorizontal } from "lucide-react";
 
-const headers = ["S No", "PO ID", "Items", "Total", "Quantity", "Status"];
+const headers = ["No", "Purchase ID", "Items", "Total", "Quantity", "Status"];
 
 export default async function PurchaseTable() {
   const purchases = await getPurchaseOrders();

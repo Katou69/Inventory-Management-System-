@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Calendar } from "lucide-react";
 
-const tabs = ["All Purchases", "Summary", "Completed", "Cancelled"];
+const tabs = ["All Purchases", "Completed", "Cancelled"];
 
 export default function Filters() {
   const [activeTab, setActiveTab] = useState("All Purchases");

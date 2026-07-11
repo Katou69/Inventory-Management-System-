@@ -1,4 +1,4 @@
-import { Filters, PurchaseTable, Pagination } from "@/components/purchase";
+import { Filters, PurchaseTable } from "@/components/purchase";
 
 export default function PurchasePage() {
   return (
@@ -9,7 +9,6 @@ export default function PurchasePage() {
       </div>
       <Filters />
       <PurchaseTable />
-      <Pagination />
     </div>
   );
 }

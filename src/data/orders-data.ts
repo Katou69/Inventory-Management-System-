@@ -1,11 +1,87 @@
 import { Order } from "@/types/orders";
 
 export const orders: Order[] = [
-  { id: "83IHKDH", customer: "The Grand Hotel", warehouseId: 1, items: "Grand Royal Black", quantity: 23000, total: 343000, status: "delivered", date: "2026-06-10" },
-  { id: "83IKDH", customer: "City Bar & Grill", warehouseId: 2, items: "Grand Royal Signature", quantity: 20000, total: 834000, status: "cancelled", date: "2026-06-11" },
-  { id: "83IHKDH2", customer: "Metro Supermarket", warehouseId: 3, items: "Grand Royal Smooth", quantity: 14000, total: 73000, status: "delivered", date: "2026-06-12" },
-  { id: "63IHDH", customer: "Riverside Restaurant", warehouseId: 4, items: "Grand Royal SRW", quantity: 11000, total: 28000, status: "delivered", date: "2026-06-13" },
-  { id: "63IHKH", customer: "Downtown Café", warehouseId: 5, items: "Grand Royal Sherry Cask", quantity: 7000, total: 23000, status: "cancelled", date: "2026-06-14" },
-  { id: "83IK2DH", customer: "The Lounge Club", warehouseId: 6, items: "Glan Master Double Smooth", quantity: 3500, total: 63000, status: "delivered", date: "2026-06-15" },
-  { id: "13IH0H", customer: "Park Inn Hotel", warehouseId: 7, items: "Glan Master Finest", quantity: 1000000, total: 38000, status: "cancelled", date: "2026-06-16" },
+  {
+    id: "ORD-001",
+    customer: "The Grand Hotel",
+    items: [
+      { product: "Grand Royal Black", quantity: 12000 },
+      { product: "Grand Royal Signature", quantity: 8000 },
+      { product: "Grand Royal Smooth", quantity: 3000 },
+    ],
+    total: 343000,
+    status: "completed",
+    date: "2026-06-10",
+  },
+
+  {
+    id: "ORD-002",
+    customer: "City Bar & Grill",
+    items: [
+      { product: "Grand Royal Signature", quantity: 12000 },
+      { product: "Grand Royal Sherry Cask", quantity: 8000 },
+    ],
+    total: 834000,
+    status: "cancelled",
+    date: "2026-06-11",
+  },
+
+  {
+    id: "ORD-003",
+    customer: "Metro Supermarket",
+    items: [
+      { product: "Grand Royal Smooth", quantity: 9000 },
+      { product: "Glan Master Finest", quantity: 5000 },
+    ],
+    total: 73000,
+    status: "completed",
+    date: "2026-06-12",
+  },
+
+  {
+    id: "ORD-004",
+    customer: "Riverside Restaurant",
+    items: [
+      { product: "Grand Royal SRW", quantity: 6000 },
+      { product: "Grand Royal Black", quantity: 5000 },
+    ],
+    total: 28000,
+    status: "pending",
+    date: "2026-06-13",
+  },
+
+  {
+    id: "ORD-005",
+    customer: "Downtown Café",
+    items: [
+      { product: "Grand Royal Sherry Cask", quantity: 7000 },
+    ],
+    total: 23000,
+    status: "pending",
+    date: "2026-06-14",
+  },
+
+  {
+    id: "ORD-006",
+    customer: "The Lounge Club",
+    items: [
+      { product: "Glan Master Double Smooth", quantity: 2000 },
+      { product: "Glan Master Finest", quantity: 1500 },
+    ],
+    total: 63000,
+    status: "pending",
+    date: "2026-06-15",
+  },
+
+  {
+    id: "ORD-007",
+    customer: "Park Inn Hotel",
+    items: [
+      { product: "Glan Master Finest", quantity: 700000 },
+      { product: "Grand Royal Black", quantity: 300000 },
+    ],
+    total: 38000,
+    status: "cancelled",
+    date: "2026-06-16",
+  },
 ];
