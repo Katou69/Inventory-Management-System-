@@ -91,7 +91,7 @@ export default function CreateMovementModal({
                 onClick={() => setOpen(true)}
                 className="self-start bg-primary text-primary-foreground px-4 py-2 rounded-lg"
             >
-                Create Movement Task
+                Move Inventory
             </button>
 
 
