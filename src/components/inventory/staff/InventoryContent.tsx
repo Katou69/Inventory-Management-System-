@@ -29,7 +29,9 @@ export default async function StaffInventoryContent() {
             <StatsCards />
 
             <MovementInbox tasks={tasks} />
-            <InventoryTable />
+
+            <InventoryTable /> 
+            {/* Need to remove the edit product for staff later*/}
 
         </div>
 

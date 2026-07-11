@@ -4,7 +4,7 @@ import {
     MovementInbox,
     
 } from "..";
-import CreateMovementModal from "./CreateMovementModal";
+import CreateMovementModal from "../CreateMovementModal";
 import { getMovementTasks } from "@/services/inventory-service";
 import WarehouseSelector from "./WarehouseSelector";
 

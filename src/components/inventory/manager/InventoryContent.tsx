@@ -4,7 +4,7 @@ import {
     MovementInbox,
     
 } from "..";
-import CreateMovementModal from "./CreateMovementModal";
+import CreateMovementModal from "../CreateMovementModal";
 import { getMovementTasks } from "@/services/inventory-service";
 
 
@@ -28,8 +28,6 @@ export default async function AdminInventoryContent() {
 
             <StatsCards />
             <CreateMovementModal />
-
-            {/* Warehouse selector later */}
 
             <MovementInbox tasks={tasks} />
             <InventoryTable />
