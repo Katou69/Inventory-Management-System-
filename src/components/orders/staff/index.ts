@@ -1,0 +1,1 @@
+export { default as StaffOrderContent } from "./OrderContent";

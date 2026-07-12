@@ -45,8 +45,13 @@ export default function OrderFormModal({
   const [total, setTotal] = useState(order?.total ?? 0);
 
   const [items, setItems] = useState<FormItem[]>(
-    order?.items ?? [{ product: "", quantity: 0 }]
-  );
+  order?.items ?? [
+    {
+      product: "",
+      quantity: 0,
+    },
+  ]
+);
 
   if (!open) return null;
 
@@ -70,14 +75,14 @@ export default function OrderFormModal({
   };
 
   const addItem = () => {
-    setItems((currentItems) => [
-      ...currentItems,
-      {
-        product: "",
-        quantity: 0,
-      },
-    ]);
-  };
+  setItems((current) => [
+    ...current,
+    {
+      product: "",
+      quantity: 0,
+    },
+  ]);
+};
 
   const removeItem = (index: number) => {
     setItems((currentItems) =>

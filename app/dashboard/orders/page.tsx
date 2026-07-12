@@ -1,16 +1,20 @@
-import { OrdersTable } from "@/components/orders";
+import { AdminOrderContent } from "@/components/orders/admin";
+import { StaffOrderContent } from "@/components/orders/staff";
+import { role } from "../page";
+import { ManagerOrderContent } from "@/components/orders/manager";
 
 export default function OrdersPage() {
-  return (
-    <div className="flex flex-col gap-[30px]">
-      <div>
-        <h1 className="text-3xl font-bold">Order History</h1>
-        <p className="text-muted-foreground">
-          Track and manage all customer orders
-        </p>
-      </div>
+  switch (role) {
+    case "admin":
+      return <AdminOrderContent />;
 
-      <OrdersTable />
-    </div>
-  );
+    case "manager":
+      return <ManagerOrderContent />;
+
+    case "staff":
+      return <StaffOrderContent />;
+
+    default:
+      return null;
+  }
 }

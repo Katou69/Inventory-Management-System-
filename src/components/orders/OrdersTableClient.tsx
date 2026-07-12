@@ -3,12 +3,15 @@
 import { useMemo, useState } from "react";
 import { Order } from "@/types/orders";
 import { Badge } from "@/components/ui";
-import { ArrowUpDown, X } from "lucide-react";
+import { ArrowUpDown } from "lucide-react";
 
 import Filters, { OrderFilterStatus } from "./Filters";
-import OrderActionsMenu from "./OrderActionsMenu";
+import OrderActionsMenu, { Role } from "./OrderActionsMenu";
 import OrderFormModal from "./OrderFormModal";
 import DeleteOrderModal from "./DeleteOrderModal";
+import CancelOrderModal from "./CancelOrderModal";
+import OrderDetailsModal from "./OrderDetailsModal";
+import MoveToShipModal from "./MoveToShipModal";
 
 const headers = [
   "No",
@@ -23,15 +26,20 @@ const headers = [
 
 type Props = {
   orders: Order[];
+  role: Role;
 };
 
-export default function OrdersTableClient({ orders }: Props) {
+export default function OrdersTableClient({ orders, role }: Props) {
   const [orderList, setOrderList] = useState<Order[]>(orders);
 
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [movingOrder, setMovingOrder] = useState<Order | null>(null);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [deletingOrder, setDeletingOrder] = useState<Order | null>(null);
+  const [cancellingOrder, setCancellingOrder] = useState<Order | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+
+  const canManage = role === "admin" || role === "manager";
 
   // Filter states
   const [activeStatus, setActiveStatus] =
@@ -42,17 +50,10 @@ export default function OrdersTableClient({ orders }: Props) {
 
   const filteredOrders = useMemo(() => {
     return orderList.filter((order) => {
-      /*
-       * The Filters for every types of Orders
-       */
       const matchesStatus =
         activeStatus === "all" ||
         order.status === activeStatus;
 
-      /*
-       * Dates use YYYY-MM-DD format, so they can be compared safely
-       * as strings.
-       */
       const matchesStartDate =
         !startDate || order.date >= startDate;
 
@@ -97,10 +98,6 @@ export default function OrdersTableClient({ orders }: Props) {
       return [savedOrder, ...previousOrders];
     });
 
-    /*
-     * Update the details modal too if the currently selected
-     * order was edited.
-     */
     setSelectedOrder((currentOrder) =>
       currentOrder?.id === savedOrder.id
         ? savedOrder
@@ -124,6 +121,49 @@ export default function OrdersTableClient({ orders }: Props) {
     setDeletingOrder(null);
   };
 
+  // Row / menu click routes to the right modal based on order status:
+  // pending -> shelf picking modal, everything else -> details modal
+  // (details modal shows the picking checklist inline when status is "picking").
+  const handleProductClick = (order: Order) => {
+    if (order.status === "pending") {
+      setMovingOrder(order);
+    } else {
+      setSelectedOrder(order);
+    }
+  };
+
+  const handleConfirmMoveToShip = (updatedOrder: Order) => {
+    setOrderList((previousOrders) =>
+      previousOrders.map((order) =>
+        order.id === updatedOrder.id ? updatedOrder : order
+      )
+    );
+    setMovingOrder(null);
+  };
+
+  const handleCompletePicking = (orderId: string) => {
+    setOrderList((previousOrders) =>
+      previousOrders.map((order) =>
+        order.id === orderId ? { ...order, status: "completed" } : order
+      )
+    );
+    setSelectedOrder(null);
+  };
+
+  const handleConfirmCancel = () => {
+    if (!cancellingOrder) return;
+
+    setOrderList((previousOrders) =>
+      previousOrders.map((order) =>
+        order.id === cancellingOrder.id
+          ? { ...order, status: "cancelled" }
+          : order
+      )
+    );
+
+    setCancellingOrder(null);
+  };
+
   return (
     <>
       <div className="space-y-5">
@@ -143,13 +183,15 @@ export default function OrdersTableClient({ orders }: Props) {
             {orderList.length} orders
           </p>
 
-          <button
-            type="button"
-            onClick={handleAddOrder}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
-          >
-            + New Order
-          </button>
+          {canManage && (
+            <button
+              type="button"
+              onClick={handleAddOrder}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+            >
+              + New Order
+            </button>
+          )}
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -213,9 +255,7 @@ export default function OrdersTableClient({ orders }: Props) {
                       <td className="px-6 py-4">
                         <button
                           type="button"
-                          onClick={() =>
-                            setSelectedOrder(order)
-                          }
+                          onClick={() => handleProductClick(order)}
                           className="text-left"
                         >
                           <p className="font-medium text-slate-700 hover:text-indigo-600 hover:underline">
@@ -249,9 +289,12 @@ export default function OrdersTableClient({ orders }: Props) {
                       <td className="px-6 py-4">
                         <OrderActionsMenu
                           order={order}
+                          role={role}
                           onView={setSelectedOrder}
+                          onMoveToShip={setMovingOrder}
                           onEdit={handleEditOrder}
                           onDelete={setDeletingOrder}
+                          onCancel={setCancellingOrder}
                         />
                       </td>
                     </tr>
@@ -289,122 +332,20 @@ export default function OrdersTableClient({ orders }: Props) {
         </div>
       </div>
 
-      {selectedOrder && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              setSelectedOrder(null);
-            }
-          }}
-        >
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-lg">
-            <div className="mb-5 flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-800">
-                  Order Details
-                </h2>
+      <OrderDetailsModal
+          open={selectedOrder !== null}
+          order={selectedOrder}
+          onClose={() => setSelectedOrder(null)}
+          onCompletePicking={handleCompletePicking}
+      />
 
-                <p className="text-sm text-slate-500">
-                  {selectedOrder.id}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setSelectedOrder(null)
-                }
-                className="rounded-lg p-2 hover:bg-slate-100"
-                aria-label="Close order details"
-              >
-                <X className="h-5 w-5 text-slate-500" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500">
-                  Customer
-                </span>
-
-                <span className="text-right font-medium">
-                  {selectedOrder.customer}
-                </span>
-              </div>
-
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500">
-                  Status
-                </span>
-
-                <Badge status={selectedOrder.status} />
-              </div>
-
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500">
-                  Order Date
-                </span>
-
-                <span>{selectedOrder.date}</span>
-              </div>
-            </div>
-
-            <div className="mt-5 border-t border-slate-200 pt-5">
-              <h3 className="mb-3 font-semibold text-slate-800">
-                Products
-              </h3>
-
-              <div className="max-h-64 space-y-3 overflow-y-auto">
-                {selectedOrder.items.map(
-                  (item, index) => (
-                    <div
-                      key={`${item.product}-${index}`}
-                      className="flex justify-between gap-4 rounded-lg bg-slate-50 px-4 py-3"
-                    >
-                      <span className="text-slate-700">
-                        {item.product}
-                      </span>
-
-                      <span className="whitespace-nowrap font-medium">
-                        {item.quantity.toLocaleString()}
-                      </span>
-                    </div>
-                  )
-                )}
-              </div>
-            </div>
-
-            <div className="mt-5 space-y-2 border-t border-slate-200 pt-5">
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500">
-                  Total Quantity
-                </span>
-
-                <span className="font-semibold">
-                  {selectedOrder.items
-                    .reduce(
-                      (sum, item) =>
-                        sum + item.quantity,
-                      0
-                    )
-                    .toLocaleString()}
-                </span>
-              </div>
-
-              <div className="flex justify-between gap-4">
-                <span className="text-slate-500">
-                  Total Amount
-                </span>
-
-                <span className="font-semibold">
-                  {selectedOrder.total.toLocaleString()}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <MoveToShipModal
+        key={movingOrder?.id ?? "none"}
+        open={movingOrder !== null}
+        order={movingOrder}
+        onClose={() => setMovingOrder(null)}
+        onConfirm={handleConfirmMoveToShip}
+      />
 
       <OrderFormModal
         key={editingOrder?.id ?? "new-order"}
@@ -421,6 +362,12 @@ export default function OrdersTableClient({ orders }: Props) {
         order={deletingOrder}
         onClose={() => setDeletingOrder(null)}
         onConfirm={handleDeleteOrder}
+      />
+
+      <CancelOrderModal
+        order={cancellingOrder}
+        onClose={() => setCancellingOrder(null)}
+        onConfirm={handleConfirmCancel}
       />
     </>
   );
