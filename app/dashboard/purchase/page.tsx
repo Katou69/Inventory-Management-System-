@@ -1,13 +1,20 @@
-import { Filters, PurchaseTable } from "@/components/purchase";
+import { AdminPurchaseContent } from "@/components/purchase/admin";
+import { StaffPurchaseContent } from "@/components/purchase/staff";
+import { ManagerPurchaseContent } from "@/components/purchase/manager";
+import { role } from "../page";
 
 export default function PurchasePage() {
-  return (
-    <div className="flex flex-col gap-[30px]">
-      <div>
-        <h1 className="text-2xl font-bold">Purchase History</h1>
-        <p className="text-muted-foreground">Track and manage all supplier purchases</p>
-      </div>
-      <PurchaseTable />
-    </div>
-  );
+  switch (role) {
+    case "admin":
+      return <AdminPurchaseContent />;
+
+    case "manager":
+      return <ManagerPurchaseContent />;
+
+    case "staff":
+      return <StaffPurchaseContent />;
+
+    default:
+      return null;
+  }
 }

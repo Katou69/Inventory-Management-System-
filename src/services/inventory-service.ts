@@ -10,6 +10,7 @@ import type { InventoryItem } from "@/types/inventory"
 import { MovementTask } from "@/types/inventory-movement"
 import { movementTasks } from "@/data/inventorymovement-data"
 import { productShelfStock } from "@/data/product-shelf-stock";
+import { shelves } from "@/data/inventorymovement-data";
 
 const clone = <T>(value: T): T => structuredClone(value)
 
@@ -30,6 +31,11 @@ export type ShelfAvailability = {
   quantity: number;
 };
 
+export type ShelfFreeSpace = {
+  shelf: string;
+  free: number;
+};
+
 /**
  * Shelves currently holding stock of a given product, and how much is
  * available on each. Used to populate the "Choose Shelf" dropdown in
@@ -45,6 +51,15 @@ export function getShelfStockForProduct(
     .map((entry) => ({ shelf: entry.shelfName, quantity: entry.quantity }));
 }
 
+/**
+ * Checks how much free space is available on each shelf
+ */
+export function getAllShelves(): ShelfFreeSpace[] {
+  return shelves.map((shelf) => ({
+    shelf: shelf.name,
+    free: shelf.capacity - shelf.currentStock,
+  }));
+}
 /**
  * Deducts the given quantities from the specified shelves, and from the
  * product's overall inventory stock, once staff confirm a Move to Ship
@@ -83,5 +98,65 @@ export function deductInventory(
     } else {
       inventoryItem.status = "in-stock";
     }
+  }
+}
+
+
+export function addInventory(
+  productName: string,
+  allocations: {
+    shelf: string;
+    quantity: number;
+  }[]
+) {
+  allocations.forEach(({ shelf, quantity }) => {
+
+    // Update shelf occupancy
+    const shelfData = shelves.find(
+      (entry) => entry.name === shelf
+    );
+
+    if (shelfData) {
+      shelfData.currentStock += quantity;
+    }
+
+    // Update per-product shelf stock
+    const productShelf = productShelfStock.find(
+      (entry) =>
+        entry.productName === productName &&
+        entry.shelfName === shelf
+    );
+
+    if (productShelf) {
+      productShelf.quantity += quantity;
+    } else {
+      productShelfStock.push({
+        productName,
+        shelfName: shelf,
+        warehouseId: shelfData?.warehouseId ?? 1,
+        quantity,
+      });
+    }
+  });
+
+  const totalAdded = allocations.reduce(
+    (sum, allocation) => sum + allocation.quantity,
+    0
+  );
+
+  const inventoryItem = inventory.find(
+    (item) => item.name === productName
+  );
+
+  if (!inventoryItem) return;
+
+  inventoryItem.stock += totalAdded;
+
+  if (inventoryItem.stock === 0) {
+    inventoryItem.status = "out-of-stock";
+  } else if (inventoryItem.stock <= inventoryItem.minStock) {
+    inventoryItem.status = "low-stock";
+  } else {
+    inventoryItem.status = "in-stock";
   }
 }

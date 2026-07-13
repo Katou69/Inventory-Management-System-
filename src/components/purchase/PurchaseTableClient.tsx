@@ -1,14 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowUpDown, X } from "lucide-react";
+import { ArrowUpDown } from "lucide-react";
 
 import { PurchaseOrder } from "@/types/purchases";
 import { Badge } from "@/components/ui";
 import Filters, { PurchaseFilterStatus } from "./Filters";
-import PurchaseActionsMenu from "./PurchaseActionsMenu";
+import PurchaseActionsMenu, { Role } from "./PurchaseActionsMenu";
 import PurchaseFormModal from "./PurchaseFormModal";
 import DeletePurchaseModal from "./DeletePurchaseModal";
+import CancelPurchaseModal from "./CancelPurchaseModal";
+import PurchaseDetailsModal from "./PurchaseDetailsModal";
+import ReceivingChecklistModal from "./ReceivingChecklistModal";
 
 const headers = [
   "No",
@@ -23,108 +26,71 @@ const headers = [
 
 type Props = {
   purchases: PurchaseOrder[];
+  role: Role;
 };
 
-export default function PurchaseTableClient({
-  purchases,
-}: Props) {
-  const [purchaseList, setPurchaseList] =
-    useState<PurchaseOrder[]>(purchases);
+export default function PurchaseTableClient({ purchases, role }: Props) {
+  const [purchaseList, setPurchaseList] = useState<PurchaseOrder[]>(purchases);
 
-  const [selectedPurchase, setSelectedPurchase] =
-    useState<PurchaseOrder | null>(null);
-
-  const [editingPurchase, setEditingPurchase] =
-    useState<PurchaseOrder | null>(null);
-
-  const [deletingPurchase, setDeletingPurchase] =
-    useState<PurchaseOrder | null>(null);
-
+  const [selectedPurchase, setSelectedPurchase] = useState<PurchaseOrder | null>(null);
+  const [receivingPurchase, setReceivingPurchase] = useState<PurchaseOrder | null>(null);
+  const [editingPurchase, setEditingPurchase] = useState<PurchaseOrder | null>(null);
+  const [deletingPurchase, setDeletingPurchase] = useState<PurchaseOrder | null>(null);
+  const [cancellingPurchase, setCancellingPurchase] = useState<PurchaseOrder | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
 
-  const [activeStatus, setActiveStatus] =
-    useState<PurchaseFilterStatus>("all");
+  const canManage = role === "admin" || role === "manager";
 
+  const [activeStatus, setActiveStatus] = useState<PurchaseFilterStatus>("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
   const filteredPurchases = useMemo(() => {
     return purchaseList.filter((purchase) => {
-      const matchesStatus =
-        activeStatus === "all" ||
-        purchase.status === activeStatus;
+      const matchesStatus = activeStatus === "all" || purchase.status === activeStatus;
+      const matchesStartDate = !startDate || purchase.date >= startDate;
+      const matchesEndDate = !endDate || purchase.date <= endDate;
 
-      const matchesStartDate =
-        !startDate || purchase.date >= startDate;
-
-      const matchesEndDate =
-        !endDate || purchase.date <= endDate;
-
-      return (
-        matchesStatus &&
-        matchesStartDate &&
-        matchesEndDate
-      );
+      return matchesStatus && matchesStartDate && matchesEndDate;
     });
-  }, [
-    purchaseList,
-    activeStatus,
-    startDate,
-    endDate,
-  ]);
+  }, [purchaseList, activeStatus, startDate, endDate]);
 
   const handleAddPurchase = () => {
     setEditingPurchase(null);
     setIsFormOpen(true);
   };
 
-  const handleEditPurchase = (
-    purchase: PurchaseOrder
-  ) => {
+  const handleEditPurchase = (purchase: PurchaseOrder) => {
     setEditingPurchase(purchase);
     setIsFormOpen(true);
   };
 
-  const handleSavePurchase = (
-    savedPurchase: PurchaseOrder
-  ) => {
-    setPurchaseList((currentPurchases) => {
-      const exists = currentPurchases.some(
-        (purchase) =>
-          purchase.id === savedPurchase.id
-      );
+  const handleSavePurchase = (savedPurchase: PurchaseOrder) => {
+    setPurchaseList((current) => {
+      const exists = current.some((purchase) => purchase.id === savedPurchase.id);
 
       if (exists) {
-        return currentPurchases.map((purchase) =>
-          purchase.id === savedPurchase.id
-            ? savedPurchase
-            : purchase
+        return current.map((purchase) =>
+          purchase.id === savedPurchase.id ? savedPurchase : purchase
         );
       }
 
-      return [savedPurchase, ...currentPurchases];
+      return [savedPurchase, ...current];
     });
 
-    setSelectedPurchase((currentPurchase) =>
-      currentPurchase?.id === savedPurchase.id
-        ? savedPurchase
-        : currentPurchase
+    setSelectedPurchase((current) =>
+      current?.id === savedPurchase.id ? savedPurchase : current
     );
   };
 
   const handleDeletePurchase = () => {
     if (!deletingPurchase) return;
 
-    setPurchaseList((currentPurchases) =>
-      currentPurchases.filter(
-        (purchase) =>
-          purchase.id !== deletingPurchase.id
-      )
+    setPurchaseList((current) =>
+      current.filter((purchase) => purchase.id !== deletingPurchase.id)
     );
 
-    if (
-      selectedPurchase?.id === deletingPurchase.id
-    ) {
+    if (selectedPurchase?.id === deletingPurchase.id) {
       setSelectedPurchase(null);
     }
 
@@ -134,6 +100,49 @@ export default function PurchaseTableClient({
   const handleClearDates = () => {
     setStartDate("");
     setEndDate("");
+  };
+
+  // pending -> standalone receiving checklist; everything else -> details
+  // modal (which embeds the "place in inventory" step when status is
+  // "receiving").
+  const handleProductClick = (purchase: PurchaseOrder) => {
+    if (purchase.status === "pending") {
+      setReceivingPurchase(purchase);
+    } else {
+      setSelectedPurchase(purchase);
+    }
+  };
+
+  const handleConfirmReceived = (updatedPurchase: PurchaseOrder) => {
+    setPurchaseList((current) =>
+      current.map((purchase) =>
+        purchase.id === updatedPurchase.id ? updatedPurchase : purchase
+      )
+    );
+    setReceivingPurchase(null);
+  };
+
+  const handleCompleteReceiving = (updatedPurchase: PurchaseOrder) => {
+    setPurchaseList((current) =>
+      current.map((purchase) =>
+        purchase.id === updatedPurchase.id ? updatedPurchase : purchase
+      )
+    );
+    setSelectedPurchase(null);
+  };
+
+  const handleConfirmCancel = () => {
+    if (!cancellingPurchase) return;
+
+    setPurchaseList((current) =>
+      current.map((purchase) =>
+        purchase.id === cancellingPurchase.id
+          ? { ...purchase, status: "cancelled" }
+          : purchase
+      )
+    );
+
+    setCancellingPurchase(null);
   };
 
   return (
@@ -151,17 +160,18 @@ export default function PurchaseTableClient({
 
         <div className="flex items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">
-            Showing {filteredPurchases.length} of{" "}
-            {purchaseList.length} purchases
+            Showing {filteredPurchases.length} of {purchaseList.length} purchases
           </p>
 
-          <button
-            type="button"
-            onClick={handleAddPurchase}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
-          >
-            + New Purchase
-          </button>
+          {canManage && (
+            <button
+              type="button"
+              onClick={handleAddPurchase}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+            >
+              + New Purchase
+            </button>
+          )}
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
@@ -188,115 +198,87 @@ export default function PurchaseTableClient({
 
             <tbody>
               {filteredPurchases.length > 0 ? (
-                filteredPurchases.map(
-                  (purchase, index) => {
-                    const totalQuantity =
-                      purchase.items.reduce(
-                        (sum, item) =>
-                          sum + item.quantity,
-                        0
-                      );
+                filteredPurchases.map((purchase, index) => {
+                  const totalQuantity = purchase.items.reduce(
+                    (sum, item) => sum + item.quantity,
+                    0
+                  );
 
-                    const firstProduct =
-                      purchase.items[0]?.product ??
-                      "No product";
+                  const firstProduct = purchase.items[0]?.product ?? "No product";
+                  const remainingProducts = Math.max(purchase.items.length - 1, 0);
 
-                    const remainingProducts =
-                      Math.max(
-                        purchase.items.length - 1,
-                        0
-                      );
+                  return (
+                    <tr
+                      key={purchase.id}
+                      className="border-b border-border transition-colors last:border-b-0 hover:bg-accent"
+                    >
+                      <td className="px-6 py-4 text-muted-foreground">{index + 1}</td>
 
-                    return (
-                      <tr
-                        key={purchase.id}
-                        className="border-b border-border transition-colors last:border-b-0 hover:bg-accent"
-                      >
-                        <td className="px-6 py-4 text-muted-foreground">
-                          {index + 1}
-                        </td>
+                      <td className="px-6 py-4">
+                        <span className="inline-flex whitespace-nowrap rounded-md bg-accent px-2 py-0.5 font-mono text-xs font-medium text-muted-foreground">
+                          {purchase.id}
+                        </span>
+                      </td>
 
-                        <td className="px-6 py-4">
-                          <span className="inline-flex whitespace-nowrap rounded-md bg-accent px-2 py-0.5 font-mono text-xs font-medium text-muted-foreground">
-                            {purchase.id}
-                          </span>
-                        </td>
+                      <td className="px-6 py-4 font-medium text-foreground">
+                        {purchase.supplier}
+                      </td>
 
-                        <td className="whitespace-nowrap px-6 py-4 font-medium text-foreground">
-                          {purchase.supplier}
-                        </td>
+                      <td className="px-6 py-4">
+                        <button
+                          type="button"
+                          onClick={() => handleProductClick(purchase)}
+                          className="text-left"
+                        >
+                          <p className="font-medium text-foreground hover:text-primary hover:underline">
+                            {firstProduct}
+                          </p>
 
-                        <td className="px-6 py-4">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setSelectedPurchase(
-                                purchase
-                              )
-                            }
-                            className="text-left"
-                          >
-                            <p className="font-medium text-foreground hover:text-primary hover:underline">
-                              {firstProduct}
+                          {remainingProducts > 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              +{remainingProducts} more
                             </p>
+                          )}
+                        </button>
+                      </td>
 
-                            {remainingProducts > 0 && (
-                              <p className="text-xs text-muted-foreground">
-                                +{remainingProducts} more
-                              </p>
-                            )}
-                          </button>
-                        </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-foreground">
+                        {totalQuantity.toLocaleString()}
+                      </td>
 
-                        <td className="whitespace-nowrap px-6 py-4 text-foreground">
-                          {totalQuantity.toLocaleString()}
-                        </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-foreground">
+                        {purchase.total.toLocaleString()}
+                      </td>
 
-                        <td className="whitespace-nowrap px-6 py-4 text-foreground">
-                          {purchase.total.toLocaleString()}
-                        </td>
+                      <td className="whitespace-nowrap px-6 py-4">
+                        <Badge status={purchase.status} />
+                      </td>
 
-                        <td className="whitespace-nowrap px-6 py-4">
-                          <Badge
-                            status={purchase.status}
-                          />
-                        </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-muted-foreground">
+                        {purchase.date}
+                      </td>
 
-                        <td className="whitespace-nowrap px-6 py-4 text-muted-foreground">
-                          {purchase.date}
-                        </td>
-
-                        <td className="px-6 py-4">
-                          <PurchaseActionsMenu
-                            purchase={purchase}
-                            onView={
-                              setSelectedPurchase
-                            }
-                            onEdit={
-                              handleEditPurchase
-                            }
-                            onDelete={
-                              setDeletingPurchase
-                            }
-                          />
-                        </td>
-                      </tr>
-                    );
-                  }
-                )
+                      <td className="px-6 py-4">
+                        <PurchaseActionsMenu
+                          purchase={purchase}
+                          role={role}
+                          onView={setSelectedPurchase}
+                          onReceive={setReceivingPurchase}
+                          onEdit={handleEditPurchase}
+                          onDelete={setDeletingPurchase}
+                          onCancel={setCancellingPurchase}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
-                  <td
-                    colSpan={headers.length + 1}
-                    className="px-6 py-14 text-center"
-                  >
-                    <p className="font-medium text-foreground">
-                      No purchases found
-                    </p>
+                  <td colSpan={headers.length + 1} className="px-6 py-14 text-center">
+                    <p className="font-medium text-foreground">No purchases found</p>
 
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Try changing the status or date
-                      filters.
+                      Try changing the status or date filters.
                     </p>
 
                     {(startDate || endDate) && (
@@ -316,133 +298,23 @@ export default function PurchaseTableClient({
         </div>
       </div>
 
-      {selectedPurchase && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onMouseDown={(event) => {
-            if (
-              event.target === event.currentTarget
-            ) {
-              setSelectedPurchase(null);
-            }
-          }}
-        >
-          <div className="w-full max-w-lg rounded-xl bg-card p-6 shadow-lg">
-            <div className="mb-5 flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">
-                  Purchase Details
-                </h2>
+      <PurchaseDetailsModal
+        open={selectedPurchase !== null}
+        purchase={selectedPurchase}
+        onClose={() => setSelectedPurchase(null)}
+        onCompleteReceiving={handleCompleteReceiving}
+      />
 
-                <p className="text-sm text-muted-foreground">
-                  {selectedPurchase.id}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setSelectedPurchase(null)
-                }
-                className="rounded-lg p-2 hover:bg-accent"
-                aria-label="Close purchase details"
-              >
-                <X className="h-5 w-5 text-muted-foreground" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">
-                  Supplier
-                </span>
-
-                <span className="text-right font-medium text-foreground">
-                  {selectedPurchase.supplier}
-                </span>
-              </div>
-
-              <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">
-                  Status
-                </span>
-
-                <Badge
-                  status={selectedPurchase.status}
-                />
-              </div>
-
-              <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">
-                  Purchase Date
-                </span>
-
-                <span className="text-foreground">
-                  {selectedPurchase.date}
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-5 border-t border-border pt-5">
-              <h3 className="mb-3 font-semibold text-foreground">
-                Products
-              </h3>
-
-              <div className="max-h-64 space-y-3 overflow-y-auto">
-                {selectedPurchase.items.map(
-                  (item, index) => (
-                    <div
-                      key={`${item.product}-${index}`}
-                      className="flex justify-between gap-4 rounded-lg bg-accent px-4 py-3"
-                    >
-                      <span className="text-foreground">
-                        {item.product}
-                      </span>
-
-                      <span className="whitespace-nowrap font-medium text-foreground">
-                        {item.quantity.toLocaleString()}
-                      </span>
-                    </div>
-                  )
-                )}
-              </div>
-            </div>
-
-            <div className="mt-5 space-y-2 border-t border-border pt-5">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">
-                  Total Quantity
-                </span>
-
-                <span className="font-semibold text-foreground">
-                  {selectedPurchase.items
-                    .reduce(
-                      (sum, item) =>
-                        sum + item.quantity,
-                      0
-                    )
-                    .toLocaleString()}
-                </span>
-              </div>
-
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">
-                  Total Amount
-                </span>
-
-                <span className="font-semibold text-foreground">
-                  {selectedPurchase.total.toLocaleString()}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <ReceivingChecklistModal
+        key={receivingPurchase?.id ?? "none"}
+        open={receivingPurchase !== null}
+        purchase={receivingPurchase}
+        onClose={() => setReceivingPurchase(null)}
+        onConfirm={handleConfirmReceived}
+      />
 
       <PurchaseFormModal
-        key={
-          editingPurchase?.id ?? "new-purchase"
-        }
+        key={editingPurchase?.id ?? "new-purchase"}
         open={isFormOpen}
         purchase={editingPurchase}
         onClose={() => {
@@ -454,10 +326,14 @@ export default function PurchaseTableClient({
 
       <DeletePurchaseModal
         purchase={deletingPurchase}
-        onClose={() =>
-          setDeletingPurchase(null)
-        }
+        onClose={() => setDeletingPurchase(null)}
         onConfirm={handleDeletePurchase}
+      />
+
+      <CancelPurchaseModal
+        purchase={cancellingPurchase}
+        onClose={() => setCancellingPurchase(null)}
+        onConfirm={handleConfirmCancel}
       />
     </>
   );

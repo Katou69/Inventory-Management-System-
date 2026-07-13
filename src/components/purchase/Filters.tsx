@@ -5,6 +5,7 @@ import { Calendar, X } from "lucide-react";
 export type PurchaseFilterStatus =
   | "all"
   | "pending"
+  | "receiving"
   | "completed"
   | "cancelled";
 
@@ -24,6 +25,7 @@ const tabs: {
 }[] = [
   { label: "All Purchases", value: "all" },
   { label: "Pending", value: "pending" },
+  { label: "Receiving", value: "receiving" },
   { label: "Completed", value: "completed" },
   { label: "Cancelled", value: "cancelled" },
 ];

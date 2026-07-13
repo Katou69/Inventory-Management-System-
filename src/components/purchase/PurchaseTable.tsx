@@ -1,8 +1,13 @@
 import { getPurchaseOrders } from "@/services/purchase-service";
 import PurchaseTableClient from "./PurchaseTableClient";
+import type { Role } from "./PurchaseActionsMenu";
 
-export default async function PurchaseTable() {
+type Props = {
+  role: Role;
+};
+
+export default async function PurchaseTable({ role }: Props) {
   const purchases = await getPurchaseOrders();
 
-  return <PurchaseTableClient purchases={purchases} />;
+  return <PurchaseTableClient purchases={purchases} role={role} />;
 }
