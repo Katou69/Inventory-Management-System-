@@ -1,18 +1,11 @@
 export type OrderStatus =
   | "pending"
-  | "picking"
   | "completed"
   | "cancelled";
-
-export interface PickedShelf {
-  shelf: string;
-  quantity: number;
-}
 
 export interface OrderItem {
   product: string;
   quantity: number;
-  pickedFrom?: PickedShelf[];
 }
 
 export interface Order {
