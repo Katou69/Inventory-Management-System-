@@ -1,0 +1,1 @@
+export { default as ManagerInventoryContent } from "./InventoryContent";
