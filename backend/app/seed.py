@@ -45,15 +45,99 @@ DEV_WAREHOUSES = [
      "email": "south@grandroyal.com"},
 ]
 
+# Warehouse floor plans for the zone layout map.
+#
+# `kind: zone` boxes are free-form grouping containers (capacity 0) drawn behind
+# the `kind: shelf` blocks that sit spatially inside them. Warehouse 1 follows a
+# real flow -- Receiving -> Storage -> Packing -> Shipping, plus an Office.
+#
+# Capacities are deliberately a mix against DEV_STOCK below, so the map exercises
+# all three occupancy colors (gray empty / amber partial / red full) instead of
+# rendering a uniform wall of one state.
 DEV_ZONES = [
-    {"warehouse_id": 1, "kind": "zone", "code": "ZONE1", "name": "Receiving Bay", "x": 20, "y": 20, "width": 320, "height": 220, "capacity": 0},
-    {"warehouse_id": 1, "kind": "shelf", "code": "S1", "name": "Shelf A", "x": 40, "y": 40, "width": 120, "height": 80, "capacity": 200},
-    {"warehouse_id": 1, "kind": "shelf", "code": "S2", "name": "Shelf B", "x": 180, "y": 40, "width": 120, "height": 80, "capacity": 200},
+    # --- Warehouse 1: Main Warehouse -------------------------------------
+    {"warehouse_id": 1, "kind": "zone", "code": "Z-SHIP", "name": "Shipping Bay",  "x": 60,  "y": 120, "width": 460, "height": 290, "capacity": 0},
+    {"warehouse_id": 1, "kind": "zone", "code": "Z-RECV", "name": "Receiving Bay", "x": 820, "y": 120, "width": 480, "height": 220, "capacity": 0},
+    {"warehouse_id": 1, "kind": "zone", "code": "Z-STOR", "name": "Storage Hall",  "x": 520, "y": 420, "width": 780, "height": 640, "capacity": 0},
+    {"warehouse_id": 1, "kind": "zone", "code": "Z-PACK", "name": "Packing Area",  "x": 80,  "y": 440, "width": 340, "height": 200, "capacity": 0},
+    {"warehouse_id": 1, "kind": "zone", "code": "Z-OFFC", "name": "Office",        "x": 80,  "y": 700, "width": 320, "height": 190, "capacity": 0},
+
+    {"warehouse_id": 1, "kind": "shelf", "code": "R1", "name": "Receiving Rack 1", "x": 850,  "y": 190, "width": 120, "height": 90, "capacity": 150},
+    {"warehouse_id": 1, "kind": "shelf", "code": "R2", "name": "Receiving Rack 2", "x": 1000, "y": 190, "width": 120, "height": 90, "capacity": 150},
+    {"warehouse_id": 1, "kind": "shelf", "code": "R3", "name": "Receiving Rack 3", "x": 1150, "y": 190, "width": 120, "height": 90, "capacity": 150},
+
+    {"warehouse_id": 1, "kind": "shelf", "code": "S1", "name": "Shipping Rack 1", "x": 90,  "y": 190, "width": 110, "height": 90, "capacity": 120},
+    {"warehouse_id": 1, "kind": "shelf", "code": "S2", "name": "Shipping Rack 2", "x": 220, "y": 190, "width": 110, "height": 90, "capacity": 120},
+    {"warehouse_id": 1, "kind": "shelf", "code": "S3", "name": "Shipping Rack 3", "x": 350, "y": 190, "width": 110, "height": 90, "capacity": 120},
+    {"warehouse_id": 1, "kind": "shelf", "code": "S4", "name": "Shipping Narrow Rack", "x": 90, "y": 300, "width": 110, "height": 90, "capacity": 80},
+
+    {"warehouse_id": 1, "kind": "shelf", "code": "ST-L1", "name": "Storage Left 1",  "x": 560, "y": 460, "width": 300, "height": 80, "capacity": 300},
+    {"warehouse_id": 1, "kind": "shelf", "code": "ST-R1", "name": "Storage Right 1", "x": 920, "y": 460, "width": 300, "height": 80, "capacity": 300},
+    {"warehouse_id": 1, "kind": "shelf", "code": "ST-L2", "name": "Storage Left 2",  "x": 560, "y": 560, "width": 300, "height": 80, "capacity": 300},
+    {"warehouse_id": 1, "kind": "shelf", "code": "ST-R2", "name": "Storage Right 2", "x": 920, "y": 560, "width": 300, "height": 80, "capacity": 300},
+    {"warehouse_id": 1, "kind": "shelf", "code": "ST-L3", "name": "Storage Left 3",  "x": 560, "y": 660, "width": 300, "height": 80, "capacity": 300},
+    {"warehouse_id": 1, "kind": "shelf", "code": "ST-R3", "name": "Storage Right 3", "x": 920, "y": 660, "width": 300, "height": 80, "capacity": 300},
+    {"warehouse_id": 1, "kind": "shelf", "code": "ST-L4", "name": "Storage Left 4",  "x": 560, "y": 760, "width": 300, "height": 80, "capacity": 300},
+    {"warehouse_id": 1, "kind": "shelf", "code": "ST-R4", "name": "Storage Right 4", "x": 920, "y": 760, "width": 300, "height": 80, "capacity": 300},
+    {"warehouse_id": 1, "kind": "shelf", "code": "ST-BULK", "name": "Storage Bulk Floor",  "x": 560,  "y": 860, "width": 660, "height": 80,  "capacity": 600},
+    {"warehouse_id": 1, "kind": "shelf", "code": "ST-RSV",  "name": "Storage Reserve Rack", "x": 1240, "y": 460, "width": 40, "height": 480, "capacity": 400},
+
+    {"warehouse_id": 1, "kind": "shelf", "code": "PK1", "name": "Packing Bench 1", "x": 110, "y": 490, "width": 130, "height": 90, "capacity": 100},
+    {"warehouse_id": 1, "kind": "shelf", "code": "PK2", "name": "Packing Bench 2", "x": 260, "y": 490, "width": 130, "height": 90, "capacity": 100},
+
+    # --- Warehouse 2: North Depot ----------------------------------------
+    {"warehouse_id": 2, "kind": "zone",  "code": "Z-MAIN", "name": "Main Hall",   "x": 40,  "y": 40,  "width": 620, "height": 380, "capacity": 0},
+    {"warehouse_id": 2, "kind": "shelf", "code": "N-A", "name": "North Rack A", "x": 80,  "y": 100, "width": 160, "height": 100, "capacity": 250},
+    {"warehouse_id": 2, "kind": "shelf", "code": "N-B", "name": "North Rack B", "x": 280, "y": 100, "width": 160, "height": 100, "capacity": 250},
+    {"warehouse_id": 2, "kind": "shelf", "code": "N-C", "name": "North Rack C", "x": 480, "y": 100, "width": 160, "height": 100, "capacity": 250},
+    {"warehouse_id": 2, "kind": "shelf", "code": "N-D", "name": "North Rack D", "x": 80,  "y": 250, "width": 160, "height": 100, "capacity": 200},
+    {"warehouse_id": 2, "kind": "shelf", "code": "N-E", "name": "North Rack E", "x": 280, "y": 250, "width": 160, "height": 100, "capacity": 200},
+    {"warehouse_id": 2, "kind": "shelf", "code": "N-BULK", "name": "North Bulk Floor", "x": 480, "y": 250, "width": 160, "height": 100, "capacity": 500},
+
+    # --- Warehouse 3: South Hub ------------------------------------------
+    {"warehouse_id": 3, "kind": "zone",  "code": "Z-COLD", "name": "Cold Chain",   "x": 420, "y": 20,  "width": 200, "height": 240, "capacity": 0},
+    {"warehouse_id": 3, "kind": "shelf", "code": "SH-A", "name": "Bulk Storage 1", "x": 40,  "y": 40,  "width": 150, "height": 150, "capacity": 450},
+    {"warehouse_id": 3, "kind": "shelf", "code": "SH-B", "name": "Bulk Storage 2", "x": 240, "y": 40,  "width": 150, "height": 150, "capacity": 300},
+    {"warehouse_id": 3, "kind": "shelf", "code": "SH-C", "name": "Bulk Storage 3", "x": 40,  "y": 240, "width": 150, "height": 150, "capacity": 350},
+    {"warehouse_id": 3, "kind": "shelf", "code": "SH-COLD", "name": "Cold Store",  "x": 440, "y": 60,  "width": 150, "height": 150, "capacity": 120},
 ]
 
+# (warehouse_id, section_code) -> product. Codes repeat across warehouses, so the
+# warehouse id is part of the key.
+#
+# Deliberately uneven: some shelves are full (qty == capacity), some partial, and
+# several are left out entirely so they render empty. ST-R3 holds two SKUs to
+# exercise the mixed-product shelf path.
 DEV_STOCK = [
-    {"section_code": "S1", "sku": "GRB-2202", "quantity": 120},
-    {"section_code": "S2", "sku": "GRS-2203", "quantity": 200},
+    # Warehouse 1
+    {"warehouse_id": 1, "section_code": "R1",      "sku": "GRB-2202", "quantity": 150},  # full
+    {"warehouse_id": 1, "section_code": "R3",      "sku": "GRG-6601", "quantity": 60},   # partial
+    {"warehouse_id": 1, "section_code": "S1",      "sku": "GRV-7701", "quantity": 120},  # full
+    {"warehouse_id": 1, "section_code": "S3",      "sku": "GRS-2203", "quantity": 45},   # partial
+    {"warehouse_id": 1, "section_code": "S4",      "sku": "GRB-2202", "quantity": 80},   # full
+    {"warehouse_id": 1, "section_code": "ST-L1",   "sku": "GRV-7701", "quantity": 300},  # full
+    {"warehouse_id": 1, "section_code": "ST-L2",   "sku": "GRG-6601", "quantity": 150},  # partial
+    {"warehouse_id": 1, "section_code": "ST-R2",   "sku": "GRR-5501", "quantity": 300},  # full
+    {"warehouse_id": 1, "section_code": "ST-R3",   "sku": "GRB-2202", "quantity": 100},  # mixed SKU...
+    {"warehouse_id": 1, "section_code": "ST-R3",   "sku": "GRG-6601", "quantity": 80},   # ...180/300 partial
+    {"warehouse_id": 1, "section_code": "ST-L4",   "sku": "GSM-2201", "quantity": 300},  # full
+    {"warehouse_id": 1, "section_code": "ST-BULK", "sku": "GRB-8801", "quantity": 600},  # full
+    {"warehouse_id": 1, "section_code": "ST-RSV",  "sku": "GRC-2204", "quantity": 200},  # partial
+    {"warehouse_id": 1, "section_code": "PK1",     "sku": "GRW-2205", "quantity": 40},   # partial
+    # R2, S2, ST-R1, ST-L3, ST-R4, PK2 intentionally empty.
+
+    # Warehouse 2
+    {"warehouse_id": 2, "section_code": "N-A",    "sku": "GMF-3301", "quantity": 250},  # full
+    {"warehouse_id": 2, "section_code": "N-B",    "sku": "GMD-3302", "quantity": 90},   # partial
+    {"warehouse_id": 2, "section_code": "N-D",    "sku": "RCG-4401", "quantity": 200},  # full
+    {"warehouse_id": 2, "section_code": "N-BULK", "sku": "GRB-8802", "quantity": 180},  # partial
+    # N-C, N-E intentionally empty.
+
+    # Warehouse 3
+    {"warehouse_id": 3, "section_code": "SH-A",    "sku": "GRS-2203", "quantity": 450},  # full
+    {"warehouse_id": 3, "section_code": "SH-B",    "sku": "GRC-2204", "quantity": 60},   # partial
+    {"warehouse_id": 3, "section_code": "SH-COLD", "sku": "GRR-5502", "quantity": 120},  # full
+    # SH-C intentionally empty.
 ]
 
 DEV_SUPPLIERS = [
@@ -302,26 +386,29 @@ def seed() -> None:
             )
         db.flush()
 
-        section_by_code: dict[str, ZoneSection] = {}
+        # Keyed by (warehouse_id, code): codes are only unique within a warehouse,
+        # and every warehouse now has a floor plan.
+        section_by_code: dict[tuple[int, str], ZoneSection] = {}
         for data in DEV_ZONES:
+            key = (data["warehouse_id"], data["code"])
             existing = (
                 db.query(ZoneSection)
                 .filter(ZoneSection.warehouse_id == data["warehouse_id"], ZoneSection.code == data["code"])
                 .first()
             )
             if existing:
-                section_by_code[data["code"]] = existing
+                section_by_code[key] = existing
                 continue
             section = ZoneSection(**data)
             db.add(section)
             db.flush()
-            section_by_code[data["code"]] = section
+            section_by_code[key] = section
 
         # Products must exist before shelf stock can reference them.
         _seed_inventory(db, rng)
 
         for data in DEV_STOCK:
-            section = section_by_code.get(data["section_code"])
+            section = section_by_code.get((data["warehouse_id"], data["section_code"]))
             if not section:
                 continue
             product = db.query(Product).filter(Product.sku == data["sku"]).first()
