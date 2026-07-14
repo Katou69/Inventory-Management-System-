@@ -1,14 +1,14 @@
 import { UserType } from "@/types/user";
 
+// Product CATEGORIES, not product names — these were the SKU names, which meant
+// the Settings page was editing a list of products labelled "categories".
+// Matches the `categories` table in the DB.
 export const CATEGORIES = [
-  "Grand Royal Black",
-  "Grand Royal Signature",
-  "Grand Royal Smooth",
-  "Grand Royal Special Reserve Whisky Sherry Cask",
-  "Grand Royal Special Reserve Whisky",
-  "Glan Master Double Smooth",
-  "Glan Master Finest",
-  "Royal Club Green"
+  "Whisky",
+  "Rum",
+  "Gin",
+  "Vodka",
+  "Beer",
 ];
 
 export const MOCK_USERS: UserType[] = [

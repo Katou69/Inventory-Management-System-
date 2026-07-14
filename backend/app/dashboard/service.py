@@ -245,11 +245,15 @@ _IN = func.sum(case((StockMovement.quantity > 0, StockMovement.quantity), else_=
 _OUT = func.sum(case((StockMovement.quantity < 0, -StockMovement.quantity), else_=0))
 
 
-def _bucket(db: Session, since: datetime, fmt: str) -> list[dict]:
-    """Group movements into buckets by strftime pattern.
+def _bucket(db: Session, since: datetime, key_fmt: str, label_fmt: str) -> list[dict]:
+    """Group movements into time buckets.
 
-    ponytail: strftime is SQLite/Postgres-portable enough here via func.strftime
-    on SQLite and to_char on PG; we normalize in Python instead to stay portable.
+    key_fmt and label_fmt are separate on purpose. Keying by the DISPLAY label
+    collides whenever the window spans the same label twice — a 12-month window
+    running Jul-2025..Jul-2026 has two "Jul"s, and a single "%b" key merged them
+    into one bucket (doubling its outflow) while ordering the series by
+    first-appearance, so the chart started at Jul and wrapped round to Jun.
+    Key on a sortable "%Y-%m", label with the pretty "%b".
     """
     rows = (
         db.query(
@@ -265,16 +269,35 @@ def _bucket(db: Session, since: datetime, fmt: str) -> list[dict]:
 
     buckets: OrderedDict[str, dict] = OrderedDict()
     for occurred_at, qty, unit_cost in rows:
-        label = occurred_at.strftime(fmt)
-        b = buckets.setdefault(label, {"label": label, "stockIn": 0, "stockOut": 0, "stockValue": 0.0})
+        key = occurred_at.strftime(key_fmt)
+        b = buckets.setdefault(
+            key,
+            {"label": occurred_at.strftime(label_fmt), "stockIn": 0, "stockOut": 0, "stockValue": 0.0},
+        )
         if qty > 0:
             b["stockIn"] += qty
         else:
             b["stockOut"] += -qty
         b["stockValue"] += float(qty * Decimal(str(unit_cost)))
 
-    # stockValue is the running on-hand value, so accumulate across buckets.
-    running = 0.0
+    # Rows arrive ordered by occurred_at, so buckets are already chronological —
+    # but sort on the key anyway so the running total below can never accumulate
+    # out of order.
+    buckets = OrderedDict(sorted(buckets.items()))
+
+    # stockValue is the running ON-HAND value, so it must start from the value
+    # already in stock when the window opens — not from zero. Accumulating only
+    # the movements inside the window makes any net-outflow period go NEGATIVE
+    # (a 14-day window was plotting -$61,998 against a true on-hand of $529,883).
+    opening = float(
+        db.query(func.coalesce(func.sum(StockMovement.quantity * Product.unit_cost), 0))
+        .join(Product, StockMovement.product_id == Product.id)
+        .filter(StockMovement.occurred_at < since)
+        .scalar()
+        or 0
+    )
+
+    running = opening
     for b in buckets.values():
         running += b["stockValue"]
         b["stockValue"] = round(running, 2)
@@ -284,9 +307,11 @@ def _bucket(db: Session, since: datetime, fmt: str) -> list[dict]:
 def get_inventory_statistics(db: Session) -> dict[str, list[dict]]:
     now = datetime.now(timezone.utc)
     return {
-        "days": _bucket(db, now - timedelta(days=14), "%d %b"),
-        "months": _bucket(db, now - timedelta(days=365), "%b"),
-        "years": _bucket(db, now - timedelta(days=365 * 5), "%Y"),
+        "days": _bucket(db, now - timedelta(days=14), "%Y-%m-%d", "%d %b"),
+        # "%b '%y" not "%b": a 12-month window spans two Julys, and two bars both
+        # labelled "Jul" is unreadable even once they are correctly separated.
+        "months": _bucket(db, now - timedelta(days=365), "%Y-%m", "%b '%y"),
+        "years": _bucket(db, now - timedelta(days=365 * 5), "%Y", "%Y"),
     }
 
 
@@ -385,7 +410,7 @@ def get_warehouse_detail(db: Session, warehouse) -> dict:
                 "id": p.id,
                 "sku": p.sku,
                 "name": p.name,
-                "category": p.category,
+                "category": p.category_name,
                 "quantity": qty,
                 "status": _stock_status(qty, p.reorder_level),
                 "lastUpdated": _fmt_date(now),

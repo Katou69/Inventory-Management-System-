@@ -19,7 +19,7 @@ export type ShelfAvailability = {
 
 
 export async function getPurchaseOrders(): Promise<PurchaseOrder[]> {
-  if (config.useMock) return clone(purchases)
+  if (config.useMockPurchases) return clone(purchases)
   return apiFetch<PurchaseOrder[]>("/purchase-orders")
 }
 

@@ -52,34 +52,40 @@ DEV_ZONES = [
 ]
 
 DEV_STOCK = [
-    {"section_code": "S1", "sku": "SKU-1001", "quantity": 120},
-    {"section_code": "S2", "sku": "SKU-1002", "quantity": 200},
+    {"section_code": "S1", "sku": "GRB-2202", "quantity": 120},
+    {"section_code": "S2", "sku": "GRS-2203", "quantity": 200},
 ]
 
 DEV_SUPPLIERS = [
-    {"name": "Acme Supply Co", "contact_email": "sales@acme.example"},
-    {"name": "Nordic Components", "contact_email": "hello@nordic.example"},
-    {"name": "Pacific Traders", "contact_email": "orders@pacific.example"},
-    {"name": "Delta Logistics", "contact_email": "info@delta.example"},
+    {"name": "Grand Royal Group International", "contact_email": "sales@grandroyal.com"},
+    {"name": "Glan Master Distillers", "contact_email": "orders@glanmaster.com"},
+    {"name": "Myanmar Distillery Co.", "contact_email": "contact@myanmardistillery.com"},
+    {"name": "Royal Club Breweries", "contact_email": "supply@royalclub.com"},
 ]
 
+# Grand Royal Group International: Myanmar spirits producer. Prices are per
+# bottle in USD — keep them in this range, not the MMK ticket price (12,000 a
+# bottle made Stock Value render as "$54,494,500", which is unreadable on a card).
+# The first 8 are the products the frontend mock data references
+# (src/data/inventory-data.ts, orders-data.ts, purchase-data.ts) — keep them in
+# sync or the mock and the real backend describe different businesses.
 # (sku, name, category, unit_price, unit_cost, reorder_level)
 DEV_PRODUCTS = [
-    ("SKU-1001", "Wireless Mouse", "Electronics", 25.00, 14.00, 40),
-    ("SKU-1002", "Mechanical Keyboard", "Electronics", 89.00, 52.00, 25),
-    ("SKU-1003", "USB-C Hub", "Electronics", 45.00, 26.00, 30),
-    ("SKU-1004", "27\" Monitor", "Electronics", 220.00, 155.00, 15),
-    ("SKU-2001", "Office Chair", "Furniture", 180.00, 110.00, 10),
-    ("SKU-2002", "Standing Desk", "Furniture", 420.00, 280.00, 8),
-    ("SKU-2003", "Filing Cabinet", "Furniture", 130.00, 78.00, 12),
-    ("SKU-3001", "A4 Paper (500)", "Stationery", 8.50, 4.20, 100),
-    ("SKU-3002", "Ballpoint Pens (50)", "Stationery", 12.00, 5.50, 80),
-    ("SKU-3003", "Sticky Notes Pack", "Stationery", 6.00, 2.80, 90),
-    ("SKU-4001", "Packing Tape", "Packaging", 3.50, 1.60, 150),
-    ("SKU-4002", "Cardboard Box (L)", "Packaging", 2.20, 0.95, 200),
-    ("SKU-4003", "Bubble Wrap Roll", "Packaging", 18.00, 9.00, 50),
-    ("SKU-5001", "Safety Helmet", "Safety", 32.00, 18.00, 35),
-    ("SKU-5002", "Hi-Vis Vest", "Safety", 15.00, 7.50, 60),
+    ("GRB-2202", "Grand Royal Black", "Whisky", 12.00, 7.20, 500),
+    ("GRS-2203", "Grand Royal Signature", "Whisky", 15.00, 9.00, 500),
+    ("GSM-2201", "Grand Royal Smooth", "Whisky", 10.00, 6.00, 500),
+    ("GRC-2204", "Grand Royal Sherry Cask", "Whisky", 18.00, 11.00, 500),
+    ("GRW-2205", "Grand Royal SRW", "Whisky", 9.00, 5.40, 500),
+    ("GMF-3301", "Glan Master Finest", "Whisky", 11.00, 6.60, 300),
+    ("GMD-3302", "Glan Master Double Smooth", "Whisky", 13.00, 7.80, 300),
+    ("RCG-4401", "Royal Club Green", "Whisky", 8.00, 4.80, 300),
+    ("GRR-5501", "Grand Royal Rum Gold", "Rum", 7.50, 4.40, 400),
+    ("GRR-5502", "Grand Royal Rum White", "Rum", 7.00, 4.10, 400),
+    ("GRG-6601", "Grand Royal Dry Gin", "Gin", 9.50, 5.60, 300),
+    ("GRG-6602", "Grand Royal Premium Gin", "Gin", 14.00, 8.40, 250),
+    ("GRV-7701", "Grand Royal Vodka", "Vodka", 8.50, 5.00, 350),
+    ("GRB-8801", "Royal Club Lager", "Beer", 2.50, 1.40, 1000),
+    ("GRB-8802", "Royal Club Strong", "Beer", 3.00, 1.70, 1000),
 ]
 
 
@@ -226,9 +232,9 @@ def _seed_activity(db, rng: random.Random, admin: User | None) -> None:
 
     now = datetime.now(timezone.utc)
     samples = [
-        ("stock", "Stock received", "Restocked Wireless Mouse (+120)", False),
+        ("stock", "Stock received", "Restocked Grand Royal Black (+120)", False),
         ("order", "Order fulfilled", "ORD-0042 shipped to BlueMart", False),
-        ("alert", "Low stock warning", "Cardboard Box (L) below reorder level", True),
+        ("alert", "Low stock warning", "Royal Club Lager below reorder level", True),
         ("user", "User added", "New staff account created", False),
         ("stock", "Stock adjusted", "Cycle count correction on Shelf B", False),
         ("alert", "Inspection due", "North Depot inspection due this week", True),

@@ -21,11 +21,11 @@ export async function login(email: string, password: string): Promise<UserType> 
     // Find user in mock data
     const user = MOCK_USERS.find(u => u.email.toLowerCase() === email.toLowerCase())
     if (!user) {
-      throw new ApiError("Invalid email or password", 401)
+      throw new ApiError(401, "Invalid email or password")
     }
     // Check if user is active
     if (user.status !== "active") {
-      throw new ApiError("Your account is not activated yet. Please wait for admin approval.", 401)
+      throw new ApiError(401, "Your account is not activated yet. Please wait for admin approval.")
     }
     return user
   }
@@ -52,7 +52,7 @@ export async function register(
     // Check if email already exists
     const existingUser = MOCK_USERS.find(u => u.email.toLowerCase() === email.toLowerCase())
     if (existingUser) {
-      throw new ApiError("Email already registered", 409)
+      throw new ApiError(409, "Email already registered")
     }
     // Create new pending user
     const newUser: UserType = {

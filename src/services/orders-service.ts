@@ -11,6 +11,6 @@ import type { Order } from "@/types/orders"
 const clone = <T>(value: T): T => structuredClone(value)
 
 export async function getOrders(): Promise<Order[]> {
-  if (config.useMock) return clone(orders)
+  if (config.useMockOrders) return clone(orders)
   return apiFetch<Order[]>("/orders")
 }

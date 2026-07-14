@@ -59,6 +59,20 @@ def top_products(
     return service.get_top_products(db, period)
 
 
+@router.get("/warehouses/public", response_model=List[dict])
+def get_warehouses_public(db: Session = Depends(get_db)) -> List[dict]:
+    """Warehouse id + name only, no auth required.
+
+    The signup form must let a new user pick their warehouse, and by definition
+    they have no session yet. Deliberately minimal — serving the full WarehouseOut
+    (capacity, manager, phone, email) to anonymous callers would leak operational
+    detail to anyone who can load the login page.
+
+    Declared BEFORE /warehouses/{warehouse_id} or FastAPI matches "public" as an int.
+    """
+    return [{"id": w["id"], "name": w["name"]} for w in service.get_warehouses(db)]
+
+
 @router.get("/warehouses/{warehouse_id}", response_model=WarehouseDetailOut)
 def warehouse_detail(
     warehouse_id: int,

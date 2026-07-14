@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import { getWarehouseDetail, getWarehouses } from "@/services/dashboard-service"
+import { getWarehouseDetail } from "@/services/dashboard-service"
 import WarehouseProfileSection from "@/components/warehouse/WarehouseProfileSection"
 import QuickStatsRow from "@/components/warehouse/QuickStatsRow"
 import CapacityCard from "@/components/warehouse/CapacityCard"
@@ -8,10 +8,9 @@ import WarehouseProductsTable from "@/components/warehouse/WarehouseProductsTabl
 import WarehouseActivitiesCard from "@/components/warehouse/WarehouseActivitiesCard"
 import ZoneLayoutSection from "@/components/warehouse/ZoneLayoutSection"
 
-export async function generateStaticParams() {
-  const warehouses = await getWarehouses()
-  return warehouses.map((w) => ({ id: String(w.id) }))
-}
+// Rendered per-request, not prebuilt: the warehouse list lives behind the
+// auth cookie, so a build-time fetch has no session and 401s.
+export const dynamic = "force-dynamic"
 
 export default async function WarehouseDetailPage({
   params,

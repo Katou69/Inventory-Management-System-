@@ -21,7 +21,21 @@ export function setAuthExpiredHandler(fn: (() => void) | null): void {
 // Shared in-flight refresh so concurrent 401s trigger only one /auth/refresh call.
 let refreshPromise: Promise<boolean> | null = null
 
+/**
+ * Browser-only, deliberately.
+ *
+ * A Server Component cannot write cookies onto the browser during render, and the
+ * backend rotates refresh tokens single-use — so a server-side refresh would burn
+ * the token, be unable to hand the new one back, and leave the browser holding a
+ * revoked session. Strictly worse than not refreshing.
+ *
+ * On the server we therefore let the 401 surface: middleware bounces to /login on
+ * a missing refresh cookie, and a stale-but-present one is recovered by the
+ * client the moment it hydrates and makes its own call.
+ */
 async function refreshSession(): Promise<boolean> {
+  if (typeof window === "undefined") return false
+
   if (!refreshPromise) {
     refreshPromise = fetch(`${config.apiBaseUrl}/auth/refresh`, {
       method: "POST",
@@ -36,14 +50,29 @@ async function refreshSession(): Promise<boolean> {
   return refreshPromise
 }
 
+/**
+ * `credentials: "include"` is a browser-only mechanism — in Node it does
+ * nothing, so a Server Component calling the API would send no auth cookie and
+ * get a 401. On the server we therefore read the incoming request's cookies and
+ * forward them explicitly. Imported lazily because `next/headers` cannot be
+ * bundled into client code.
+ */
+async function serverCookieHeader(): Promise<Record<string, string>> {
+  if (typeof window !== "undefined") return {}
+  const { cookies } = await import("next/headers")
+  const cookie = (await cookies()).toString()
+  return cookie ? { cookie } : {}
+}
+
 async function doFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${config.apiBaseUrl}${path}`
   const res = await fetch(url, {
     ...init,
-    // Send/receive the httpOnly auth cookies cross-origin (localhost:3000 -> :8000).
+    // Browser: send the httpOnly auth cookies cross-origin (:3000 -> :8000).
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      ...(await serverCookieHeader()), // Server: forward them by hand.
       ...init?.headers,
     },
   })

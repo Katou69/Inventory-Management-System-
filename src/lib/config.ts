@@ -18,13 +18,22 @@
  */
 const useMock = process.env.NEXT_PUBLIC_USE_MOCK_API !== "false"
 
+/** Falls back to `useMock` unless the domain's own flag is set explicitly. */
+const flag = (value: string | undefined): boolean =>
+  value != null ? value !== "false" : useMock
+
 export const config = {
   /** When true, data services return in-memory mock data instead of calling the API. */
   useMock,
   /** When true, auth is the client-side demo; false calls the real /auth backend. */
-  useMockAuth:
-    process.env.NEXT_PUBLIC_USE_MOCK_AUTH != null
-      ? process.env.NEXT_PUBLIC_USE_MOCK_AUTH !== "false"
-      : useMock,
+  useMockAuth: flag(process.env.NEXT_PUBLIC_USE_MOCK_AUTH),
+  /**
+   * Inventory, orders and purchases have their own flags because their backend
+   * routers are still stubs — the dashboard can go live while they stay mocked.
+   * Drop these once /inventory, /orders and /purchase-orders exist.
+   */
+  useMockInventory: flag(process.env.NEXT_PUBLIC_USE_MOCK_INVENTORY),
+  useMockOrders: flag(process.env.NEXT_PUBLIC_USE_MOCK_ORDERS),
+  useMockPurchases: flag(process.env.NEXT_PUBLIC_USE_MOCK_PURCHASES),
   apiBaseUrl: process.env.NEXT_PUBLIC_API_URL ?? "",
 } as const

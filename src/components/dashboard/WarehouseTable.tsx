@@ -8,14 +8,26 @@ import WarehouseImagePicker from "@/components/warehouse/WarehouseImagePicker"
 import type { Warehouse } from "@/types/dashboard"
 
 function CapacityBar({ used, total }: { used: number; total: number }) {
-  const pct = Math.round((used / total) * 100)
-  const color = pct >= 85 ? "bg-red-500" : pct >= 65 ? "bg-amber-400" : "bg-emerald-500"
+  // total=0 (a warehouse with no capacity recorded) made this Infinity and
+  // emitted style="width: Infinity%". Over-capacity (>100%) overflowed the track.
+  // Report the true figure, but only ever *fill* between 0 and 100.
+  const hasCapacity = total > 0
+  const pct = hasCapacity ? Math.round((used / total) * 100) : null
+  const fill = pct === null ? 0 : Math.min(100, Math.max(0, pct))
+  const over = pct !== null && pct > 100
+  const color = over || fill >= 85 ? "bg-red-500" : fill >= 65 ? "bg-amber-400" : "bg-emerald-500"
+
   return (
     <div className="flex items-center gap-2 w-full">
       <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-        <div className={`h-full ${color} rounded-full`} style={{ width: `${pct}%` }} />
+        <div className={`h-full ${color} rounded-full`} style={{ width: `${fill}%` }} />
       </div>
-      <span className="text-xs text-muted-foreground shrink-0 w-8 text-right">{pct}%</span>
+      <span
+        className={`text-xs shrink-0 w-8 text-right ${over ? "text-red-500 font-medium" : "text-muted-foreground"}`}
+        title={pct === null ? "No capacity recorded for this warehouse" : undefined}
+      >
+        {pct === null ? "—" : `${pct}%`}
+      </span>
     </div>
   )
 }

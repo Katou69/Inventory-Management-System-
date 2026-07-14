@@ -8,6 +8,8 @@ sign convention is ever broken.
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
+import pytest
+
 from app.dashboard import service
 from app.items.models import Category, Product, StockMovement
 from app.warehouses.models import Warehouse
@@ -95,6 +97,78 @@ def test_inventory_statistics_splits_in_and_out(db_session):
     days = stats["days"]
     assert sum(d["stockIn"] for d in days) == 180  # 150 + 30
     assert sum(d["stockOut"] for d in days) == 60  # 50 + 10, unsigned
+
+
+def test_inventory_statistics_stock_value_includes_opening_balance(db_session):
+    """stockValue is running ON-HAND value, so it must start from the stock that
+    already existed when the window opened — not from zero.
+
+    Accumulating only in-window movements made any net-outflow period go negative
+    (a 14-day window plotted -$61,998 against a true on-hand of $529,883), and the
+    line rendered off the bottom of the chart.
+
+    Reproducing that needs stock received BEFORE the 14-day window and a net
+    OUTFLOW inside it — the fixture's all-inbound movements never trip it.
+    """
+    now = datetime.now(timezone.utc)
+    wh = Warehouse(id=1, name="Test WH", code="WH-001", capacity_total=1000)
+    db_session.add(wh)
+    widget = Product(sku="SKU-1", name="Widget", unit_price=Decimal("10.00"),
+                     unit_cost=Decimal("4.00"), reorder_level=10)
+    db_session.add(widget)
+    db_session.flush()
+
+    # 100 units in, 60 days ago — outside the "days" window, so it is pure opening balance.
+    db_session.add(StockMovement(product_id=widget.id, warehouse_id=1, kind="inbound",
+                                 quantity=100, occurred_at=now - timedelta(days=60)))
+    # 30 units out, 2 days ago — inside the window. Net outflow.
+    db_session.add(StockMovement(product_id=widget.id, warehouse_id=1, kind="outbound",
+                                 quantity=-30, occurred_at=now - timedelta(days=2)))
+    db_session.commit()
+
+    stats = service.get_inventory_statistics(db_session)
+
+    for period, points in stats.items():
+        for p in points:
+            assert p["stockValue"] >= 0, f"{period} went negative: {p}"
+
+    # 70 units on hand x $4 cost = $280. Without the opening balance this is -$120.
+    assert stats["days"][-1]["stockValue"] == pytest.approx(280.0)
+    assert stats["days"][-1]["stockValue"] == pytest.approx(
+        float(service.stock_value(db_session))
+    )
+
+
+def test_inventory_statistics_does_not_merge_same_month_across_years(db_session):
+    """A 12-month window spans the same month twice (e.g. Jul-2025 and Jul-2026).
+
+    Keying buckets by the display label ("%b") merged those two into ONE bucket —
+    doubling its totals — and ordered the series by first-appearance, so the chart
+    started mid-year and wrapped (Jul, Aug, ... Jun). Buckets must key on a
+    sortable "%Y-%m" and only *label* with "%b".
+    """
+    now = datetime.now(timezone.utc)
+    db_session.add(Warehouse(id=1, name="Test WH", code="WH-001", capacity_total=1000))
+    widget = Product(sku="SKU-1", name="Widget", unit_price=Decimal("10.00"),
+                     unit_cost=Decimal("4.00"), reorder_level=10)
+    db_session.add(widget)
+    db_session.flush()
+
+    # Two movements ~11 months apart: same calendar month, different years, and
+    # both inside the 365-day window.
+    for days_ago, qty in ((350, 100), (5, 7)):
+        db_session.add(StockMovement(product_id=widget.id, warehouse_id=1, kind="inbound",
+                                     quantity=qty, occurred_at=now - timedelta(days=days_ago)))
+    db_session.commit()
+
+    months = service.get_inventory_statistics(db_session)["months"]
+
+    # Two distinct buckets, not one merged bucket of 107.
+    assert len(months) == 2, f"same month across years got merged: {months}"
+    assert [m["stockIn"] for m in months] == [100, 7], "buckets merged or out of order"
+
+    # And the running value must be chronological: older bucket first.
+    assert months[0]["stockValue"] < months[1]["stockValue"]
 
 
 def test_sales_goal_round_trips(db_session):

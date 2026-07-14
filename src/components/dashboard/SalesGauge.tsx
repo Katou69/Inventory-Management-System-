@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { MoreVertical, TrendingUp, Target, RotateCcw, X } from "lucide-react"
 import { updateSalesGoal } from "@/services/dashboard-service"
+import { money } from "@/lib/format"
 
 interface SalesGaugeProps {
   numberOfSales?: number
@@ -65,7 +66,7 @@ export default function SalesGauge({
       <div className="flex items-center justify-between mb-2">
         <div>
           <h3 className="text-base font-semibold text-foreground">Sales Overview</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">Goal: ${target.toLocaleString()}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Goal: {money(target)}</p>
         </div>
         <div className="relative">
           <button onClick={() => setMenuOpen((v) => !v)} className="p-1.5 rounded-lg hover:bg-accent transition-colors">
@@ -128,7 +129,7 @@ export default function SalesGauge({
         </div>
         <div className="text-right">
           <p className="text-xs text-muted-foreground mb-1">Total Sales</p>
-          <p className="text-lg font-bold text-foreground">${totalSales.toLocaleString()}</p>
+          <p className="text-lg font-bold text-foreground">{money(totalSales)}</p>
         </div>
       </div>
 

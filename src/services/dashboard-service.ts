@@ -68,6 +68,16 @@ export async function getWarehouses(): Promise<Warehouse[]> {
   return apiFetch<Warehouse[]>("/warehouses")
 }
 
+/**
+ * Warehouse id + name only, unauthenticated. The signup form needs to offer a
+ * warehouse choice to a user who has no session yet, so it cannot call the
+ * authed /warehouses (which 401s and would leave the dropdown silently empty).
+ */
+export async function getWarehouseOptions(): Promise<Pick<Warehouse, "id" | "name">[]> {
+  if (config.useMock) return clone(warehouses).map(({ id, name }) => ({ id, name }))
+  return apiFetch<Pick<Warehouse, "id" | "name">[]>("/warehouses/public")
+}
+
 export async function getWarehouseDetail(id: number): Promise<WarehouseDetail | null> {
   if (config.useMock) return buildWarehouseDetail(id) ?? null
   return apiFetch<WarehouseDetail | null>(`/warehouses/${id}`)

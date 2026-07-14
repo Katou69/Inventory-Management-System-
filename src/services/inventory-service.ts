@@ -15,13 +15,13 @@ import { shelves } from "@/data/inventorymovement-data";
 const clone = <T>(value: T): T => structuredClone(value)
 
 export async function getInventory(): Promise<InventoryItem[]> {
-  if (config.useMock) return clone(inventory)
+  if (config.useMockInventory) return clone(inventory)
   return apiFetch<InventoryItem[]>("/inventory")
 }
 
 
 export async function getMovementTasks(): Promise<MovementTask[]> {
-  if (config.useMock) return clone(movementTasks);
+  if (config.useMockInventory) return clone(movementTasks);
   return apiFetch<MovementTask[]>("/movement");
 
 }

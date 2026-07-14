@@ -5,6 +5,7 @@ import {
   ResponsiveContainer, Customized,
 } from "recharts"
 import type { InventoryPeriod, InventoryDataPoint } from "@/types/dashboard"
+import { CURRENCY, moneyCompact } from "@/lib/format"
 
 const PERIODS: { key: InventoryPeriod; label: string }[] = [
   { key: "days",   label: "Days"   },
@@ -55,10 +56,10 @@ function CustomTooltip({ active, payload, label }: TooltipProps) {
   const stockIn    = payload.find((p: TooltipDatum) => p.dataKey === "stockIn")?.value ?? 0
   const stockOut   = payload.find((p: TooltipDatum) => p.dataKey === "stockOut")?.value ?? 0
   const stockValue = payload.find((p: TooltipDatum) => p.dataKey === "stockValue")?.value ?? 0
-  const fmt = (v: number) =>
-    v >= 1_000_000 ? `$${(v / 1_000_000).toFixed(1)}M`
-    : v >= 1_000   ? `$${(v / 1_000).toFixed(0)}k`
-    : `$${v}`
+  // Stock in/out are UNIT counts; only stockValue is money. Formatting all three
+  // as currency was the headline inconsistency — "$91" for 91 units received.
+  const units = (v: number) => `${v.toLocaleString()} units`
+  const money = moneyCompact
   return (
     <div className="bg-card rounded-xl shadow-lg border border-border px-4 py-3 min-w-[160px]">
       <p className="text-xs font-bold text-foreground mb-2">{label}</p>
@@ -68,21 +69,21 @@ function CustomTooltip({ active, payload, label }: TooltipProps) {
             <span className="size-2 rounded-sm shrink-0" style={{ background: "#f59e0b" }} />
             <span className="text-xs text-muted-foreground">Stock In</span>
           </div>
-          <span className="text-xs font-semibold text-foreground">{fmt(stockIn)}</span>
+          <span className="text-xs font-semibold text-foreground">{units(stockIn)}</span>
         </div>
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-1.5">
             <span className="size-2 rounded-sm shrink-0" style={{ background: "#8b5cf6" }} />
             <span className="text-xs text-muted-foreground">Stock Out</span>
           </div>
-          <span className="text-xs font-semibold text-foreground">{fmt(stockOut)}</span>
+          <span className="text-xs font-semibold text-foreground">{units(stockOut)}</span>
         </div>
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-1.5">
             <span className="size-2 rounded-full border-2 border-[#3b9eff] bg-card shrink-0" />
             <span className="text-xs text-muted-foreground">Stock Value</span>
           </div>
-          <span className="text-xs font-semibold text-foreground">{fmt(stockValue)}</span>
+          <span className="text-xs font-semibold text-foreground">{money(stockValue)}</span>
         </div>
       </div>
     </div>
@@ -132,11 +133,41 @@ function niceStep(rawStep: number) {
   return nice * magnitude
 }
 
-function buildTicks(data: InventoryDataPoint[]) {
-  const max  = Math.max(...data.map(d => Math.max(d.stockIn, d.stockOut, d.stockValue)))
+/**
+ * Ticks for ONE axis, from that axis's own max.
+ *
+ * Guards the degenerate inputs a real (rather than mock) backend produces: an
+ * empty series makes Math.max() return -Infinity, and an all-zero series makes
+ * Math.log10(0) return -Infinity — either way every tick came out NaN and the
+ * chart rendered blank. A brand-new warehouse with no movements hits this on
+ * day one.
+ */
+const FALLBACK_TICKS = [0, 25, 50, 75, 100]
+
+function ticksFor(values: number[]) {
+  if (!values.length) return FALLBACK_TICKS
+
+  const max = Math.max(...values)
+  if (!Number.isFinite(max) || max <= 0) return FALLBACK_TICKS
+
   const step = niceStep(max / 4)
-  const top  = Math.ceil(max / step) * step
+  if (!Number.isFinite(step) || step <= 0) return FALLBACK_TICKS
+
+  const top = Math.ceil(max / step) * step
   return [0, top / 4, top / 2, (top * 3) / 4, top]
+}
+
+/**
+ * Quantities and money need SEPARATE axes. Stock in/out run in the hundreds
+ * while stock value runs in the hundreds of thousands, so sharing one axis
+ * scaled it to ~600k and squashed every bar into a sub-pixel sliver at the
+ * baseline while the value line floated up top. Left axis = units, right = $.
+ */
+function buildAxes(data: InventoryDataPoint[]) {
+  return {
+    qty: ticksFor(data.flatMap(d => [d.stockIn, d.stockOut])),
+    value: ticksFor(data.map(d => d.stockValue)),
+  }
 }
 
 export default function InventoryStatisticsChart({
@@ -145,8 +176,9 @@ export default function InventoryStatisticsChart({
   data: Record<InventoryPeriod, InventoryDataPoint[]>
 }) {
   const [period, setPeriod] = useState<InventoryPeriod>("months")
-  const data  = dataByPeriod[period]
-  const ticks = buildTicks(data)
+  const data  = dataByPeriod[period] ?? []
+  const axes  = buildAxes(data)
+  const isEmpty = data.length === 0
 
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm p-5">
@@ -162,6 +194,7 @@ export default function InventoryStatisticsChart({
               <span className="size-2 rounded-full inline-block bg-[#8b5cf6]" />
               Stock Out
             </div>
+            <span className="text-xs text-muted-foreground/60">units (left)</span>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <svg width="16" height="8" className="shrink-0">
                 <line x1="0" y1="4" x2="16" y2="4" stroke="#3b9eff" strokeWidth="2" strokeDasharray="4,2" />
@@ -169,6 +202,7 @@ export default function InventoryStatisticsChart({
               <span className="size-2 rounded-full border-2 border-[#3b9eff] bg-card inline-block" />
               Stock Value
             </div>
+            <span className="text-xs text-[#3b9eff]/70">$ (right)</span>
           </div>
           <div className="flex items-center border border-border rounded-lg overflow-hidden">
             {PERIODS.map(({ key, label }) => (
@@ -188,6 +222,11 @@ export default function InventoryStatisticsChart({
         </div>
       </div>
 
+      {isEmpty ? (
+        <div className="h-[260px] flex items-center justify-center text-sm text-muted-foreground">
+          No stock movements in this period.
+        </div>
+      ) : (
       <ResponsiveContainer width="100%" height={260}>
         <ComposedChart
           data={data}
@@ -203,27 +242,44 @@ export default function InventoryStatisticsChart({
             tickLine={false}
             tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
           />
+          {/* Left: units (stock in/out). Right: money (stock value). */}
           <YAxis
+            yAxisId="qty"
             tickFormatter={yTickFormatter}
-            ticks={ticks}
+            ticks={axes.qty}
+            domain={[0, axes.qty[axes.qty.length - 1]]}
             axisLine={false}
             tickLine={false}
             tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
             width={36}
+          />
+          <YAxis
+            yAxisId="value"
+            orientation="right"
+            tickFormatter={(v: number) => `${CURRENCY}${yTickFormatter(v)}`}
+            ticks={axes.value}
+            domain={[0, axes.value[axes.value.length - 1]]}
+            axisLine={false}
+            tickLine={false}
+            tick={{ fontSize: 11, fill: "#3b9eff" }}
+            width={48}
           />
           <Tooltip
             content={<CustomTooltip />}
             cursor={{ fill: "rgba(99,102,241,0.06)", rx: 4 }}
           />
           <Bar
+            yAxisId="qty"
             dataKey="stockIn"
             shape={(props) => <GradientBar {...(props as GradientBarProps)} color="#f59e0b" />}
           />
           <Bar
+            yAxisId="qty"
             dataKey="stockOut"
             shape={(props) => <GradientBar {...(props as GradientBarProps)} color="#8b5cf6" />}
           />
           <Line
+            yAxisId="value"
             dataKey="stockValue"
             type="monotone"
             stroke="#3b9eff"
@@ -234,6 +290,7 @@ export default function InventoryStatisticsChart({
           />
         </ComposedChart>
       </ResponsiveContainer>
+      )}
     </div>
   )
 }

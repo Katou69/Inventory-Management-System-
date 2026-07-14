@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Warehouse, Package, Building2, Shield, TrendingUp, User, Mail, Lock, Eye, EyeOff, Sun, Moon } from "lucide-react";
 import { Role } from "@/types/user";
 import type { Warehouse as WarehouseEntity } from "@/types/dashboard";
-import { getWarehouses } from "@/services/dashboard-service";
+import { getWarehouseOptions } from "@/services/dashboard-service";
 import { useAuth } from "@/lib/auth/auth-context";
 import { config } from "@/lib/config";
 import { ApiError } from "@/lib/api-client";
@@ -31,7 +31,7 @@ export default function AuthPage() {
   const { signIn, signUp, signInDemo, theme, setTheme } = useAuth();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [showPw, setShowPw] = useState(false);
-  const [warehouses, setWarehouses] = useState<WarehouseEntity[]>([]);
+  const [warehouses, setWarehouses] = useState<Pick<WarehouseEntity, "id" | "name">[]>([]);
   const [form, setForm] = useState({ name: "", email: "", password: "", warehouseId: 1 });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -40,7 +40,10 @@ export default function AuthPage() {
   // Quick-login demo buttons are mock-only.
   const isMock = config.useMockAuth;
 
-  useEffect(() => { void getWarehouses().then(setWarehouses); }, []);
+  // Unauthed endpoint: this page is precisely where there is no session yet.
+  // Swallow failures so a backend hiccup leaves the dropdown empty rather than
+  // taking down the whole login screen with an unhandled rejection.
+  useEffect(() => { void getWarehouseOptions().then(setWarehouses).catch(() => setWarehouses([])); }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
