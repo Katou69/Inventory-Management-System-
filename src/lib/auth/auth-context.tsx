@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import type { UserType, Theme, Role } from "@/types/user"
 import { config } from "@/lib/config"
@@ -19,6 +19,15 @@ interface AuthContextValue {
   theme: Theme
   setTheme: (t: Theme) => void
   ready: boolean
+  /**
+   * True while the identity changed but the server has not re-rendered yet.
+   *
+   * setUser() paints instantly; router.refresh() is a round-trip. In that gap the
+   * NEW user is live in client state while the OLD user's server-rendered
+   * dashboard is still mounted — which is the split-second flash of the previous
+   * user's dashboard. Consumers must not show authed content while this is true.
+   */
+  settling: boolean
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -31,6 +40,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserType | null>(null)
   const [theme, setThemeState] = useState<Theme>("light")
   const [ready, setReady] = useState(false)
+  // Pending for as long as the refresh's server work is in flight -- see `settling`.
+  const [settling, startSettling] = useTransition()
 
   // Hydrate session + theme on mount (client only).
   // - Mock mode: restore the demo user from localStorage (zero-backend).
@@ -77,11 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Notify local state immediately if a session refresh fails (session truly
   // expired), instead of waiting for the user to hit another dead request.
   useEffect(() => {
-    setAuthExpiredHandler(() => {
-      setUser(null)
-      persistMockUser(null)
-      router.refresh()
-    })
+    setAuthExpiredHandler(() => swapIdentity(null))
     return () => setAuthExpiredHandler(null)
   }, [router])
 
@@ -107,48 +114,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // Every path below that changes WHO is logged in must call router.refresh().
-  //
-  // The dashboard picks its role-specific view in a Server Component, and Next
-  // caches that RSC payload client-side. setUser() only moves client state, so
-  // without a refresh the cached payload survives a logout + login as a
-  // different role: sign in as manager, log out, sign in as admin, and the
-  // admin is served the manager's dashboard straight out of the Router Cache.
-  // refresh() is what discards it and re-runs the role switch on the server.
+  /**
+   * The ONLY way to change who is logged in. Every caller goes through here.
+   *
+   * The dashboard picks its role-specific view in a Server Component, and Next
+   * caches that RSC payload client-side. setUser() alone only moves client state,
+   * so the cached payload survives a logout + login as a different role: sign in
+   * as manager, log out, sign in as admin, and the admin is served the manager's
+   * dashboard straight out of the Router Cache. router.refresh() discards it and
+   * re-runs the role switch on the server.
+   *
+   * Both calls sit inside one transition so `settling` stays true until the new
+   * server render commits. Without that, setUser paints instantly while the
+   * refresh is still in flight, and the incoming user sees a split second of the
+   * outgoing user's dashboard.
+   */
+  const swapIdentity = (next: UserType | null) => {
+    startSettling(() => {
+      setUser(next)
+      persistMockUser(next)
+      router.refresh()
+    })
+  }
+
   const signIn: AuthContextValue["signIn"] = async (email, password) => {
-    const u = await authService.login(email, password)
-    setUser(u)
-    persistMockUser(u)
-    router.refresh()
+    swapIdentity(await authService.login(email, password))
   }
 
   const signUp: AuthContextValue["signUp"] = async (name, email, password, warehouseId) => {
-    const u = await authService.register(name, email, password, warehouseId)
-    // Don't log in automatically - user needs admin approval first
+    await authService.register(name, email, password, warehouseId)
+    // Don't log in automatically - user needs admin approval first.
   }
 
   const signInDemo = (role: Role) => {
-    const u = authService.demoLogin(role)
-    setUser(u)
-    persistMockUser(u)
-    router.refresh()
+    swapIdentity(authService.demoLogin(role))
   }
 
   const logout = () => {
     void authService.logout().catch(() => {
       /* clear locally regardless of network result */
     })
-    setUser(null)
-    persistMockUser(null)
-    // Drop the outgoing user's server-rendered dashboard, so it cannot be handed
-    // to whoever logs in next.
-    router.refresh()
+    swapIdentity(null)
   }
 
   const setTheme = (t: Theme) => setThemeState(t)
 
   return (
-    <AuthContext.Provider value={{ user, signIn, signUp, signInDemo, logout, theme, setTheme, ready }}>
+    <AuthContext.Provider value={{ user, signIn, signUp, signInDemo, logout, theme, setTheme, ready, settling }}>
       {children}
     </AuthContext.Provider>
   )
