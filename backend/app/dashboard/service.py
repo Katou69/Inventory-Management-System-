@@ -402,12 +402,13 @@ def get_warehouse_detail(db: Session, warehouse) -> dict:
     # Last movement per product *in this warehouse*. This column used to be
     # _fmt_date(now) for every row, which claimed all 15 SKUs were touched this
     # second — the one number on the table nobody could trust.
-    last_moved = dict(
-        db.query(StockMovement.product_id, func.max(StockMovement.occurred_at))
+    last_moved: dict[int, datetime] = {
+        pid: moved_at
+        for pid, moved_at in db.query(StockMovement.product_id, func.max(StockMovement.occurred_at))
         .filter(StockMovement.warehouse_id == wid)
         .group_by(StockMovement.product_id)
         .all()
-    )
+    }
 
     products = db.query(Product).all()
     product_rows = []
