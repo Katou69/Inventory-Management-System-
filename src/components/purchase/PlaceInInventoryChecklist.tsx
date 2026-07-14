@@ -88,10 +88,39 @@ export default function PlaceInInventoryChecklist({ purchase, onComplete }: Prop
     (item) => getRemaining(item) === 0
   );
 
+  // A row that overflows its shelf would push that shelf's currentStock past
+  // capacity, leaving free space negative for every later allocation.
+  const shelfFree = (name: string) =>
+    shelves.find((shelf) => shelf.shelf === name)?.free ?? 0;
+
+  // Totalled per shelf ACROSS products: two products each within a shelf's free
+  // space can still overflow it together (30 + 30 onto a shelf with 40 free).
+  const demandByShelf = purchase.items.reduce<Record<string, number>>(
+    (totals, item) => {
+      getRows(item.product).forEach((row) => {
+        if (row.shelf) {
+          totals[row.shelf] = (totals[row.shelf] ?? 0) + (row.quantity || 0);
+        }
+      });
+      return totals;
+    },
+    {}
+  );
+
+  const overCapacityShelves = Object.entries(demandByShelf).filter(
+    ([shelf, demand]) => demand > shelfFree(shelf)
+  );
+
+  const canComplete = allItemsFullyAllocated && overCapacityShelves.length === 0;
+
   const handleComplete = () => {
-    if (!allItemsFullyAllocated) {
+    if (!canComplete) {
       alert(
-        "Please allocate the full received quantity for every product before completing."
+        overCapacityShelves.length > 0
+          ? `Over capacity: ${overCapacityShelves
+              .map(([shelf]) => shelf)
+              .join(", ")}. Reduce those quantities before completing.`
+          : "Please allocate the full received quantity for every product before completing."
       );
       return;
     }
@@ -153,7 +182,11 @@ export default function PlaceInInventoryChecklist({ purchase, onComplete }: Prop
                   const shelfOptions = getAvailableShelves(item, rowIndex);
                   const selected = shelfOptions.find((s) => s.shelf === row.shelf);
                   const maxQuantity = remaining + row.quantity;
-                  const exceedsCapacity = selected && row.quantity > selected.free;
+                  // Judged on the shelf's TOTAL demand across products, not this
+                  // row alone — otherwise two in-range rows can still overflow.
+                  const shelfDemand = row.shelf ? demandByShelf[row.shelf] ?? 0 : 0;
+                  const exceedsCapacity =
+                    selected && shelfDemand > shelfFree(row.shelf);
 
                   return (
                     <div key={rowIndex} className="space-y-1">
@@ -201,9 +234,12 @@ export default function PlaceInInventoryChecklist({ purchase, onComplete }: Prop
                       </div>
 
                       {exceedsCapacity && (
-                        <p className="text-xs text-amber-600">
-                          Heads up: this exceeds {row.shelf}&apos;s free capacity by{" "}
-                          {(row.quantity - (selected?.free ?? 0)).toLocaleString()}.
+                        <p className="text-xs text-red-600">
+                          {row.shelf} is over capacity by{" "}
+                          {(shelfDemand - shelfFree(row.shelf)).toLocaleString()}{" "}
+                          (allocating {shelfDemand.toLocaleString()} into{" "}
+                          {shelfFree(row.shelf).toLocaleString()} free). Reduce to
+                          continue.
                         </p>
                       )}
                     </div>
@@ -237,7 +273,7 @@ export default function PlaceInInventoryChecklist({ purchase, onComplete }: Prop
 
       <div className="mt-6 flex justify-end">
         <button
-          disabled={!allItemsFullyAllocated}
+          disabled={!canComplete}
           onClick={handleComplete}
           className="rounded-lg bg-primary px-5 py-2 text-primary-foreground disabled:opacity-50"
         >

@@ -109,6 +109,20 @@ export function addInventory(
     quantity: number;
   }[]
 ) {
+  // Reject the whole batch rather than clamp: a silent cap would report the
+  // full quantity as placed while only part of it landed, losing the rest.
+  // Mirrors the Math.max(0, ...) floor that deductInventory applies.
+  const overflow = allocations.find(({ shelf, quantity }) => {
+    const shelfData = shelves.find((entry) => entry.name === shelf);
+    return shelfData && shelfData.currentStock + quantity > shelfData.capacity;
+  });
+
+  if (overflow) {
+    throw new Error(
+      `Cannot place ${overflow.quantity} units on ${overflow.shelf}: exceeds free capacity.`
+    );
+  }
+
   allocations.forEach(({ shelf, quantity }) => {
 
     // Update shelf occupancy
