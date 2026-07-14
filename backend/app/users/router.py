@@ -54,7 +54,7 @@ def update_user(
     if user_update.role is not None:
         user.role = user_update.role
     if user_update.warehouse_id is not None:
-        user.warehouse_id = str(user_update.warehouse_id)
+        user.warehouse_id = user_update.warehouse_id
     if user_update.status is not None:
         user.status = user_update.status
     

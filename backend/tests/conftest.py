@@ -12,6 +12,7 @@ from app.warehouses import models as warehouse_models  # noqa: F401
 from app.zones import models as zone_models  # noqa: F401
 from app.items import models as item_models  # noqa: F401
 from app.orders import models as order_models  # noqa: F401
+from app.purchases import models as purchase_models  # noqa: F401
 from app.activity import models as activity_models  # noqa: F401
 from app.appsettings import models as appsetting_models  # noqa: F401
 

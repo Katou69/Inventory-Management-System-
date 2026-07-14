@@ -4,13 +4,13 @@ from app.users.models import User
 from app.auth.jwt import hash_password
 
 
-def _create_user(db_session, email="user@example.com", password="secret123"):
+def _create_user(db_session, email="user@grandroyal.com", password="secret123"):
     user = User(
         name="Test User",
         email=email,
         hashed_password=hash_password(password),
         role="staff",
-        warehouse_id="1",
+        warehouse_id=None,  # NULL = all warehouses
         status="active",
         joined_date=date(2024, 1, 1),
     )
@@ -21,13 +21,13 @@ def _create_user(db_session, email="user@example.com", password="secret123"):
 
 
 def test_login_success_sets_cookies(client, db_session):
-    _create_user(db_session, email="user@example.com", password="secret123")
+    _create_user(db_session, email="user@grandroyal.com", password="secret123")
 
-    response = client.post("/auth/login", json={"email": "user@example.com", "password": "secret123"})
+    response = client.post("/auth/login", json={"email": "user@grandroyal.com", "password": "secret123"})
 
     assert response.status_code == 200
     body = response.json()
-    assert body["email"] == "user@example.com"
+    assert body["email"] == "user@grandroyal.com"
     # Tokens are delivered as cookies, not in the body.
     assert "access_token" not in body
     assert "access_token" in response.cookies
@@ -35,28 +35,28 @@ def test_login_success_sets_cookies(client, db_session):
 
 
 def test_login_wrong_password(client, db_session):
-    _create_user(db_session, email="user@example.com", password="secret123")
+    _create_user(db_session, email="user@grandroyal.com", password="secret123")
 
-    response = client.post("/auth/login", json={"email": "user@example.com", "password": "wrong"})
+    response = client.post("/auth/login", json={"email": "user@grandroyal.com", "password": "wrong"})
 
     assert response.status_code == 401
 
 
 def test_login_unknown_email(client, db_session):
-    response = client.post("/auth/login", json={"email": "nobody@example.com", "password": "secret123"})
+    response = client.post("/auth/login", json={"email": "nobody@grandroyal.com", "password": "secret123"})
 
     assert response.status_code == 401
 
 
 def test_me_after_login_via_cookie(client, db_session):
-    _create_user(db_session, email="user@example.com", password="secret123")
-    client.post("/auth/login", json={"email": "user@example.com", "password": "secret123"})
+    _create_user(db_session, email="user@grandroyal.com", password="secret123")
+    client.post("/auth/login", json={"email": "user@grandroyal.com", "password": "secret123"})
 
     # TestClient persists the cookie jar across requests.
     response = client.get("/auth/me")
 
     assert response.status_code == 200
-    assert response.json()["email"] == "user@example.com"
+    assert response.json()["email"] == "user@grandroyal.com"
 
 
 def test_me_without_cookie(client, db_session):
@@ -64,18 +64,39 @@ def test_me_without_cookie(client, db_session):
     assert response.status_code == 401
 
 
-def test_register_creates_staff_user_and_sets_cookies(client, db_session):
+def test_register_creates_pending_staff_user_without_session(client, db_session):
     response = client.post(
         "/auth/register",
-        json={"name": "New Person", "email": "new@example.com", "password": "secret123", "warehouse_id": 1},
+        json={"name": "New Person", "email": "new@grandroyal.com", "password": "secret123", "warehouse_id": 1},
     )
 
     assert response.status_code == 201
     body = response.json()
-    assert body["email"] == "new@example.com"
+    assert body["email"] == "new@grandroyal.com"
     assert body["role"] == "staff"
-    assert "access_token" in response.cookies
-    assert "refresh_token" in response.cookies
+    # Registration does NOT log you in: new users are "pending" until an admin
+    # approves them, so no session is issued.
+    assert body["status"] == "pending"
+    assert "access_token" not in response.cookies
+    assert "refresh_token" not in response.cookies
+
+
+def test_register_rejects_outside_email_domain(client, db_session):
+    response = client.post(
+        "/auth/register",
+        json={"name": "Outsider", "email": "outsider@gmail.com", "password": "secret123", "warehouse_id": 1},
+    )
+
+    assert response.status_code == 400
+    assert "grandroyal.com" in response.json()["detail"]
+
+
+def test_login_rejects_outside_email_domain(client, db_session):
+    # Even a user already in the table cannot log in from a non-company domain.
+    _create_user(db_session, email="legacy@gmail.com", password="secret123")
+    response = client.post("/auth/login", json={"email": "legacy@gmail.com", "password": "secret123"})
+
+    assert response.status_code == 401
 
 
 def test_register_ignores_client_supplied_role(client, db_session):
@@ -83,7 +104,7 @@ def test_register_ignores_client_supplied_role(client, db_session):
         "/auth/register",
         json={
             "name": "Wannabe Admin",
-            "email": "wannabe@example.com",
+            "email": "wannabe@grandroyal.com",
             "password": "secret123",
             "warehouse_id": 1,
             "role": "admin",
@@ -95,11 +116,11 @@ def test_register_ignores_client_supplied_role(client, db_session):
 
 
 def test_register_duplicate_email_conflicts(client, db_session):
-    _create_user(db_session, email="taken@example.com", password="secret123")
+    _create_user(db_session, email="taken@grandroyal.com", password="secret123")
 
     response = client.post(
         "/auth/register",
-        json={"name": "Someone Else", "email": "taken@example.com", "password": "secret123", "warehouse_id": 1},
+        json={"name": "Someone Else", "email": "taken@grandroyal.com", "password": "secret123", "warehouse_id": 1},
     )
 
     assert response.status_code == 409
@@ -108,26 +129,26 @@ def test_register_duplicate_email_conflicts(client, db_session):
 def test_register_short_password_rejected(client, db_session):
     response = client.post(
         "/auth/register",
-        json={"name": "Short Pass", "email": "shortpass@example.com", "password": "short", "warehouse_id": 1},
+        json={"name": "Short Pass", "email": "shortpass@grandroyal.com", "password": "short", "warehouse_id": 1},
     )
 
     assert response.status_code == 422
 
 
 def test_refresh_rotates_and_returns_user(client, db_session):
-    _create_user(db_session, email="user@example.com", password="secret123")
-    client.post("/auth/login", json={"email": "user@example.com", "password": "secret123"})
+    _create_user(db_session, email="user@grandroyal.com", password="secret123")
+    client.post("/auth/login", json={"email": "user@grandroyal.com", "password": "secret123"})
 
     response = client.post("/auth/refresh")
 
     assert response.status_code == 200
-    assert response.json()["email"] == "user@example.com"
+    assert response.json()["email"] == "user@grandroyal.com"
     assert "access_token" in response.cookies
 
 
 def test_logout_revokes_refresh_token(client, db_session):
-    _create_user(db_session, email="user@example.com", password="secret123")
-    login = client.post("/auth/login", json={"email": "user@example.com", "password": "secret123"})
+    _create_user(db_session, email="user@grandroyal.com", password="secret123")
+    login = client.post("/auth/login", json={"email": "user@grandroyal.com", "password": "secret123"})
     old_refresh = login.cookies["refresh_token"]
 
     logout = client.post("/auth/logout")

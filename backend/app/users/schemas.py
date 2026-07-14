@@ -24,8 +24,12 @@ class UserOut(BaseModel):
     @field_validator("warehouseId", mode="before")
     @classmethod
     def _coerce_warehouse_id(cls, v: object) -> WarehouseId:
-        if isinstance(v, str) and v != "all":
-            return int(v)
+        # Column is a nullable int FK; NULL means "all warehouses". The API
+        # contract still speaks the "all" sentinel the frontend expects.
+        if v is None:
+            return "all"
+        if isinstance(v, str):
+            return v if v == "all" else int(v)
         return v  # type: ignore[return-value]
 
 

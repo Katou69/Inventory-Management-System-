@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.activity.models import ActivityEvent, NotificationRead
 from app.activity.service import log_event
 from app.appsettings.models import AppSetting
-from app.items.models import Product, StockMovement, Supplier
+from app.items.models import Category, Product, StockMovement, Supplier
 from app.orders.models import Order
 from app.users.models import User
 from app.warehouses.models import Warehouse
@@ -112,7 +112,7 @@ def _kpis_asof(db: Session, cutoff: datetime, window_start: datetime) -> dict[st
     suppliers = db.query(func.count(Supplier.id)).filter(Supplier.created_at < cutoff).scalar() or 0
     revenue = (
         db.query(func.coalesce(func.sum(Order.total), 0))
-        .filter(Order.status == "fulfilled", Order.placed_at >= window_start, Order.placed_at < cutoff)
+        .filter(Order.status == "completed", Order.placed_at >= window_start, Order.placed_at < cutoff)
         .scalar()
         or 0
     )
@@ -144,8 +144,8 @@ def _kpis_asof(db: Session, cutoff: datetime, window_start: datetime) -> dict[st
         "orders": float(orders),
     }
 def get_sales_overview(db: Session):
-    number_of_sales = db.query(func.count(Order.id)).filter(Order.status == "fulfilled").scalar()
-    total_sales = db.query(func.coalesce(func.sum(Order.total),0)).filter(Order.status == "fulfilled").scalar()
+    number_of_sales = db.query(func.count(Order.id)).filter(Order.status == "completed").scalar()
+    total_sales = db.query(func.coalesce(func.sum(Order.total),0)).filter(Order.status == "completed").scalar()
     setting = db.get(AppSetting, "sales_target")
     return {
         "numberOfSales" : number_of_sales,
@@ -309,18 +309,20 @@ def get_top_products(db: Session, period: str = "This month", limit: int = 6) ->
     since = datetime.now(timezone.utc) - timedelta(days=days)
 
     sold = func.coalesce(func.sum(-StockMovement.quantity), 0)
+    category_name = func.coalesce(Category.name, "")
     rows = (
         db.query(
             Product.id,
             Product.name,
             Product.image,
-            Product.category,
+            category_name,
             sold.label("qty"),
             (sold * Product.unit_price).label("revenue"),
         )
         .join(StockMovement, StockMovement.product_id == Product.id)
+        .outerjoin(Category, Category.id == Product.category_id)
         .filter(StockMovement.quantity < 0, StockMovement.occurred_at >= since)
-        .group_by(Product.id, Product.name, Product.image, Product.category, Product.unit_price)
+        .group_by(Product.id, Product.name, Product.image, category_name, Product.unit_price)
         .order_by((sold * Product.unit_price).desc())
         .limit(limit)
         .all()
@@ -638,7 +640,7 @@ def get_search_index(db: Session) -> dict:
             "id": p.id,
             "name": p.name,
             "image": p.image,
-            "category": p.category,
+            "category": p.category_name,
             "quantity": f"{on_hand.get(p.id, 0):,} units",
             "revenue": _money(Decimal(str(p.unit_price)) * on_hand.get(p.id, 0)),
         }
@@ -649,8 +651,8 @@ def get_search_index(db: Session) -> dict:
 
 
 def get_staff_stats(db: Session, user: User) -> list[dict]:
-    """Scoped to the staff member's warehouse; admins ("all") see every warehouse."""
-    wid = None if user.warehouse_id == "all" else int(user.warehouse_id)
+    """Scoped to the staff member's warehouse; admins (NULL = "all") see every warehouse."""
+    wid = user.warehouse_id
 
     orders_q = db.query(func.count(Order.id)).filter(Order.status == "pending")
     if wid is not None:

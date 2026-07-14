@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlalchemy import Date, Integer, String
+from sqlalchemy import Date, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.mixins import AuditMixin
@@ -14,7 +14,10 @@ class Warehouse(Base, AuditMixin):
     name: Mapped[str] = mapped_column(String, nullable=False)
     code: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)  # "WH-001"
     location: Mapped[str] = mapped_column(String, nullable=False, default="")
+    # `manager` is the display name the API/UI already read; manager_id is the real
+    # link. Kept both: managers are often recorded before they have a user account.
     manager: Mapped[str] = mapped_column(String, nullable=False, default="")
+    manager_id: Mapped[str | None] = mapped_column(String, ForeignKey("users.id"), nullable=True, index=True)
     image: Mapped[str] = mapped_column(String, nullable=False, default="/images/ellipse-2.png")
     capacity_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     status: Mapped[str] = mapped_column(String, nullable=False, default="active")  # active|maintenance|closed

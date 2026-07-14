@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 from app.dashboard import service
-from app.items.models import Product, StockMovement
+from app.items.models import Category, Product, StockMovement
 from app.warehouses.models import Warehouse
 
 
@@ -18,11 +18,15 @@ def _setup(db):
     wh = Warehouse(id=1, name="Test WH", code="WH-001", capacity_total=1000)
     db.add(wh)
 
+    electronics = Category(name="Electronics")
+    db.add(electronics)
+    db.flush()
+
     # reorder_level 40: on-hand lands at 100, comfortably Normal.
-    widget = Product(sku="SKU-1", name="Widget", category="Electronics",
+    widget = Product(sku="SKU-1", name="Widget", category_id=electronics.id,
                      unit_price=Decimal("10.00"), unit_cost=Decimal("4.00"), reorder_level=40)
     # reorder_level 50: on-hand lands at 20, i.e. below reorder -> low stock.
-    gadget = Product(sku="SKU-2", name="Gadget", category="Electronics",
+    gadget = Product(sku="SKU-2", name="Gadget", category_id=electronics.id,
                      unit_price=Decimal("20.00"), unit_cost=Decimal("9.00"), reorder_level=50)
     db.add_all([widget, gadget])
     db.flush()
@@ -109,7 +113,7 @@ def test_notifications_read_state_is_per_user(db_session):
 
     def _user(email, role):
         u = User(name=email, email=email, hashed_password="x", role=role,
-                 warehouse_id="1", status="active", joined_date=date(2024, 1, 1))
+                 warehouse_id=1, status="active", joined_date=date(2024, 1, 1))
         db_session.add(u)
         return u
 

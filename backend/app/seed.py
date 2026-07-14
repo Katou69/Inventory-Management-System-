@@ -5,7 +5,7 @@ from app.activity.models import ActivityEvent
 from app.appsettings.models import AppSetting
 from app.auth.jwt import hash_password
 from app.db.session import SessionLocal
-from app.items.models import Product, StockMovement, Supplier
+from app.items.models import Category, Product, StockMovement, Supplier
 from app.orders.models import Order
 from app.users.models import User
 from app.warehouses.models import Warehouse
@@ -17,7 +17,7 @@ DEV_USERS = [
         "email": "admin@grandroyal.com",
         "password": "password123",
         "role": "admin",
-        "warehouse_id": "all",
+        "warehouse_id": None,  # NULL = all warehouses
         "status": "active",
         "joined_date": date(2024, 1, 1),
     },
@@ -26,7 +26,7 @@ DEV_USERS = [
         "email": "manager@grandroyal.com",
         "password": "password123",
         "role": "manager",
-        "warehouse_id": "1",
+        "warehouse_id": 1,
         "status": "active",
         "joined_date": date(2024, 1, 1),
     },
@@ -52,8 +52,8 @@ DEV_ZONES = [
 ]
 
 DEV_STOCK = [
-    {"section_code": "S1", "item_name": "Widget A", "quantity": 120},
-    {"section_code": "S2", "item_name": "Widget B", "quantity": 200},
+    {"section_code": "S1", "sku": "SKU-1001", "quantity": 120},
+    {"section_code": "S2", "sku": "SKU-1002", "quantity": 200},
 ]
 
 DEV_SUPPLIERS = [
@@ -96,12 +96,19 @@ def _seed_inventory(db, rng: random.Random) -> None:
     db.add_all(suppliers)
     db.flush()
 
+    categories: dict[str, Category] = {}
+    for _, _, category_name, *_rest in DEV_PRODUCTS:
+        if category_name not in categories:
+            categories[category_name] = Category(name=category_name)
+    db.add_all(categories.values())
+    db.flush()
+
     products = []
-    for sku, name, category, price, cost, reorder in DEV_PRODUCTS:
+    for sku, name, category_name, price, cost, reorder in DEV_PRODUCTS:
         p = Product(
             sku=sku,
             name=name,
-            category=category,
+            category_id=categories[category_name].id,
             unit_price=price,
             unit_cost=cost,
             reorder_level=reorder,
@@ -200,7 +207,7 @@ def _seed_orders(db, rng: random.Random) -> None:
     customers = ["Ace Retail", "BlueMart", "CityStore", "Dawn Traders", "EverShop", "Fresh Foods"]
     for i in range(1, 61):
         placed = now - timedelta(days=rng.randint(0, 60), hours=rng.randint(0, 23))
-        status = rng.choices(["fulfilled", "pending", "cancelled"], weights=[7, 2, 1])[0]
+        status = rng.choices(["completed", "pending", "cancelled"], weights=[7, 2, 1])[0]
         db.add(
             Order(
                 order_no=f"ORD-{i:04d}",
@@ -290,20 +297,25 @@ def seed() -> None:
             db.flush()
             section_by_code[data["code"]] = section
 
+        # Products must exist before shelf stock can reference them.
+        _seed_inventory(db, rng)
+
         for data in DEV_STOCK:
             section = section_by_code.get(data["section_code"])
             if not section:
                 continue
+            product = db.query(Product).filter(Product.sku == data["sku"]).first()
+            if not product:
+                continue
             existing = (
                 db.query(ZoneStockEntry)
-                .filter(ZoneStockEntry.section_id == section.id, ZoneStockEntry.item_name == data["item_name"])
+                .filter(ZoneStockEntry.section_id == section.id, ZoneStockEntry.product_id == product.id)
                 .first()
             )
             if existing:
                 continue
-            db.add(ZoneStockEntry(section_id=section.id, item_name=data["item_name"], quantity=data["quantity"]))
+            db.add(ZoneStockEntry(section_id=section.id, product_id=product.id, quantity=data["quantity"]))
 
-        _seed_inventory(db, rng)
         _seed_orders(db, rng)
 
         admin = db.query(User).filter(User.role == "admin").first()

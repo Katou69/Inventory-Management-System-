@@ -134,7 +134,7 @@ def register(body: RegisterRequest, response: Response, db: Session = Depends(ge
         email=body.email,
         hashed_password=hash_password(body.password),
         role="staff",
-        warehouse_id=str(body.warehouse_id),
+        warehouse_id=body.warehouse_id,
         status="pending",  # New users require admin approval
         joined_date=date.today(),
     )
