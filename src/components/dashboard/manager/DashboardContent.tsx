@@ -15,8 +15,14 @@ import {
 } from "@/services/dashboard-service";
 import WarehouseProfileCard from "@/components/warehouse/WarehouseProfileCard"
 import ZoneLayoutCanvas from "@/components/warehouse/ZoneLayoutCanvas"
+import { requireUser } from "@/lib/auth/require-user"
 
 export default async function ManagerDashboardContent() {
+  const user = await requireUser();
+
+  // Was hardcoded to warehouse 1, so a manager of North Depot saw Main Warehouse.
+  const warehouseId = user.warehouseId === "all" ? 1 : user.warehouseId;
+
   const [
     warehouse,
     statusCards,
@@ -25,7 +31,7 @@ export default async function ManagerDashboardContent() {
     products,
     activities,
   ] = await Promise.all([
-    getWarehouseDetail(1),
+    getWarehouseDetail(warehouseId),
     getStatusCards(),
     getInventoryStatistics(),
     getSalesOverview(),
@@ -57,9 +63,9 @@ export default async function ManagerDashboardContent() {
       />
 
       <ZoneLayoutCanvas
-            warehouseId={1}
+            warehouseId={warehouseId}
             role="manager"
-            viewerName="Mr Staff"
+            viewerName={user.name}
         />
 
       

@@ -1,7 +1,4 @@
-import {
-  ActivityFeed,
-  ProductTable,
-} from "@/components/dashboard"
+import { ProductTable } from "@/components/dashboard"
 
 import WarehouseProfileCard from "@/components/warehouse/WarehouseProfileCard"
 import ZoneLayoutCanvas from "@/components/warehouse/ZoneLayoutCanvas"
@@ -11,20 +8,22 @@ import StaffStats from "./StaffStats"
 import {
   getWarehouseDetail,
   getTopProducts,
-  getRecentActivities,
   getStaffStats,
 } from "@/services/dashboard-service"
+import { requireUser } from "@/lib/auth/require-user"
 
 export default async function StaffDashboardContent() {
-  const [
-    warehouse,
-    products,
-    activities,
-    stats,
-  ] = await Promise.all([
-    getWarehouseDetail(1),
+  const user = await requireUser()
+
+  // Staff are scoped to one warehouse. This used to be a hardcoded `1`, so every
+  // staff member saw Main Warehouse regardless of their actual assignment.
+  const warehouseId = user.warehouseId === "all" ? 1 : user.warehouseId
+
+  // No ActivityFeed: /activities is admin+manager only, and calling it here made
+  // the whole staff dashboard throw a 403 out of the render tree.
+  const [warehouse, products, stats] = await Promise.all([
+    getWarehouseDetail(warehouseId),
     getTopProducts(),
-    getRecentActivities(),
     getStaffStats(),
   ])
 
@@ -51,24 +50,18 @@ export default async function StaffDashboardContent() {
       <StaffStats stats={stats} />
 
       <ZoneLayoutCanvas
-        warehouseId={1}
+        warehouseId={warehouseId}
         role="staff"
-        viewerName="Mr Staff"
-        />
+        viewerName={user.name}
+      />
 
       <WarehouseProfileCard
         wh={warehouse}
       />
 
-      <div className="flex items-start justify-between gap-2 flex-wrap lg:flex-nowrap">
-        <ProductTable
-          initialProducts={products}
-        />
-
-        <ActivityFeed
-          activities={activities}
-        />
-      </div>
+      <ProductTable
+        initialProducts={products}
+      />
     </div>
   )
 }

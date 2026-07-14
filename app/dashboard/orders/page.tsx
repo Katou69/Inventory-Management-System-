@@ -1,9 +1,11 @@
 import { AdminOrderContent } from "@/components/orders/admin";
 import { StaffOrderContent } from "@/components/orders/staff";
-import { role } from "../page";
 import { ManagerOrderContent } from "@/components/orders/manager";
+import { requireUser } from "@/lib/auth/require-user";
 
-export default function OrdersPage() {
+export default async function OrdersPage() {
+  const { role } = await requireUser();
+
   switch (role) {
     case "admin":
       return <AdminOrderContent />;

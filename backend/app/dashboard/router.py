@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_role
-from app.dashboard import service
+from . import service
 from app.dashboard.schemas import (
     InventoryDataPointOut,
     ProductOut,

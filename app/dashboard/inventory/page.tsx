@@ -1,11 +1,11 @@
-import {AdminInventoryContent} from "@/components/inventory/admin";
-import {StaffInventoryContent} from "@/components/inventory/staff";
-import {ManagerInventoryContent} from "@/components/inventory/manager";
-import {role} from "../page"; // import the role from dashboard/page.tsx (need to remove when backend is implemented)
-// temporary (change this later to get the role from auth/session)
-// const role: string = "admin";
+import { AdminInventoryContent } from "@/components/inventory/admin";
+import { StaffInventoryContent } from "@/components/inventory/staff";
+import { ManagerInventoryContent } from "@/components/inventory/manager";
+import { requireUser } from "@/lib/auth/require-user";
 
-export default function InventoryPage() {
+export default async function InventoryPage() {
+  const { role } = await requireUser();
+
   switch (role) {
     case "admin":
       return <AdminInventoryContent />;
@@ -15,7 +15,6 @@ export default function InventoryPage() {
 
     case "staff":
       return <StaffInventoryContent />;
-    
 
     default:
       return null;
