@@ -8,6 +8,12 @@ from app.db.session import Base, get_db
 from app.main import app
 from app.auth import models as auth_models  # noqa: F401  (register tables on Base.metadata)
 from app.users import models as user_models  # noqa: F401
+from app.warehouses import models as warehouse_models  # noqa: F401
+from app.zones import models as zone_models  # noqa: F401
+from app.items import models as item_models  # noqa: F401
+from app.orders import models as order_models  # noqa: F401
+from app.activity import models as activity_models  # noqa: F401
+from app.appsettings import models as appsetting_models  # noqa: F401
 
 TEST_DATABASE_URL = "sqlite:///:memory:"
 

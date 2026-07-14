@@ -9,6 +9,12 @@ from app.config import settings
 from app.db.session import Base
 from app.auth import models as auth_models  # noqa: F401  (ensures models are registered on Base.metadata)
 from app.users import models as user_models  # noqa: F401
+from app.warehouses import models as warehouse_models  # noqa: F401
+from app.zones import models as zone_models  # noqa: F401
+from app.items import models as item_models  # noqa: F401
+from app.orders import models as order_models  # noqa: F401
+from app.activity import models as activity_models  # noqa: F401
+from app.appsettings import models as appsetting_models  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

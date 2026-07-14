@@ -5,6 +5,8 @@ from fastapi.staticfiles import StaticFiles
 from app.auth import router as auth
 from app.users import router as users
 from app.uploads import router as uploads
+from app.zones import router as zones
+from app.dashboard import router as dashboard
 from app.config import settings
 
 app = FastAPI(title="Inventory Management API")
@@ -20,6 +22,8 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(uploads.router)
+app.include_router(zones.router)
+app.include_router(dashboard.router)
 
 app.mount("/uploads", StaticFiles(directory=uploads.UPLOAD_ROOT), name="uploads")
 
