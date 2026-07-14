@@ -276,14 +276,28 @@ def seed() -> None:
             db.add(user)
 
         now = datetime.now(timezone.utc)
+        last_inspection = (now - timedelta(days=30)).date()
+        next_inspection = (now + timedelta(days=60)).date()
         for data in DEV_WAREHOUSES:
-            if db.get(Warehouse, data["id"]):
+            existing = db.get(Warehouse, data["id"])
+            if existing:
+                # Backfill rather than skip. A warehouse created before the profile
+                # columns existed keeps them blank forever under a plain `continue`,
+                # which is exactly how WH-001 ended up with no manager or address.
+                # Only empty fields are filled, so real edits are never overwritten.
+                for field, value in data.items():
+                    if not getattr(existing, field, None):
+                        setattr(existing, field, value)
+                if existing.last_inspection is None:
+                    existing.last_inspection = last_inspection
+                if existing.next_inspection is None:
+                    existing.next_inspection = next_inspection
                 continue
             db.add(
                 Warehouse(
                     **data,
-                    last_inspection=(now - timedelta(days=30)).date(),
-                    next_inspection=(now + timedelta(days=60)).date(),
+                    last_inspection=last_inspection,
+                    next_inspection=next_inspection,
                 )
             )
         db.flush()

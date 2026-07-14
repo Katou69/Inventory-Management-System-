@@ -399,12 +399,23 @@ def get_warehouse_detail(db: Session, warehouse) -> dict:
     on_hand = on_hand_by_product(db, wid)
     now = datetime.now(timezone.utc)
 
+    # Last movement per product *in this warehouse*. This column used to be
+    # _fmt_date(now) for every row, which claimed all 15 SKUs were touched this
+    # second — the one number on the table nobody could trust.
+    last_moved = dict(
+        db.query(StockMovement.product_id, func.max(StockMovement.occurred_at))
+        .filter(StockMovement.warehouse_id == wid)
+        .group_by(StockMovement.product_id)
+        .all()
+    )
+
     products = db.query(Product).all()
     product_rows = []
     for p in products:
         qty = on_hand.get(p.id, 0)
         if qty == 0:
             continue  # not stocked here
+        moved_at = last_moved.get(p.id)
         product_rows.append(
             {
                 "id": p.id,
@@ -413,7 +424,7 @@ def get_warehouse_detail(db: Session, warehouse) -> dict:
                 "category": p.category_name,
                 "quantity": qty,
                 "status": _stock_status(qty, p.reorder_level),
-                "lastUpdated": _fmt_date(now),
+                "lastUpdated": _fmt_date(moved_at) if moved_at else "",
             }
         )
 
@@ -436,35 +447,33 @@ def get_warehouse_detail(db: Session, warehouse) -> dict:
         for m, pname in recent
     ]
 
-    # 7-day inbound/outbound for the mini bar chart.
-    daily = []
-    for offset in range(6, -1, -1):
-        day_start = (now - timedelta(days=offset)).replace(hour=0, minute=0, second=0, microsecond=0)
-        day_end = day_start + timedelta(days=1)
-        row = (
-            db.query(_IN, _OUT)
+    # 7-day inbound/outbound for the mini bar chart. One grouped query, not seven:
+    # the old version ran a separate round-trip per day.
+    window_start = (now - timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
+    day_col = func.date(StockMovement.occurred_at)
+    by_day = {
+        str(day): (int(inb or 0), int(out or 0))
+        for day, inb, out in (
+            db.query(day_col, _IN, _OUT)
             .filter(
                 StockMovement.warehouse_id == wid,
-                StockMovement.occurred_at >= day_start,
-                StockMovement.occurred_at < day_end,
+                StockMovement.occurred_at >= window_start,
             )
-            .one()
+            .group_by(day_col)
+            .all()
         )
-        daily.append(
-            {"day": day_start.strftime("%a"), "inbound": int(row[0] or 0), "outbound": int(row[1] or 0)}
-        )
+    }
+    daily = []
+    for offset in range(6, -1, -1):
+        day = (now - timedelta(days=offset)).date()
+        inbound, outbound = by_day.get(str(day), (0, 0))
+        daily.append({"day": day.strftime("%a"), "inbound": inbound, "outbound": outbound})
 
     low_stock_count = sum(1 for r in product_rows if r["status"] in ("Low", "Critical"))
-    pending_inbound = (
-        db.query(func.coalesce(func.sum(StockMovement.quantity), 0))
-        .filter(
-            StockMovement.warehouse_id == wid,
-            StockMovement.quantity > 0,
-            StockMovement.occurred_at >= now - timedelta(days=7),
-        )
-        .scalar()
-        or 0
-    )
+    # Both of these describe the same 7-day window the chart above shows. They were
+    # surfaced as "Pending inbound" and "Throughput (mo.)", but nothing here is
+    # pending (these are settled movements) and the window is a week, not a month.
+    inbound_7d = sum(d["inbound"] for d in daily)
     throughput = sum(d["inbound"] + d["outbound"] for d in daily)
 
     return {
@@ -484,7 +493,7 @@ def get_warehouse_detail(db: Session, warehouse) -> dict:
         "nextInspection": _fmt_date(warehouse.next_inspection),
         "totalSkus": len(product_rows),
         "lowStockCount": low_stock_count,
-        "pendingInbound": int(pending_inbound),
+        "pendingInbound": inbound_7d,
         "throughput": throughput,
         "dailyMovement": daily,
         "movements": movements,

@@ -5,8 +5,8 @@ export default function QuickStatsRow({ wh }: { wh: WarehouseDetail }) {
   const stats = [
     { label: "Total SKUs stored", value: wh.totalSkus.toLocaleString(), icon: Boxes,         tone: "bg-[#E5F0F5] text-[#1A6B8A] dark:bg-primary/20 dark:text-primary" },
     { label: "Low stock items",   value: String(wh.lowStockCount),      icon: AlertTriangle,  tone: "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400", alert: wh.lowStockCount > 0 },
-    { label: "Pending inbound",   value: String(wh.pendingInbound),     icon: Truck,          tone: "bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400" },
-    { label: "Throughput (mo.)",  value: `${wh.throughput.toLocaleString()} u`, icon: Activity, tone: "bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400" },
+    { label: "Inbound (7d)",      value: wh.pendingInbound.toLocaleString(), icon: Truck,     tone: "bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400" },
+    { label: "Throughput (7d)",   value: `${wh.throughput.toLocaleString()} u`, icon: Activity, tone: "bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400" },
   ]
 
   return (

@@ -214,3 +214,43 @@ def test_create_warehouse_derives_code_from_id(db_session):
     )
     assert created["warehouseId"] == f"WH-{created['id']:03d}"
     assert created["capacityUsed"] == 0  # no movements yet
+
+
+def test_warehouse_detail_stats_cover_the_window_they_claim(db_session):
+    """throughput/pendingInbound must describe the same 7 days the chart plots.
+
+    Both were surfaced on the stats row as a *month* of throughput and as
+    "pending" inbound, while actually being summed off the 7-day daily buckets.
+    The stale movement below sits outside the window, so a regression that widens
+    the query (or narrows the chart) makes these stop agreeing.
+    """
+    widget, _ = _setup(db_session)
+    now = datetime.now(timezone.utc)
+    db_session.add(
+        StockMovement(product_id=widget.id, warehouse_id=1, kind="inbound",
+                      quantity=999, occurred_at=now - timedelta(days=90))
+    )
+    db_session.commit()
+
+    wh = db_session.get(Warehouse, 1)
+    detail = service.get_warehouse_detail(db_session, wh)
+
+    daily = detail["dailyMovement"]
+    assert len(daily) == 7
+    assert detail["throughput"] == sum(d["inbound"] + d["outbound"] for d in daily)
+    assert detail["pendingInbound"] == sum(d["inbound"] for d in daily)
+    # The 90-day-old inbound is out of window: it must not leak into either stat.
+    assert detail["pendingInbound"] == 180  # 150 + 30, not 1179
+
+
+def test_warehouse_detail_last_updated_is_the_real_movement_date(db_session):
+    """lastUpdated was hardcoded to now(), so every SKU claimed a fresh update."""
+    widget, gadget = _setup(db_session)
+    now = datetime.now(timezone.utc)
+    wh = db_session.get(Warehouse, 1)
+
+    rows = {r["sku"]: r for r in service.get_warehouse_detail(db_session, wh)["products"]}
+
+    # widget's last movement is 2 days ago, gadget's is 1 -- neither is today.
+    assert rows["SKU-1"]["lastUpdated"] == (now - timedelta(days=2)).strftime("%d-%m-%Y")
+    assert rows["SKU-2"]["lastUpdated"] == (now - timedelta(days=1)).strftime("%d-%m-%Y")
