@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import type { UserType, Theme, Role } from "@/types/user"
 import { config } from "@/lib/config"
 import { setAuthExpiredHandler } from "@/lib/api-client"
@@ -26,6 +27,7 @@ const USER_KEY = "grgi.user"
 const THEME_KEY = "grgi.theme"
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
   const [user, setUser] = useState<UserType | null>(null)
   const [theme, setThemeState] = useState<Theme>("light")
   const [ready, setReady] = useState(false)
@@ -78,9 +80,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAuthExpiredHandler(() => {
       setUser(null)
       persistMockUser(null)
+      router.refresh()
     })
     return () => setAuthExpiredHandler(null)
-  }, [])
+  }, [router])
 
   // Reflect theme on the document + persist it.
   useEffect(() => {
@@ -104,10 +107,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Every path below that changes WHO is logged in must call router.refresh().
+  //
+  // The dashboard picks its role-specific view in a Server Component, and Next
+  // caches that RSC payload client-side. setUser() only moves client state, so
+  // without a refresh the cached payload survives a logout + login as a
+  // different role: sign in as manager, log out, sign in as admin, and the
+  // admin is served the manager's dashboard straight out of the Router Cache.
+  // refresh() is what discards it and re-runs the role switch on the server.
   const signIn: AuthContextValue["signIn"] = async (email, password) => {
     const u = await authService.login(email, password)
     setUser(u)
     persistMockUser(u)
+    router.refresh()
   }
 
   const signUp: AuthContextValue["signUp"] = async (name, email, password, warehouseId) => {
@@ -119,6 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const u = authService.demoLogin(role)
     setUser(u)
     persistMockUser(u)
+    router.refresh()
   }
 
   const logout = () => {
@@ -127,6 +140,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
     setUser(null)
     persistMockUser(null)
+    // Drop the outgoing user's server-rendered dashboard, so it cannot be handed
+    // to whoever logs in next.
+    router.refresh()
   }
 
   const setTheme = (t: Theme) => setThemeState(t)
