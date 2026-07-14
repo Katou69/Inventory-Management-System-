@@ -56,9 +56,13 @@ class ZoneChangeItemOut(ZoneChangeItemIn):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
+# requestedBy/reviewedBy are deliberately NOT accepted from the client. They are
+# taken from the authenticated session. Before, the caller supplied them, so a
+# manager could POST requestedBy=<admin's id> and the audit trail would record the
+# admin as the author. (The FK to users.id was the only thing limiting it -- and
+# it "helped" by raising a 500 on a bad value rather than rejecting it.)
 class DirectChangeRequest(BaseModel):
     item: ZoneChangeItemIn
-    requestedBy: str = Field(validation_alias="requested_by")
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -66,19 +70,11 @@ class DirectChangeRequest(BaseModel):
 class ProposeChangeRequest(BaseModel):
     items: list[ZoneChangeItemIn]
     requestNote: Optional[str] = Field(default=None, validation_alias="request_note")
-    requestedBy: str = Field(validation_alias="requested_by")
-
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class ApproveRequest(BaseModel):
-    reviewedBy: str = Field(validation_alias="reviewed_by")
 
     model_config = ConfigDict(populate_by_name=True)
 
 
 class RejectRequest(BaseModel):
-    reviewedBy: str = Field(validation_alias="reviewed_by")
     reviewNote: str = Field(validation_alias="review_note")
 
     model_config = ConfigDict(populate_by_name=True)

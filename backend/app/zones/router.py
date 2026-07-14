@@ -10,7 +10,6 @@ from app.warehouses.models import Warehouse
 from app.zones import service
 from app.zones.models import LayoutRequest, ZoneSection, ZoneStockEntry
 from app.zones.schemas import (
-    ApproveRequest,
     DirectChangeRequest,
     ProposeChangeRequest,
     RejectRequest,
@@ -30,13 +29,29 @@ def _get_warehouse_or_404(db: Session, warehouse_id: int) -> Warehouse:
     return warehouse
 
 
+def _scoped_warehouse_or_403(db: Session, warehouse_id: int, user: User) -> Warehouse:
+    """Warehouse the user is actually allowed to act on.
+
+    require_role checks the ROLE but never the warehouse, so a manager of
+    warehouse 1 could edit the layout of warehouse 3. Admins are global
+    (warehouse_id NULL = all); everyone else is pinned to their assignment.
+    """
+    warehouse = _get_warehouse_or_404(db, warehouse_id)
+    if user.role != "admin" and user.warehouse_id != warehouse_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not assigned to this warehouse",
+        )
+    return warehouse
+
+
 @router.get("/warehouses/{warehouse_id}/zones", response_model=List[ZoneSectionOut])
 def list_zones(
     warehouse_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin", "manager", "staff")),
 ) -> List[ZoneSection]:
-    _get_warehouse_or_404(db, warehouse_id)
+    _scoped_warehouse_or_403(db, warehouse_id, current_user)
     return db.query(ZoneSection).filter(ZoneSection.warehouse_id == warehouse_id).all()
 
 
@@ -46,7 +61,7 @@ def list_zone_stock(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin", "manager", "staff")),
 ) -> List[ZoneStockEntry]:
-    _get_warehouse_or_404(db, warehouse_id)
+    _scoped_warehouse_or_403(db, warehouse_id, current_user)
     return (
         db.query(ZoneStockEntry)
         .join(ZoneSection, ZoneStockEntry.section_id == ZoneSection.id)
@@ -62,7 +77,7 @@ def list_layout_requests(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin", "manager")),
 ) -> List[LayoutRequest]:
-    _get_warehouse_or_404(db, warehouse_id)
+    _scoped_warehouse_or_403(db, warehouse_id, current_user)
     query = db.query(LayoutRequest).filter(LayoutRequest.warehouse_id == warehouse_id)
     if status_filter is not None:
         query = query.filter(LayoutRequest.status == status_filter)
@@ -80,8 +95,8 @@ def apply_direct_change(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin")),
 ) -> LayoutRequest:
-    _get_warehouse_or_404(db, warehouse_id)
-    return service.apply_direct(db, warehouse_id, body.item, body.requestedBy)
+    _scoped_warehouse_or_403(db, warehouse_id, current_user)
+    return service.apply_direct(db, warehouse_id, body.item, current_user)
 
 
 @router.post(
@@ -95,18 +110,17 @@ def propose_change(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("manager")),
 ) -> LayoutRequest:
-    _get_warehouse_or_404(db, warehouse_id)
-    return service.propose_change(db, warehouse_id, body.items, body.requestNote, body.requestedBy)
+    _scoped_warehouse_or_403(db, warehouse_id, current_user)
+    return service.propose_change(db, warehouse_id, body.items, body.requestNote, current_user)
 
 
 @router.post("/layout-requests/{request_id}/approve", status_code=status.HTTP_204_NO_CONTENT)
 def approve_request(
     request_id: int,
-    body: ApproveRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin")),
 ) -> None:
-    service.approve_request(db, request_id, body.reviewedBy)
+    service.approve_request(db, request_id, current_user)
 
 
 @router.post("/layout-requests/{request_id}/reject", status_code=status.HTTP_204_NO_CONTENT)
@@ -116,4 +130,4 @@ def reject_request(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin")),
 ) -> None:
-    service.reject_request(db, request_id, body.reviewedBy, body.reviewNote)
+    service.reject_request(db, request_id, current_user, body.reviewNote)

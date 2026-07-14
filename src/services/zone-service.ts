@@ -257,9 +257,11 @@ export async function applyDirectChange(
     store.requests.push(req)
     return clone(req)
   }
+  // requestedBy is NOT sent: the server takes the author from the session. It used
+  // to be client-supplied, which meant the caller chose who the audit trail blamed.
   return apiFetch<ZoneChangeRequest>(`/warehouses/${input.warehouseId}/layout-requests/direct`, {
     method: "POST",
-    body: JSON.stringify(input),
+    body: JSON.stringify({ item: input.item }),
   })
 }
 
@@ -291,7 +293,7 @@ export async function proposeChange(input: ZoneChangeInput): Promise<ZoneChangeR
   }
   return apiFetch<ZoneChangeRequest>(`/warehouses/${input.warehouseId}/layout-requests`, {
     method: "POST",
-    body: JSON.stringify(input),
+    body: JSON.stringify({ items: input.items, requestNote: input.requestNote }),
   })
 }
 
