@@ -1,9 +1,9 @@
 "use client"
 import { useState } from "react"
-import { X } from "lucide-react"
 import WarehouseHeader from "./WarehouseHeader"
 import WarehouseProfileCard from "./WarehouseProfileCard"
 import WarehouseImagePicker from "./WarehouseImagePicker"
+import { Modal, ModalFooter, FormField } from "@/components/ui"
 import { updateWarehouseProfile } from "@/services/dashboard-service"
 import type { WarehouseDetail, UpdateWarehouseProfileInput } from "@/types/dashboard"
 
@@ -23,22 +23,26 @@ export default function WarehouseProfileSection({ wh: initialWh }: { wh: Warehou
   const [editing, setEditing] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [form, setForm] = useState<UpdateWarehouseProfileInput>(formFromWh(wh))
+  const [error, setError] = useState<string | null>(null)
 
   function openEdit() {
     setForm(formFromWh(wh))
+    setError(null)
     setEditing(true)
   }
 
   const canSubmit = form.manager.trim() && form.address.trim() && form.phone.trim() && form.email.trim() && form.nextInspection.trim()
 
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleSave() {
     if (!canSubmit || submitting) return
     setSubmitting(true)
+    setError(null)
     try {
       const saved = await updateWarehouseProfile(wh.id, form)
       setWh((prev) => ({ ...prev, ...saved }))
       setEditing(false)
+    } catch {
+      setError("Couldn't save changes. Please try again.")
     } finally {
       setSubmitting(false)
     }
@@ -50,51 +54,29 @@ export default function WarehouseProfileSection({ wh: initialWh }: { wh: Warehou
       <WarehouseProfileCard wh={wh} />
 
       {editing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setEditing(false)} />
-          <div className="relative bg-card rounded-2xl shadow-xl w-full max-w-md p-6 border border-border">
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-lg font-semibold text-foreground">Edit Warehouse Profile</h3>
-              <button onClick={() => setEditing(false)} className="p-1.5 rounded-lg hover:bg-accent transition-colors">
-                <X className="size-4 text-muted-foreground" />
-              </button>
-            </div>
-            <form onSubmit={handleSave} className="flex flex-col gap-4">
-              <WarehouseImagePicker value={form.image ?? null} onChange={(url) => setForm((f) => ({ ...f, image: url ?? undefined }))} />
-              <Field label="Manager" value={form.manager} onChange={(v) => setForm((f) => ({ ...f, manager: v }))} placeholder="e.g. Aung Aung" />
-              <Field label="Address" value={form.address} onChange={(v) => setForm((f) => ({ ...f, address: v }))} placeholder="e.g. No. 12, Bayint Naung Rd, Yangon" />
-              <Field label="Phone" value={form.phone} onChange={(v) => setForm((f) => ({ ...f, phone: v }))} placeholder="e.g. +95 9 770 112 233" />
-              <Field label="Email" value={form.email} onChange={(v) => setForm((f) => ({ ...f, email: v }))} placeholder="e.g. manager@grgi.com" type="email" />
-              <Field label="Next Inspection" value={form.nextInspection} onChange={(v) => setForm((f) => ({ ...f, nextInspection: v }))} placeholder="e.g. 18 Dec 2026" />
-              <div className="flex items-center justify-end gap-2 mt-2">
-                <button type="button" onClick={() => setEditing(false)} className="px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-accent rounded-lg transition-colors">
-                  Cancel
-                </button>
-                <button type="submit" disabled={!canSubmit || submitting} className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                  {submitting ? "Saving…" : "Save Changes"}
-                </button>
-              </div>
-            </form>
+        <Modal title="Edit Warehouse Profile" onClose={() => setEditing(false)}>
+          <div className="p-5 space-y-4">
+            <WarehouseImagePicker value={form.image ?? null} onChange={(url) => setForm((f) => ({ ...f, image: url ?? undefined }))} />
+            <FormField label="Manager">
+              <input className="modal-input" value={form.manager} onChange={(e) => setForm((f) => ({ ...f, manager: e.target.value }))} placeholder="e.g. Aung Aung" />
+            </FormField>
+            <FormField label="Address">
+              <input className="modal-input" value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} placeholder="e.g. No. 12, Bayint Naung Rd, Yangon" />
+            </FormField>
+            <FormField label="Phone">
+              <input className="modal-input" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="e.g. +95 9 770 112 233" />
+            </FormField>
+            <FormField label="Email">
+              <input className="modal-input" type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="e.g. manager@grgi.com" />
+            </FormField>
+            <FormField label="Next Inspection">
+              <input className="modal-input" value={form.nextInspection} onChange={(e) => setForm((f) => ({ ...f, nextInspection: e.target.value }))} placeholder="e.g. 18 Dec 2026" />
+            </FormField>
+            {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
           </div>
-        </div>
+          <ModalFooter onCancel={() => setEditing(false)} onConfirm={handleSave} confirmLabel="Save Changes" disabled={!canSubmit} loading={submitting} />
+        </Modal>
       )}
     </>
-  )
-}
-
-function Field({
-  label, value, onChange, placeholder, type = "text",
-}: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string }) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium text-foreground">{label}</span>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full px-3 py-2 text-sm bg-input-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-      />
-    </label>
   )
 }

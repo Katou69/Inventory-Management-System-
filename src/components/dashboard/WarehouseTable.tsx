@@ -2,9 +2,10 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useState } from "react"
-import { Plus, ArrowUpRight, X } from "lucide-react"
+import { Plus, ArrowUpRight } from "lucide-react"
 import { createWarehouse } from "@/services/dashboard-service"
 import WarehouseImagePicker from "@/components/warehouse/WarehouseImagePicker"
+import { Modal, ModalFooter, FormField } from "@/components/ui"
 import type { Warehouse } from "@/types/dashboard"
 
 function CapacityBar({ used, total }: { used: number; total: number }) {
@@ -40,6 +41,7 @@ export default function WarehouseTable({ initialWarehouses }: { initialWarehouse
   const [form, setForm] = useState(emptyForm)
   const [submitting, setSubmitting] = useState(false)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const canSubmit = form.name.trim() && form.location.trim() && form.manager.trim() && Number(form.capacityTotal) > 0
 
@@ -47,12 +49,13 @@ export default function WarehouseTable({ initialWarehouses }: { initialWarehouse
     setModalOpen(false)
     setForm(emptyForm)
     setImagePreview(null)
+    setError(null)
   }
 
-  async function handleAdd(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleAdd() {
     if (!canSubmit || submitting) return
     setSubmitting(true)
+    setError(null)
     try {
       const newWarehouse = await createWarehouse({
         name: form.name.trim(),
@@ -63,6 +66,8 @@ export default function WarehouseTable({ initialWarehouses }: { initialWarehouse
       })
       setWarehouses((prev) => [newWarehouse, ...prev])
       closeModal()
+    } catch {
+      setError("Couldn't add the warehouse. Please try again.")
     } finally {
       setSubmitting(false)
     }
@@ -136,53 +141,27 @@ export default function WarehouseTable({ initialWarehouses }: { initialWarehouse
         </table>
       </div>
 
-      {/* Add Warehouse modal */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={closeModal} />
-          <div className="relative bg-card rounded-2xl shadow-xl w-full max-w-md p-6 border border-border">
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-lg font-semibold text-foreground">Add Warehouse</h3>
-              <button onClick={closeModal} className="p-1.5 rounded-lg hover:bg-accent transition-colors">
-                <X className="size-4 text-muted-foreground" />
-              </button>
-            </div>
-            <form onSubmit={handleAdd} className="flex flex-col gap-4">
-              <WarehouseImagePicker value={imagePreview} onChange={setImagePreview} />
-              <Field label="Warehouse name" value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="e.g. Yangon East Depot" />
-              <Field label="Location" value={form.location} onChange={(v) => setForm((f) => ({ ...f, location: v }))} placeholder="e.g. Yangon" />
-              <Field label="Manager" value={form.manager} onChange={(v) => setForm((f) => ({ ...f, manager: v }))} placeholder="e.g. Aung Aung" />
-              <Field label="Total capacity (units)" value={form.capacityTotal} onChange={(v) => setForm((f) => ({ ...f, capacityTotal: v.replace(/[^0-9]/g, "") }))} placeholder="e.g. 5000" inputMode="numeric" />
-              <div className="flex items-center justify-end gap-2 mt-2">
-                <button type="button" onClick={closeModal} className="px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-accent rounded-lg transition-colors">
-                  Cancel
-                </button>
-                <button type="submit" disabled={!canSubmit || submitting} className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                  {submitting ? "Adding…" : "Add Warehouse"}
-                </button>
-              </div>
-            </form>
+        <Modal title="Add Warehouse" onClose={closeModal}>
+          <div className="p-5 space-y-4">
+            <WarehouseImagePicker value={imagePreview} onChange={setImagePreview} />
+            <FormField label="Warehouse name">
+              <input className="modal-input" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Yangon East Depot" />
+            </FormField>
+            <FormField label="Location">
+              <input className="modal-input" value={form.location} onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))} placeholder="e.g. Yangon" />
+            </FormField>
+            <FormField label="Manager">
+              <input className="modal-input" value={form.manager} onChange={(e) => setForm((f) => ({ ...f, manager: e.target.value }))} placeholder="e.g. Aung Aung" />
+            </FormField>
+            <FormField label="Total capacity (units)">
+              <input className="modal-input" inputMode="numeric" value={form.capacityTotal} onChange={(e) => setForm((f) => ({ ...f, capacityTotal: e.target.value.replace(/[^0-9]/g, "") }))} placeholder="e.g. 5000" />
+            </FormField>
+            {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
           </div>
-        </div>
+          <ModalFooter onCancel={closeModal} onConfirm={handleAdd} confirmLabel="Add Warehouse" disabled={!canSubmit} loading={submitting} />
+        </Modal>
       )}
     </div>
-  )
-}
-
-function Field({
-  label, value, onChange, placeholder, inputMode,
-}: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; inputMode?: "numeric" | "text" }) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium text-foreground">{label}</span>
-      <input
-        type="text"
-        inputMode={inputMode}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full px-3 py-2 text-sm bg-input-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-      />
-    </label>
   )
 }
