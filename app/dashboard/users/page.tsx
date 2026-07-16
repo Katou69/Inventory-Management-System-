@@ -1,16 +1,9 @@
-"use client"
-
-import { useAuth } from "@/lib/auth/auth-context"
+import { requireRole } from "@/lib/auth/require-user"
 import { UsersView } from "@/components/users"
 
-export default function UsersPage() {
-  const { user } = useAuth()
-  if (!user || user.role === "staff") {
-    return (
-      <div className="py-24 text-center text-muted-foreground text-sm">
-        You don&apos;t have access to user management.
-      </div>
-    )
-  }
+export default async function UsersPage() {
+  // Admin/manager only — staff (or any lower rank) is bounced server-side before
+  // the view or its data is ever sent to the browser.
+  const user = await requireRole("admin", "manager")
   return <UsersView role={user.role} userWarehouseId={user.warehouseId} />
 }

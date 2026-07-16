@@ -27,10 +27,17 @@ export async function proxy(request: NextRequest) {
   // No refresh token: genuinely no session.
   if (!hasRefresh) return redirectToLogin(request)
 
-  // Session is live.
-  if (hasAccess) return NextResponse.next()
+  // Access token present AND not past its own `exp`: trust it and pass through.
+  // We only read the unverified `exp` claim here (no secret, no signature check) —
+  // enough to catch a lapsed token so we refresh instead of shipping a render that
+  // 401s server-side with no way to recover. Signature/revocation stay the
+  // backend's job: a forged or revoked-but-unexpired token still 401s at the
+  // render, and the client recovers it on hydration.
+  if (hasAccess && !isExpired(request.cookies.get("access_token")?.value)) {
+    return NextResponse.next()
+  }
 
-  // Refresh token but no access token: expired. Rotate it.
+  // No access token, or it's expired. Rotate via the refresh token.
   const refreshed = await fetch(`${API}/auth/refresh`, {
     method: "POST",
     headers: { cookie: request.headers.get("cookie") ?? "" },
@@ -49,6 +56,25 @@ export async function proxy(request: NextRequest) {
   const response = NextResponse.next({ request: { headers } })
   for (const cookie of setCookie) response.headers.append("set-cookie", cookie)
   return response
+}
+
+/**
+ * True if the JWT is absent, unparseable, or past its `exp`. Reads the payload's
+ * `exp` claim WITHOUT verifying the signature — proxy has no secret and this is
+ * only an "is it worth refreshing?" hint, never an authorization decision.
+ * A malformed token counts as expired so we fall through to refresh.
+ */
+function isExpired(token: string | undefined): boolean {
+  if (!token) return true
+  try {
+    const payload = JSON.parse(
+      Buffer.from(token.split(".")[1], "base64").toString("utf-8"),
+    )
+    // `exp` is seconds since epoch; Date.now() is ms.
+    return typeof payload.exp !== "number" || payload.exp * 1000 <= Date.now()
+  } catch {
+    return true
+  }
 }
 
 function redirectToLogin(request: NextRequest) {

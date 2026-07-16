@@ -19,3 +19,17 @@ export async function requireUser(): Promise<UserType> {
   if (!user) redirect("/login")
   return user
 }
+
+/**
+ * Like requireUser, but also enforces a role allow-list server-side — the page
+ * never renders (nor fetches its data) for a disallowed role, instead of a
+ * client-side gate that ships the view and hides it after hydration.
+ *
+ * A logged-in-but-disallowed user is bounced to the dashboard, not /login: they
+ * have a valid session, just not the rank for this page.
+ */
+export async function requireRole(...allowed: UserType["role"][]): Promise<UserType> {
+  const user = await requireUser()
+  if (!allowed.includes(user.role)) redirect("/dashboard")
+  return user
+}

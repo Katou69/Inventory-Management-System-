@@ -21,8 +21,6 @@ export default function WarehouseHeader({
         <nav className="flex items-center gap-1.5 text-sm text-muted-foreground min-w-0">
           <Link href="/dashboard" className="hover:text-foreground transition-colors">Dashboard</Link>
           <span>/</span>
-          <Link href="/dashboard" className="hover:text-foreground transition-colors">Warehouses</Link>
-          <span>/</span>
           <span className="text-foreground font-medium truncate">{name}</span>
         </nav>
       </div>
