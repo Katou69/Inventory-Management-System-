@@ -3,9 +3,9 @@ import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 
 export default function Modal({
-  title, subtitle, onClose, children
+  title, subtitle, onClose, size = "md", children
 }: {
-  title: string; subtitle?: string; onClose: () => void; children: React.ReactNode;
+  title: string; subtitle?: string; onClose: () => void; size?: "md" | "lg"; children: React.ReactNode;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -46,7 +46,7 @@ export default function Modal({
         aria-label={title}
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        className="bg-card border border-border rounded-xl w-full max-w-md shadow-2xl outline-none"
+        className={`bg-card border border-border rounded-xl w-full ${size === "lg" ? "max-w-3xl" : "max-w-md"} shadow-2xl outline-none`}
       >
         <div className="flex items-start justify-between px-5 py-4 border-b border-border">
           <div>

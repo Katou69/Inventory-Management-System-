@@ -183,8 +183,13 @@ export interface SalesOverview {
 export interface CreateWarehouseInput {
   name: string
   location: string
-  manager: string
+  /** Optional at creation time — can be assigned once the site is staffed. */
+  manager?: string
+  /** Optional at creation time — can be added once the site has a line. */
+  phone?: string
   capacityTotal: number
+  /** Defaults to "Under Maintenance" (not yet operational) when omitted. */
+  status?: WarehouseStatus
   image?: string
 }
 
@@ -194,6 +199,7 @@ export interface UpdateWarehouseProfileInput {
   phone: string
   email: string
   nextInspection: string
+  status: WarehouseStatus
   image?: string
 }
 

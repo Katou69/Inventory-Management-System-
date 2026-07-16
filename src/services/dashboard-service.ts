@@ -123,7 +123,7 @@ export async function createWarehouse(input: CreateWarehouseInput): Promise<Ware
       lastInspection: new Date().toLocaleDateString("en-GB").replace(/\//g, "-"),
       warehouseId: `WH-${String(nextId).padStart(3, "0")}`,
       location: input.location,
-      manager: input.manager,
+      manager: input.manager ?? "Unassigned",
       capacityUsed: 0,
       capacityTotal: input.capacityTotal,
     }
