@@ -15,7 +15,12 @@ import type { UserType } from "@/types/user"
  * just a guard for a cookie that exists but no longer resolves to a user.
  */
 export async function requireUser(): Promise<UserType> {
-  const user = await getCurrentUser().catch(() => null)
+  // Only a real 401 means "not logged in" -- getCurrentUser() already maps that
+  // to null. Anything else (404, ECONNREFUSED, timeout) is the backend being
+  // wrong, not the user being logged out: let it throw so it surfaces as an
+  // error instead of a silent redirect to /login. Swallowing everything here
+  // once turned a stray dev server on port 8000 into an unexplained login loop.
+  const user = await getCurrentUser()
   if (!user) redirect("/login")
   return user
 }
