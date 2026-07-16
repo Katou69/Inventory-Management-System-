@@ -125,7 +125,7 @@ export async function createWarehouse(input: CreateWarehouseInput): Promise<Ware
       location: input.location,
       manager: input.manager ?? "Unassigned",
       capacityUsed: 0,
-      capacityTotal: input.capacityTotal,
+      capacityTotal: 0, // brand new: no zones/shelves yet
     }
   }
   return apiFetch<Warehouse>("/warehouses", {

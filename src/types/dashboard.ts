@@ -187,7 +187,6 @@ export interface CreateWarehouseInput {
   manager?: string
   /** Optional at creation time — can be added once the site has a line. */
   phone?: string
-  capacityTotal: number
   /** Defaults to "Under Maintenance" (not yet operational) when omitted. */
   status?: WarehouseStatus
   image?: string

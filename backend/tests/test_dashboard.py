@@ -17,7 +17,7 @@ from app.warehouses.models import Warehouse
 
 def _setup(db):
     now = datetime.now(timezone.utc)
-    wh = Warehouse(id=1, name="Test WH", code="WH-001", capacity_total=1000)
+    wh = Warehouse(id=1, name="Test WH", code="WH-001")
     db.add(wh)
 
     electronics = Category(name="Electronics")
@@ -111,7 +111,7 @@ def test_inventory_statistics_stock_value_includes_opening_balance(db_session):
     OUTFLOW inside it — the fixture's all-inbound movements never trip it.
     """
     now = datetime.now(timezone.utc)
-    wh = Warehouse(id=1, name="Test WH", code="WH-001", capacity_total=1000)
+    wh = Warehouse(id=1, name="Test WH", code="WH-001")
     db_session.add(wh)
     widget = Product(sku="SKU-1", name="Widget", unit_price=Decimal("10.00"),
                      unit_cost=Decimal("4.00"), reorder_level=10)
@@ -148,7 +148,7 @@ def test_inventory_statistics_does_not_merge_same_month_across_years(db_session)
     sortable "%Y-%m" and only *label* with "%b".
     """
     now = datetime.now(timezone.utc)
-    db_session.add(Warehouse(id=1, name="Test WH", code="WH-001", capacity_total=1000))
+    db_session.add(Warehouse(id=1, name="Test WH", code="WH-001"))
     widget = Product(sku="SKU-1", name="Widget", unit_price=Decimal("10.00"),
                      unit_cost=Decimal("4.00"), reorder_level=10)
     db_session.add(widget)
@@ -210,10 +210,11 @@ def test_create_warehouse_derives_code_from_id(db_session):
 
     created = service.create_warehouse(
         db_session,
-        CreateWarehouseIn(name="North", location="Bago", manager="Aye", capacityTotal=900),
+        CreateWarehouseIn(name="North", location="Bago", manager="Aye"),
     )
     assert created["warehouseId"] == f"WH-{created['id']:03d}"
     assert created["capacityUsed"] == 0  # no movements yet
+    assert created["capacityTotal"] == 0  # no zones/shelves yet
 
 
 def test_warehouse_detail_stats_cover_the_window_they_claim(db_session):

@@ -1,6 +1,8 @@
 import random
 from datetime import date, datetime, timedelta, timezone
 
+from sqlalchemy import text
+
 from app.activity.models import ActivityEvent
 from app.appsettings.models import AppSetting
 from app.auth.jwt import hash_password
@@ -35,13 +37,13 @@ DEV_USERS = [
 
 DEV_WAREHOUSES = [
     {"id": 1, "name": "Main Warehouse", "code": "WH-001", "location": "Yangon, MM",
-     "manager": "Morgan Lee", "capacity_total": 5000, "phone": "+95 9 111 2222",
+     "manager": "Morgan Lee", "phone": "+95 9 111 2222",
      "email": "main@grandroyal.com"},
     {"id": 2, "name": "North Depot", "code": "WH-002", "location": "Mandalay, MM",
-     "manager": "Aye Chan", "capacity_total": 3000, "phone": "+95 9 333 4444",
+     "manager": "Aye Chan", "phone": "+95 9 333 4444",
      "email": "north@grandroyal.com"},
     {"id": 3, "name": "South Hub", "code": "WH-003", "location": "Bago, MM",
-     "manager": "Kyaw Zin", "capacity_total": 2000, "phone": "+95 9 555 6666",
+     "manager": "Kyaw Zin", "phone": "+95 9 555 6666",
      "email": "south@grandroyal.com"},
 ]
 
@@ -385,6 +387,15 @@ def seed() -> None:
                 )
             )
         db.flush()
+
+        # DEV_WAREHOUSES inserts explicit ids, which never advances the
+        # warehouses_id_seq — the next ORM insert then collides on the PK.
+        db.execute(
+            text(
+                "SELECT setval(pg_get_serial_sequence('warehouses', 'id'), "
+                "(SELECT COALESCE(MAX(id), 1) FROM warehouses))"
+            )
+        )
 
         # Keyed by (warehouse_id, code): codes are only unique within a warehouse,
         # and every warehouse now has a floor plan.

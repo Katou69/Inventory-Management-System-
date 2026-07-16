@@ -12,7 +12,6 @@ export const createWarehouseSchema = z.object({
   location: z.string().trim().min(1, "Location is required"),
   manager: z.string(),
   phone,
-  capacityTotal: z.number().int().positive("Enter a valid number"),
   status: warehouseStatus,
   image: z.string().nullable(),
 })

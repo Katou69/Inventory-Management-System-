@@ -21,6 +21,7 @@ from app.items.models import Category, Product, StockMovement, Supplier
 from app.orders.models import Order
 from app.users.models import User
 from app.warehouses.models import Warehouse
+from app.zones.models import ZoneSection
 # --------------------------------------------------------------------------
 # Shared: on-hand quantity + stock value (used by nearly every endpoint)
 # --------------------------------------------------------------------------
@@ -45,6 +46,17 @@ def on_hand_by_warehouse(db: Session) -> dict[int, int]:
         .all()
     )
     return {wid: int(qty) for wid, qty in rows}
+
+
+def capacity_by_warehouse(db: Session) -> dict[int, int]:
+    """warehouse_id -> total shelf capacity. Powers the capacity bars."""
+    rows = (
+        db.query(ZoneSection.warehouse_id, func.coalesce(func.sum(ZoneSection.capacity), 0))
+        .filter(ZoneSection.kind == "shelf")
+        .group_by(ZoneSection.warehouse_id)
+        .all()
+    )
+    return {wid: int(cap) for wid, cap in rows}
 
 
 def stock_value(db: Session, warehouse_id: int | None = None) -> Decimal:
@@ -182,6 +194,7 @@ def get_activities(db: Session):
 def get_warehouses(db: Session):
     warehouse_list = db.query(Warehouse).order_by(Warehouse.name).all()
     used_capacity_list = on_hand_by_warehouse(db=db)
+    total_capacity_list = capacity_by_warehouse(db=db)
     result = []
     for warehouse in warehouse_list:
         result.append(
@@ -194,7 +207,7 @@ def get_warehouses(db: Session):
                 "location": warehouse.location,
                 "manager": warehouse.manager,
                 "capacityUsed" : used_capacity_list.get(warehouse.id,0),
-                "capacityTotal": warehouse.capacity_total
+                "capacityTotal": total_capacity_list.get(warehouse.id, 0)
             }
         )
 
@@ -371,6 +384,7 @@ def get_top_products(db: Session, period: str = "This month", limit: int = 6) ->
 # --------------------------------------------------------------------------
 
 _STATUS_LABEL = {"active": "Active", "maintenance": "Under Maintenance", "closed": "Closed"}
+_STATUS_VALUE = {label: value for value, label in _STATUS_LABEL.items()}
 _MOVEMENT_LABEL = {
     "inbound": "Inbound",
     "outbound": "Outbound",
@@ -486,7 +500,7 @@ def get_warehouse_detail(db: Session, warehouse) -> dict:
         "location": warehouse.location,
         "manager": warehouse.manager,
         "capacityUsed": sum(on_hand.values()),
-        "capacityTotal": warehouse.capacity_total,
+        "capacityTotal": capacity_by_warehouse(db).get(wid, 0),
         "status": _STATUS_LABEL.get(warehouse.status, "Active"),
         "phone": warehouse.phone,
         "email": warehouse.email,
@@ -514,7 +528,7 @@ def create_warehouse(db: Session, data, actor: User | None = None) -> dict:
         code="",  # needs the PK, so it is set after the flush below
         location=data.location,
         manager=data.manager,
-        capacity_total=data.capacityTotal,
+        status=_STATUS_VALUE.get(data.status, "active"),
         image=data.image or DEFAULT_AVATAR,
         last_inspection=datetime.now(timezone.utc).date(),
         created_by=actor.id if actor else None,
@@ -542,7 +556,7 @@ def create_warehouse(db: Session, data, actor: User | None = None) -> dict:
         "location": warehouse.location,
         "manager": warehouse.manager,
         "capacityUsed": 0,  # brand new: no movements yet
-        "capacityTotal": warehouse.capacity_total,
+        "capacityTotal": 0,  # brand new: no zones/shelves yet
     }
 
 

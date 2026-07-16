@@ -22,8 +22,8 @@ from app.zones.models import LayoutRequest, ZoneSection
 def setup(db_session):
     """Two warehouses; an admin (global), plus a manager/staff pinned to warehouse 1."""
     db_session.add_all([
-        Warehouse(id=1, name="Main", code="WH-001", capacity_total=1000),
-        Warehouse(id=2, name="North", code="WH-002", capacity_total=500),
+        Warehouse(id=1, name="Main", code="WH-001"),
+        Warehouse(id=2, name="North", code="WH-002"),
     ])
     db_session.flush()
 

@@ -8,16 +8,20 @@ export default function Modal({
   title: string; subtitle?: string; onClose: () => void; size?: "md" | "lg"; children: React.ReactNode;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   // Esc-to-close, focus-into-panel on open, focus-restore-to-trigger on close,
   // and body scroll-lock. Applies to every modal that uses this shell.
+  // Mount-only: onClose is re-created every render by callers, so depending on
+  // it here re-stole focus to the first focusable element on every keystroke.
   useEffect(() => {
     const prevFocus = document.activeElement as HTMLElement | null;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onCloseRef.current();
     }
     document.addEventListener("keydown", onKeyDown);
 
@@ -32,7 +36,7 @@ export default function Modal({
       document.body.style.overflow = prevOverflow;
       prevFocus?.focus();
     };
-  }, [onClose]);
+  }, []);
 
   return (
     <div

@@ -108,8 +108,8 @@ class WarehouseDetailOut(WarehouseOut):
 class CreateWarehouseIn(BaseModel):
     name: str
     location: str
-    manager: str
-    capacityTotal: int
+    manager: str = ""
+    status: WarehouseStatus = "Active"
     image: str | None = None
 
 

@@ -35,8 +35,8 @@ function CapacityBar({ used, total }: { used: number; total: number }) {
   )
 }
 
-const emptyForm = { name: "", location: "", manager: "", phone: "", capacityTotal: "", status: "Under Maintenance" as WarehouseStatus }
-const TABS = ["Details", "Contact", "Capacity"] as const
+const emptyForm = { name: "", location: "", manager: "", phone: "", status: "Under Maintenance" as WarehouseStatus }
+const TABS = ["Details", "Contact"] as const
 
 export default function WarehouseTable({ initialWarehouses }: { initialWarehouses: Warehouse[] }) {
   const [warehouses, setWarehouses] = useState<Warehouse[]>(initialWarehouses)
@@ -49,11 +49,10 @@ export default function WarehouseTable({ initialWarehouses }: { initialWarehouse
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const [confirmingClose, setConfirmingClose] = useState(false)
 
-  const isDirty = !!(form.name || form.location || form.manager || form.phone || form.capacityTotal || imagePreview || form.status !== emptyForm.status)
+  const isDirty = !!(form.name || form.location || form.manager || form.phone || imagePreview || form.status !== emptyForm.status)
 
   const parseResult = createWarehouseSchema.safeParse({
     ...form,
-    capacityTotal: Number(form.capacityTotal) || 0,
     phone: form.phone || "",
     image: imagePreview,
   })
@@ -62,7 +61,6 @@ export default function WarehouseTable({ initialWarehouses }: { initialWarehouse
   const nameError = touched.name ? (fieldErrors.name?.[0] ?? "") : ""
   const locationError = touched.location ? (fieldErrors.location?.[0] ?? "") : ""
   const phoneError = touched.phone ? (fieldErrors.phone?.[0] ?? "") : ""
-  const capacityError = touched.capacityTotal ? (fieldErrors.capacityTotal?.[0] ?? "") : ""
 
   const canSubmit = parseResult.success
 
@@ -89,11 +87,10 @@ export default function WarehouseTable({ initialWarehouses }: { initialWarehouse
   }
 
   async function handleAdd() {
-    setTouched({ name: true, location: true, capacityTotal: true, phone: true })
+    setTouched({ name: true, location: true, phone: true })
     if (!canSubmit || submitting) {
       if (nameError || locationError) setTab(0)
       else if (phoneError) setTab(1)
-      else if (capacityError) setTab(2)
       return
     }
     setSubmitting(true)
@@ -104,7 +101,6 @@ export default function WarehouseTable({ initialWarehouses }: { initialWarehouse
         location: form.location.trim(),
         manager: form.manager.trim() || undefined,
         phone: form.phone.trim() || undefined,
-        capacityTotal: Number(form.capacityTotal),
         status: form.status,
         image: imagePreview ?? undefined,
       })
@@ -217,7 +213,7 @@ export default function WarehouseTable({ initialWarehouses }: { initialWarehouse
                   tabs={TABS}
                   active={tab}
                   onChange={setTab}
-                  errorTabs={{ 0: !!(nameError || locationError), 1: !!phoneError, 2: !!capacityError }}
+                  errorTabs={{ 0: !!(nameError || locationError), 1: !!phoneError }}
                 />
 
                 {tab === 0 && (
@@ -246,15 +242,6 @@ export default function WarehouseTable({ initialWarehouses }: { initialWarehouse
                     <FormField label="Phone" error={phoneError}>
                       <input className="modal-input" value={form.phone} onBlur={() => setTouched((t) => ({ ...t, phone: true }))} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="e.g. +95 9 111 2222 (optional)" />
                     </FormField>
-                  </div>
-                )}
-
-                {tab === 2 && (
-                  <div className="space-y-4">
-                    <FormField label="Total capacity (units)" required error={capacityError}>
-                      <input className="modal-input" inputMode="numeric" value={form.capacityTotal} onBlur={() => setTouched((t) => ({ ...t, capacityTotal: true }))} onChange={(e) => setForm((f) => ({ ...f, capacityTotal: e.target.value.replace(/[^0-9]/g, "") }))} placeholder="e.g. 5000" />
-                    </FormField>
-                    <p className="text-xs text-muted-foreground">Zones can be laid out on the warehouse's map once it's created.</p>
                   </div>
                 )}
 
