@@ -272,3 +272,108 @@ def test_layout_events_use_a_kind_the_notification_schema_accepts(client, setup,
     )
     event = db_session.query(ActivityEvent).order_by(ActivityEvent.id.desc()).first()
     assert event.kind in {"stock", "order", "alert", "user"}
+
+
+# ---------------------------------------------------------------------------
+# Floors -- a real table. Floors used to be client-only React state, so a
+# multi-floor layout collapsed onto one floor on every reload.
+# ---------------------------------------------------------------------------
+
+
+def _floor(client, warehouse_id=1, level=2, name="Mezzanine"):
+    return client.post(f"/warehouses/{warehouse_id}/floors", json={"level": level, "name": name}).json()
+
+
+def test_floor_assignment_persists_through_create_and_unrelated_updates(client, setup, db_session):
+    as_user(setup["admin"])
+    floor = _floor(client)
+    client.post(
+        "/warehouses/1/layout-requests/direct",
+        json={"item": {"actionType": "create", "proposedData": {
+            "kind": "shelf", "floorId": floor["id"], "code": "UP", "name": "Upstairs Rack",
+            "x": 0, "y": 0, "width": 10, "height": 10, "capacity": 50,
+        }}},
+    )
+    db_session.expire_all()
+    section = db_session.query(ZoneSection).filter_by(code="UP").one()
+    assert section.floor_id == floor["id"]  # not silently dropped
+
+    # A move must not knock the box off its floor.
+    client.post("/warehouses/1/layout-requests/direct", json={"item": _update(section.id, x=99)})
+    db_session.expire_all()
+    assert db_session.get(ZoneSection, section.id).floor_id == floor["id"]
+
+
+def test_a_section_cannot_be_parked_on_another_warehouses_floor(client, setup, db_session):
+    """The floor id is caller-supplied -- it must be scoped like everything else.
+
+    A proposal only records intent, so it is accepted; the check belongs where
+    the change is actually applied (direct edit, and approve).
+    """
+    as_user(setup["admin"])
+    foreign = _floor(client, warehouse_id=2, level=1, name="North Ground")
+
+    # Admin direct edit is rejected outright.
+    assert client.post(
+        "/warehouses/1/layout-requests/direct",
+        json={"item": _update(10, floorId=foreign["id"])},
+    ).status_code == 400
+
+    # ...and a manager cannot smuggle it through the proposal flow either.
+    as_user(setup["manager"])
+    rid = client.post(
+        "/warehouses/1/layout-requests",
+        json={"items": [_update(10, floorId=foreign["id"])], "requestNote": "sneaky"},
+    ).json()["id"]
+    as_user(setup["admin"])
+    assert client.post(f"/layout-requests/{rid}/approve").status_code == 400
+
+    db_session.expire_all()
+    assert db_session.get(ZoneSection, 10).floor_id is None  # never landed
+
+
+def test_deleting_a_floor_keeps_its_boxes(client, setup, db_session):
+    """Losing a floor label is recoverable; losing the layout on it is not."""
+    as_user(setup["admin"])
+    floor = _floor(client)
+    client.post("/warehouses/1/layout-requests/direct", json={"item": _update(10, floorId=floor["id"])})
+
+    assert client.delete(f"/floors/{floor['id']}").status_code == 204
+
+    db_session.expire_all()
+    section = db_session.get(ZoneSection, 10)
+    assert section is not None  # box survived
+    assert section.floor_id is None  # merely unassigned
+
+
+def test_floor_level_is_unique_per_warehouse(client, setup):
+    as_user(setup["admin"])
+    _floor(client, level=2)
+    assert client.post("/warehouses/1/floors", json={"level": 2, "name": "Dupe"}).status_code == 409
+    # ...but the same level in a different warehouse is fine.
+    assert client.post("/warehouses/2/floors", json={"level": 2, "name": "North 2"}).status_code == 201
+
+
+def test_staff_can_read_floors_but_not_change_them(client, setup):
+    as_user(setup["admin"])
+    floor = _floor(client)
+    as_user(setup["staff"])
+    assert client.get("/warehouses/1/floors").status_code == 200  # the map needs the tabs
+    assert client.post("/warehouses/1/floors", json={"level": 9, "name": "Nope"}).status_code == 403
+    assert client.patch(f"/floors/{floor['id']}", json={"name": "Nope"}).status_code == 403
+    assert client.delete(f"/floors/{floor['id']}").status_code == 403
+
+
+def test_manager_cannot_touch_another_warehouses_floors(client, setup):
+    as_user(setup["admin"])
+    foreign = _floor(client, warehouse_id=2, level=1, name="North Ground")
+    as_user(setup["manager"])  # pinned to warehouse 1
+    assert client.patch(f"/floors/{foreign['id']}", json={"name": "Mine now"}).status_code == 403
+    assert client.delete(f"/floors/{foreign['id']}").status_code == 403
+
+
+def test_renaming_a_floor_persists(client, setup):
+    as_user(setup["manager"])
+    floor = _floor(client)
+    assert client.patch(f"/floors/{floor['id']}", json={"name": "Cold Level"}).json()["name"] == "Cold Level"
+    assert client.get("/warehouses/1/floors").json()[-1]["name"] == "Cold Level"

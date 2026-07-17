@@ -1,17 +1,36 @@
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 SectionKind = Literal["shelf", "zone"]
 ZoneChangeAction = Literal["create", "update", "delete"]
 ZoneChangeStatus = Literal["pending", "approved", "rejected"]
 
 
+class FloorOut(BaseModel):
+    id: int
+    warehouseId: int = Field(validation_alias="warehouse_id")
+    level: int
+    name: str
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
+class FloorIn(BaseModel):
+    level: int
+    name: str
+
+
+class FloorUpdate(BaseModel):
+    name: str
+
+
 class ZoneSectionOut(BaseModel):
     id: int
     warehouseId: int = Field(validation_alias="warehouse_id")
     kind: SectionKind
+    floorId: Optional[int] = Field(default=None, validation_alias="floor_id")
     code: str
     name: str
     x: float
@@ -34,6 +53,9 @@ class ZoneStockEntryOut(BaseModel):
 
 class ZoneFields(BaseModel):
     kind: Optional[SectionKind] = None
+    # AliasChoices, not validation_alias: a bare validation_alias REPLACES the
+    # field name, so the client's own `floorId` would be dropped to None.
+    floorId: Optional[int] = Field(default=None, validation_alias=AliasChoices("floorId", "floor_id"))
     code: Optional[str] = None
     name: Optional[str] = None
     x: Optional[float] = None

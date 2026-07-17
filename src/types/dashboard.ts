@@ -112,10 +112,20 @@ export type ViewerRole = "admin" | "manager" | "staff"
 export type SectionKind = "shelf" | "zone"
 
 /** Live layout row — the "true" state, and (for shelves) the storage unit. */
+/** A physical floor of a warehouse. `level` orders the tabs; `name` is free text. */
+export interface Floor {
+  id: number
+  warehouseId: number
+  level: number
+  name: string
+}
+
 export interface ZoneSection {
   id: number
   warehouseId: number
   kind: SectionKind
+  /** The floor this section sits on. null = unassigned (its floor was deleted). */
+  floorId: number | null
   /** Short label (e.g. "A", "COLD"). */
   code: string
   /** Human-readable name (e.g. "Receiving", "Bulk Storage 1"). */
@@ -140,7 +150,7 @@ export type ZoneChangeAction = "create" | "update" | "delete"
 export type ZoneChangeStatus = "pending" | "approved" | "rejected"
 
 /** Editable zone fields carried in proposed/previous snapshots. */
-export type ZoneFields = Partial<Pick<ZoneSection, "kind" | "code" | "name" | "x" | "y" | "width" | "height" | "capacity">>
+export type ZoneFields = Partial<Pick<ZoneSection, "kind" | "floorId" | "code" | "name" | "x" | "y" | "width" | "height" | "capacity">>
 
 /**
  * One change inside a proposal batch. A move/resize/field-edit is an "update",
