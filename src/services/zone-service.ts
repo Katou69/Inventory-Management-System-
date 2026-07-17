@@ -14,6 +14,7 @@
 import { config } from "@/lib/config"
 import { apiFetch } from "@/lib/api-client"
 import type {
+  Floor,
   ZoneSection,
   ZoneStockEntry,
   ZoneChangeRequest,
@@ -25,9 +26,18 @@ import type {
 // Mock store (module-level, survives across calls within a browser session)
 // ---------------------------------------------------------------------------
 
+// One ground floor per seeded warehouse. Mock floor ids are `warehouseId * 10`
+// so they stay stable and distinct from the auto-increment ids below.
+const seedFloors: Floor[] = [
+  { id: 10, warehouseId: 1, level: 1, name: "Floor 1" },
+  { id: 30, warehouseId: 3, level: 1, name: "Floor 1" },
+]
+
 // Shelf blocks are square by default (equal width/height); zone boxes are
 // free-form grouping containers rendered behind the shelves.
-const seedZones: ZoneSection[] = [
+// Seeds omit `floorId` — they're all on their warehouse's ground floor,
+// stamped in below.
+const seedZones: Omit<ZoneSection, "floorId">[] = [
   // Warehouse 1 — floor plan (see grgi_mock_layout_plan.md): Receiving → Storage
   // → Packing → Shipping flow, plus an Office. Grouping zone boxes render behind
   // the shelf blocks that sit spatially inside them.
@@ -93,12 +103,12 @@ const seedStock: ZoneStockEntry[] = [
 
 // Default zones for any warehouse without an explicit seed, so every detail
 // page has something to show.
-function defaultZones(warehouseId: number): ZoneSection[] {
+function defaultZones(warehouseId: number, floorId: number): ZoneSection[] {
   const base = warehouseId * 100
   return [
-    { id: base + 1, warehouseId, kind: "shelf", code: "A", name: "Bulk Storage 1", x: 40,  y: 40,  width: 150, height: 150, capacity: 300 },
-    { id: base + 2, warehouseId, kind: "shelf", code: "B", name: "Bulk Storage 2", x: 240, y: 40,  width: 150, height: 150, capacity: 300 },
-    { id: base + 3, warehouseId, kind: "shelf", code: "C", name: "Bulk Storage 3", x: 40,  y: 240, width: 150, height: 150, capacity: 200 },
+    { id: base + 1, warehouseId, floorId, kind: "shelf", code: "A", name: "Bulk Storage 1", x: 40,  y: 40,  width: 150, height: 150, capacity: 300 },
+    { id: base + 2, warehouseId, floorId, kind: "shelf", code: "B", name: "Bulk Storage 2", x: 240, y: 40,  width: 150, height: 150, capacity: 300 },
+    { id: base + 3, warehouseId, floorId, kind: "shelf", code: "C", name: "Bulk Storage 3", x: 40,  y: 240, width: 150, height: 150, capacity: 200 },
   ]
 }
 
@@ -133,17 +143,24 @@ const seedRequests: ZoneChangeRequest[] = [
 ]
 
 const store = {
-  zones: [...seedZones],
+  floors: [...seedFloors],
+  zones: seedZones.map((z) => ({
+    ...z,
+    floorId: seedFloors.find((f) => f.warehouseId === z.warehouseId)?.id ?? null,
+  })),
   stock: [...seedStock],
   requests: [...seedRequests],
   seededWarehouses: new Set(seedZones.map((z) => z.warehouseId)),
   nextZoneId: 1000,
+  nextFloorId: 1000,
   nextRequestId: seedRequests.length + 1,
 }
 
 function ensureWarehouse(warehouseId: number) {
   if (!store.seededWarehouses.has(warehouseId)) {
-    store.zones.push(...defaultZones(warehouseId))
+    const floor: Floor = { id: warehouseId * 10, warehouseId, level: 1, name: "Floor 1" }
+    store.floors.push(floor)
+    store.zones.push(...defaultZones(warehouseId, floor.id))
     store.seededWarehouses.add(warehouseId)
   }
 }
@@ -157,6 +174,7 @@ function applyItem(warehouseId: number, item: ZoneChangeItem) {
     store.zones.push({
       id,
       warehouseId,
+      floorId: item.proposedData?.floorId ?? null,
       kind: item.proposedData?.kind ?? "shelf",
       code: item.proposedData?.code ?? "NEW",
       name: item.proposedData?.name ?? "",
@@ -185,10 +203,23 @@ function applyRequest(req: ZoneChangeRequest) {
 // ---------------------------------------------------------------------------
 
 export function zoneOccupancy(zone: ZoneSection, stock: ZoneStockEntry[]): ZoneOccupancy {
-  const total = stock.filter((s) => s.sectionId === zone.id).reduce((sum, s) => sum + s.quantity, 0)
+  return occupancyOf(zoneStockTotal(zone.id, stock), zone.capacity)
+}
+
+/** Occupancy tier for a total already in hand. Order matters: an empty zero-capacity
+ *  box is "empty", not "full". */
+export function occupancyOf(total: number, capacity: number): ZoneOccupancy {
   if (total <= 0) return "empty"
-  if (total >= zone.capacity) return "full"
+  if (total >= capacity) return "full"
   return "partial"
+}
+
+/** sectionId -> total units. One pass, so callers index instead of re-filtering the
+ *  whole stock list per zone (that was zones x stock work on every render). */
+export function stockTotals(stock: ZoneStockEntry[]): Map<number, number> {
+  const totals = new Map<number, number>()
+  for (const s of stock) totals.set(s.sectionId, (totals.get(s.sectionId) ?? 0) + s.quantity)
+  return totals
 }
 
 export function zoneStockTotal(zoneId: number, stock: ZoneStockEntry[]): number {
@@ -198,6 +229,53 @@ export function zoneStockTotal(zoneId: number, stock: ZoneStockEntry[]): number 
 // ---------------------------------------------------------------------------
 // Reads
 // ---------------------------------------------------------------------------
+
+export async function getFloors(warehouseId: number): Promise<Floor[]> {
+  if (config.useMock) {
+    ensureWarehouse(warehouseId)
+    return clone(store.floors.filter((f) => f.warehouseId === warehouseId).sort((a, b) => a.level - b.level))
+  }
+  return apiFetch<Floor[]>(`/warehouses/${warehouseId}/floors`)
+}
+
+export async function createFloor(warehouseId: number, level: number, name: string): Promise<Floor> {
+  if (config.useMock) {
+    if (store.floors.some((f) => f.warehouseId === warehouseId && f.level === level)) {
+      throw new Error(`Floor level ${level} already exists in this warehouse.`)
+    }
+    const floor: Floor = { id: store.nextFloorId++, warehouseId, level, name: name.trim() || `Floor ${level}` }
+    store.floors.push(floor)
+    return clone(floor)
+  }
+  return apiFetch<Floor>(`/warehouses/${warehouseId}/floors`, {
+    method: "POST",
+    body: JSON.stringify({ level, name }),
+  })
+}
+
+export async function renameFloor(floorId: number, name: string): Promise<Floor> {
+  if (!name.trim()) throw new Error("A floor name is required.")
+  if (config.useMock) {
+    const floor = store.floors.find((f) => f.id === floorId)
+    if (!floor) throw new Error("Floor not found.")
+    floor.name = name.trim()
+    return clone(floor)
+  }
+  return apiFetch<Floor>(`/floors/${floorId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ name: name.trim() }),
+  })
+}
+
+/** Deletes the floor; its sections are unassigned (floorId → null), not deleted. */
+export async function deleteFloor(floorId: number): Promise<void> {
+  if (config.useMock) {
+    store.floors = store.floors.filter((f) => f.id !== floorId)
+    for (const z of store.zones) if (z.floorId === floorId) z.floorId = null
+    return
+  }
+  await apiFetch<void>(`/floors/${floorId}`, { method: "DELETE" })
+}
 
 export async function getZones(warehouseId: number): Promise<ZoneSection[]> {
   if (config.useMock) {
