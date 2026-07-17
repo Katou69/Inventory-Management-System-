@@ -9,12 +9,16 @@ import * as authService from "@/services/auth-service"
 
 interface AuthContextValue {
   user: UserType | null
-  /** Sign in with credentials. Live mode validates against the backend; throws ApiError on failure. */
-  signIn: (email: string, password: string) => Promise<void>
+  /**
+   * Sign in with credentials. Live mode validates against the backend; throws ApiError on failure.
+   * Pass `to` to navigate on success — it must happen inside the same transition
+   * as the identity change, so callers must not router.push() themselves.
+   */
+  signIn: (email: string, password: string, to?: string) => Promise<void>
   /** Register a new account. Live mode always gets role "staff"; throws ApiError on failure (e.g. 409 duplicate email). */
   signUp: (name: string, email: string, password: string, warehouseId: number) => Promise<void>
-  /** Mock-only quick demo login (no-op affordance when live). */
-  signInDemo: (role: Role) => void
+  /** Mock-only quick demo login (no-op affordance when live). `to` as in signIn. */
+  signInDemo: (role: Role, to?: string) => void
   logout: () => void
   theme: Theme
   setTheme: (t: Theme) => void
@@ -129,16 +133,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * refresh is still in flight, and the incoming user sees a split second of the
    * outgoing user's dashboard.
    */
-  const swapIdentity = (next: UserType | null) => {
+  const swapIdentity = (next: UserType | null, to?: string) => {
     startSettling(() => {
       setUser(next)
       persistMockUser(next)
+      // Navigate inside the same transition when the caller wants to land
+      // somewhere: a router.push() fired separately interrupts this transition
+      // and discards the setUser above, leaving the app logged out.
+      if (to) router.push(to)
       router.refresh()
     })
   }
 
-  const signIn: AuthContextValue["signIn"] = async (email, password) => {
-    swapIdentity(await authService.login(email, password))
+  const signIn: AuthContextValue["signIn"] = async (email, password, to) => {
+    swapIdentity(await authService.login(email, password), to)
   }
 
   const signUp: AuthContextValue["signUp"] = async (name, email, password, warehouseId) => {
@@ -146,8 +154,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Don't log in automatically - user needs admin approval first.
   }
 
-  const signInDemo = (role: Role) => {
-    swapIdentity(authService.demoLogin(role))
+  const signInDemo = (role: Role, to?: string) => {
+    swapIdentity(authService.demoLogin(role), to)
   }
 
   const logout = () => {
