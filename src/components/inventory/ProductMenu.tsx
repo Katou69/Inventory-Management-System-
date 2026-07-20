@@ -1,10 +1,12 @@
+// Save as: src/components/inventory/ProductMenu.tsx
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import { MoreHorizontal } from "lucide-react";
 
 interface ProductMenuProps {
-  onEdit: () => void;
+  // Omit onEdit entirely to hide "Edit Product" (used for staff).
+  onEdit?: () => void;
   onHistory: () => void;
 }
 
@@ -50,12 +52,14 @@ export default function ProductMenu({
       {open && (
         <div className="absolute right-0 mt-2 w-44 rounded-lg border border-slate-200 bg-white shadow-lg z-50 overflow-hidden">
 
-          <button
-            onClick={() => handleAction(onEdit)}
-            className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-100"
-          >
-            Edit Product
-          </button>
+          {onEdit && (
+            <button
+              onClick={() => handleAction(onEdit)}
+              className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-100"
+            >
+              Edit Product
+            </button>
+          )}
 
           <button
             onClick={() => handleAction(onHistory)}

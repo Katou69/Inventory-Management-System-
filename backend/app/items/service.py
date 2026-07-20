@@ -1,4 +1,3 @@
-# Save as: backend/app/items/service.py
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -91,13 +90,52 @@ def create_movement_task(
     if quantity <= 0:
         raise ValueError("Quantity must be positive")
 
-    available = (
+    on_shelf = (
         db.query(ZoneStockEntry.quantity)
         .filter(ZoneStockEntry.section_id == from_section_id, ZoneStockEntry.product_id == product_id)
         .scalar()
-    )
-    if not available or available < quantity:
-        raise ValueError("Not enough stock on the selected shelf")
+    ) or 0
+
+    # Stock already claimed by OTHER pending tasks pulling from this same
+    # shelf. Without this, two tasks can each pass validation against the
+    # same untouched balance — since only *completing* a task moves stock —
+    # and only go negative once both get completed later.
+    already_reserved_out = (
+        db.query(func.coalesce(func.sum(MovementTask.quantity), 0))
+        .filter(
+            MovementTask.from_section_id == from_section_id,
+            MovementTask.product_id == product_id,
+            MovementTask.status == "pending",
+        )
+        .scalar()
+    ) or 0
+
+    free_to_reserve = on_shelf - already_reserved_out
+    if free_to_reserve < quantity:
+        raise ValueError(
+            f"Not enough unreserved stock on the selected shelf "
+            f"({free_to_reserve} available, {quantity} requested)"
+        )
+
+    # Same idea for the destination: don't let a shelf get overbooked past
+    # its capacity by several pending tasks that haven't landed yet.
+    to_capacity = db.query(ZoneSection.capacity).filter(ZoneSection.id == to_section_id).scalar()
+    to_occupied = (
+        db.query(func.coalesce(func.sum(ZoneStockEntry.quantity), 0))
+        .filter(ZoneStockEntry.section_id == to_section_id)
+        .scalar()
+    ) or 0
+    already_reserved_in = (
+        db.query(func.coalesce(func.sum(MovementTask.quantity), 0))
+        .filter(MovementTask.to_section_id == to_section_id, MovementTask.status == "pending")
+        .scalar()
+    ) or 0
+    free_space = (to_capacity or 0) - to_occupied - already_reserved_in
+    if free_space < quantity:
+        raise ValueError(
+            f"Not enough free space on the destination shelf "
+            f"({free_space} free, {quantity} requested)"
+        )
 
     task = MovementTask(
         product_id=product_id,

@@ -1,19 +1,52 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import { InventoryItem } from "@/types/inventory";
 import Modal from "@/components/ui/Modal";
+import { getProductHistory, HistoryEntry } from "@/services/inventory-service";
 
 interface Props {
   open: boolean;
   product: InventoryItem | null;
+  warehouseId: number;
   onClose: () => void;
 }
+
+const RANGE_OPTIONS: { label: string; value?: "7d" | "30d" }[] = [
+  { label: "All Time", value: undefined },
+  { label: "Last 7 Days", value: "7d" },
+  { label: "Last Month", value: "30d" },
+];
+
+const KIND_LABEL: Record<HistoryEntry["kind"], string> = {
+  inbound: "Stock In",
+  outbound: "Stock Out",
+  transfer_in: "Stock In",
+  transfer_out: "Stock Out",
+  adjustment: "Adjustment",
+};
 
 export default function ViewHistoryModal({
   open,
   product,
+  warehouseId,
   onClose,
 }: Props) {
+
+  const [range, setRange] = useState<"7d" | "30d" | undefined>(undefined);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open || !product) return;
+
+    setLoading(true);
+    getProductHistory(product.id, warehouseId, range)
+      .then(setHistory)
+      .catch(() => setHistory([]))
+      .finally(() => setLoading(false));
+  }, [open, product, warehouseId, range]);
 
   if (!open || !product) return null;
 
@@ -41,19 +74,16 @@ export default function ViewHistoryModal({
               text-sm
               bg-background
             "
+            value={range ?? ""}
+            onChange={(e) =>
+              setRange(e.target.value === "" ? undefined : (e.target.value as "7d" | "30d"))
+            }
           >
-            <option>
-              All Time
-            </option>
-
-            <option>
-              Last 7 Days
-            </option>
-
-            <option>
-              Last Month
-            </option>
-
+            {RANGE_OPTIONS.map((opt) => (
+              <option key={opt.label} value={opt.value ?? ""}>
+                {opt.label}
+              </option>
+            ))}
           </select>
 
 
@@ -64,51 +94,38 @@ export default function ViewHistoryModal({
         {/* History list */}
         <div className="space-y-3">
 
+          {loading && (
+            <p className="text-sm text-muted-foreground">Loading...</p>
+          )}
 
-          <div className="border border-border rounded-lg p-3">
+          {!loading && history.length === 0 && (
+            <p className="text-sm text-muted-foreground">No movement history yet.</p>
+          )}
 
-            <div className="flex justify-between">
+          {history.map((entry) => (
 
-              <span className="font-medium text-sm">
-                Stock In
-              </span>
+            <div key={entry.id} className="border border-border rounded-lg p-3">
 
-              <span className="text-xs text-muted-foreground">
-                2026-06-15
-              </span>
+              <div className="flex justify-between">
 
-            </div>
+                <span className="font-medium text-sm">
+                  {KIND_LABEL[entry.kind]}
+                </span>
 
+                <span className="text-xs text-muted-foreground">
+                  {new Date(entry.occurredAt).toLocaleDateString()}
+                </span>
 
-            <p className="text-sm text-muted-foreground mt-1">
-              +50 units added to warehouse
-            </p>
-
-          </div>
-
+              </div>
 
 
-          <div className="border border-border rounded-lg p-3">
-
-            <div className="flex justify-between">
-
-              <span className="font-medium text-sm">
-                Stock Out
-              </span>
-
-              <span className="text-xs text-muted-foreground">
-                2026-06-10
-              </span>
+              <p className="text-sm text-muted-foreground mt-1">
+                {entry.quantity > 0 ? "+" : ""}{entry.quantity} — {entry.note}
+              </p>
 
             </div>
 
-
-            <p className="text-sm text-muted-foreground mt-1">
-              -10 units removed from warehouse
-            </p>
-
-          </div>
-
+          ))}
 
 
         </div>

@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 import type { MovementTask } from "@/types/inventory-movement";
 
 import MovementCard from "./MovementCard";
 import MovementModal from "./MovementModal";
+import { completeMovementTask } from "@/services/inventory-service";
 
 interface Props {
   tasks: MovementTask[];
@@ -14,13 +16,33 @@ interface Props {
 export default function MovementInbox({
   tasks,
 }: Props) {
+  const router = useRouter();
+
   const [selectedTask, setSelectedTask] =
     useState<MovementTask | null>(null);
 
   const [open, setOpen] = useState(false);
+  const [completing, setCompleting] = useState(false);
+
   const pendingTasks = tasks.filter(
       task => task.status === "pending"
   );
+
+  async function handleComplete() {
+    if (!selectedTask) return;
+
+    setCompleting(true);
+    try {
+      await completeMovementTask(selectedTask.id);
+      router.refresh();
+      setOpen(false);
+      setSelectedTask(null);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setCompleting(false);
+    }
+  }
 
   return (
     <>
@@ -49,7 +71,10 @@ export default function MovementInbox({
 
           ))}
 
-          {tasks.length === 0 && (
+          {/* NOTE: was checking tasks.length === 0 before, which hid this
+              message whenever any tasks existed at all, even if none were
+              pending. Fixed to check pendingTasks. */}
+          {pendingTasks.length === 0 && (
 
             <p className="text-sm text-muted-foreground text-center py-6">
               No pending inventory movement tasks.
@@ -68,12 +93,8 @@ export default function MovementInbox({
           setOpen(false);
           setSelectedTask(null);
         }}
-        onComplete={() => {
-          console.log("Completed:", selectedTask);
-
-          setOpen(false);
-          setSelectedTask(null);
-        }}
+        onComplete={handleComplete}
+        completing={completing}
       />
     </>
   );

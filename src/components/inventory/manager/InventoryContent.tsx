@@ -1,16 +1,21 @@
-import { inventory } from "@/data/inventory-data";
+import { getMovementTasks, getInventory } from "@/services/inventory-service";
 import {
     StatsCards,
     InventoryTable,
     MovementInbox,
-    
 } from "..";
 import CreateMovementModal from "../CreateMovementModal";
-import { getMovementTasks } from "@/services/inventory-service";
 
+type Props = {
+    warehouseId: number;
+};
 
-export default async function AdminInventoryContent() {
-    const tasks = await getMovementTasks();
+export default async function ManagerInventoryContent({ warehouseId }: Props) {
+    const [tasks, inventory] = await Promise.all([
+        getMovementTasks(warehouseId),
+        getInventory(warehouseId),
+    ]);
+
     return (
 
         <div className="flex flex-col gap-[30px]">
@@ -27,11 +32,11 @@ export default async function AdminInventoryContent() {
 
             </div>
 
-            <StatsCards />
-            <CreateMovementModal inventory={inventory} />
+            <StatsCards warehouseId={warehouseId} />
+            <CreateMovementModal inventory={inventory} warehouseId={warehouseId} />
 
             <MovementInbox tasks={tasks} />
-            <InventoryTable />
+            <InventoryTable warehouseId={warehouseId} />
             {/* Can add view history later for all roles*/}
 
         </div>
