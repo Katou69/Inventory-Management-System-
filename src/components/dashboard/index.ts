@@ -9,4 +9,3 @@ export { default as ActivityFeed } from "./ActivityFeed"
 export { default as Header } from "./Header"
 export { default as Sidebar } from "./Sidebar"
 export { default as DashboardLayout } from "./DashboardLayout"
-export { AdminDashboardContent } from "./admin";

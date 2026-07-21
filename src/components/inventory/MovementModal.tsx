@@ -10,6 +10,7 @@ interface Props {
   task: MovementTask | null;
   onClose: () => void;
   onComplete: () => void;
+  completing?: boolean;
 }
 
 export default function MovementModal({
@@ -17,6 +18,7 @@ export default function MovementModal({
   task,
   onClose,
   onComplete,
+  completing,
 }: Props) {
   if (!open || !task) return null;
 
@@ -63,7 +65,8 @@ export default function MovementModal({
       <ModalFooter
         onCancel={onClose}
         onConfirm={onComplete}
-        confirmLabel="Complete Task"
+        confirmLabel={completing ? "Completing..." : "Complete Task"}
+        disabled={completing}
       />
     </Modal>
   );

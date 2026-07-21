@@ -1,47 +1,67 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Modal from "@/components/ui/Modal";
 import ModalFooter from "@/components/ui/ModalFooter";
 
-import { shelves } from "@/data/inventorymovement-data";
+import { getShelvesForProduct, createMovementTask, ShelfOption } from "@/services/inventory-service";
 import { InventoryItem } from "@/types/inventory";
 
 
-interface Props{
-    inventory: InventoryItem[]
+interface Props {
+    inventory: InventoryItem[];
+    warehouseId: number;
 }
 
 export default function CreateMovementModal({
-        inventory
-    }:Props){
+        inventory,
+        warehouseId,
+    }: Props) {
 
+    const router = useRouter();
     const [open, setOpen] = useState(false);
 
     const [productId, setProductId] = useState("");
     const [quantity, setQuantity] = useState(0);
-    const [fromShelf, setFromShelf] = useState("");
-    const [toShelf, setToShelf] = useState("");
+    const [fromShelfId, setFromShelfId] = useState<number | "">("");
+    const [toShelfId, setToShelfId] = useState<number | "">("");
     const [reason, setReason] = useState("");
 
+    const [shelfOptions, setShelfOptions] = useState<ShelfOption[]>([]);
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const selectedProduct = inventory.find(
         product => product.id === productId
     );
 
+    // Shelves are matched by product NAME on the backend (ZoneStockEntry has
+    // no product FK, only a joined display name), so re-fetch whenever the
+    // selected product changes.
+    useEffect(() => {
+        if (!selectedProduct) {
+            setShelfOptions([]);
+            return;
+        }
+        getShelvesForProduct(warehouseId, selectedProduct.name)
+            .then(setShelfOptions)
+            .catch(() => setShelfOptions([]));
+    }, [selectedProduct?.name, warehouseId]);
 
-    const warehouseShelves = shelves.filter(
-        shelf =>
-            shelf.warehouseId === selectedProduct?.warehouseId
+    const fromOptions = shelfOptions.filter(s => s.stockOfProduct > 0);
+    const toOptions = shelfOptions.filter(
+        s => s.id !== fromShelfId && (s.capacity - s.totalOccupied) > 0
     );
 
 
     function resetForm() {
         setProductId("");
         setQuantity(0);
-        setFromShelf("");
-        setToShelf("");
+        setFromShelfId("");
+        setToShelfId("");
         setReason("");
+        setError(null);
     }
 
 
@@ -51,35 +71,29 @@ export default function CreateMovementModal({
     }
 
 
-    function handleSubmit() {
+    async function handleSubmit() {
 
-        if (!selectedProduct) return;
+        if (!selectedProduct || fromShelfId === "" || toShelfId === "") return;
 
+        setSubmitting(true);
+        setError(null);
 
-        const task = {
-            id: crypto.randomUUID(),
+        try {
+            await createMovementTask(warehouseId, {
+                productId: selectedProduct.id,
+                quantity,
+                fromShelfId: Number(fromShelfId),
+                toShelfId: Number(toShelfId),
+                reason,
+            });
 
-            productId: selectedProduct.id,
-            productName: selectedProduct.name,
-
-            warehouseId: selectedProduct.warehouseId,
-
-            quantity,
-
-            fromShelf,
-            toShelf,
-
-            requestedBy: "Admin",
-
-            reason,
-
-            status: "pending",
-        };
-
-
-        console.log(task);
-
-        handleClose();
+            router.refresh();
+            handleClose();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to create task.");
+        } finally {
+            setSubmitting(false);
+        }
     }
 
 
@@ -110,9 +124,11 @@ export default function CreateMovementModal({
                         <select
                             className="border border-border rounded-lg p-2"
                             value={productId}
-                            onChange={(e) =>
-                                setProductId(e.target.value)
-                            }
+                            onChange={(e) => {
+                                setProductId(e.target.value);
+                                setFromShelfId("");
+                                setToShelfId("");
+                            }}
                         >
 
                             <option value="" disabled>
@@ -165,9 +181,9 @@ export default function CreateMovementModal({
 
                         <select
                             className="border border-border rounded-lg p-2"
-                            value={fromShelf}
+                            value={fromShelfId}
                             onChange={(e)=>
-                                setFromShelf(e.target.value)
+                                setFromShelfId(Number(e.target.value))
                             }
                         >
 
@@ -175,17 +191,16 @@ export default function CreateMovementModal({
                                 From shelf
                             </option>
 
-                            
-                            {warehouseShelves.filter(shelf => shelf.currentStock > 0)
-                            .map(shelf => (
+
+                            {fromOptions.map(shelf => (
 
                                 <option
                                     key={shelf.id}
-                                    value={shelf.name}
+                                    value={shelf.id}
                                 >
                                     {shelf.name}
                                     {" "}
-                                    ({shelf.currentStock})
+                                    ({shelf.stockOfProduct})
                                 </option>
 
                             ))}
@@ -197,9 +212,9 @@ export default function CreateMovementModal({
 
                         <select
                             className="border border-border rounded-lg p-2"
-                            value={toShelf}
+                            value={toShelfId}
                             onChange={(e)=>
-                                setToShelf(e.target.value)
+                                setToShelfId(Number(e.target.value))
                             }
                         >
 
@@ -208,18 +223,17 @@ export default function CreateMovementModal({
                             </option>
 
 
-                            {warehouseShelves.filter((shelf) => shelf.name !== fromShelf)
-                            .map(shelf => (
+                            {toOptions.map(shelf => (
 
                                 <option
                                     key={shelf.id}
-                                    value={shelf.name}
+                                    value={shelf.id}
                                 >
                                     {shelf.name}
                                     {" "}
                                     Free:
                                     {" "}
-                                    {shelf.capacity - shelf.currentStock}
+                                    {shelf.capacity - shelf.totalOccupied}
                                 </option>
 
                             ))}
@@ -238,6 +252,10 @@ export default function CreateMovementModal({
                             }
                         />
 
+                        {error && (
+                            <p className="text-sm text-red-600">{error}</p>
+                        )}
+
 
                     </div>
 
@@ -246,12 +264,13 @@ export default function CreateMovementModal({
                     <ModalFooter
                         onCancel={handleClose}
                         onConfirm={handleSubmit}
-                        confirmLabel="Create Task"
+                        confirmLabel={submitting ? "Creating..." : "Create Task"}
                         disabled={
+                            submitting ||
                             !productId ||
                             !quantity ||
-                            !fromShelf ||
-                            !toShelf
+                            fromShelfId === "" ||
+                            toShelfId === ""
                         }
                     />
 

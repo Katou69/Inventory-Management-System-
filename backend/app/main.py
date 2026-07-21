@@ -8,6 +8,8 @@ from app.uploads import router as uploads
 from app.zones import router as zones
 from app.dashboard import router as dashboard
 from app.config import settings
+from app.items import router as items
+from app.warehouses import router as warehouses
 
 app = FastAPI(title="Inventory Management API")
 
@@ -24,6 +26,8 @@ app.include_router(users.router)
 app.include_router(uploads.router)
 app.include_router(zones.router)
 app.include_router(dashboard.router)
+app.include_router(warehouses.router)
+app.include_router(items.router)
 
 app.mount("/uploads", StaticFiles(directory=uploads.UPLOAD_ROOT), name="uploads")
 

@@ -81,7 +81,14 @@ async function doFetch<T>(path: string, init?: RequestInit): Promise<T> {
     let message = `Request to ${path} failed with ${res.status}`
     try {
       const body = await res.json()
-      if (body?.message) message = body.message
+      // FastAPI's default HTTPException shape is `{"detail": "..."}`.
+      // `.message` is checked too in case any endpoint returns a custom
+      // shape — this is additive, nothing that worked before stops working.
+      if (typeof body?.detail === "string") {
+        message = body.detail
+      } else if (typeof body?.message === "string") {
+        message = body.message
+      }
     } catch {
       /* response had no JSON body */
     }

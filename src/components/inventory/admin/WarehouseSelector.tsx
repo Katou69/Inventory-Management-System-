@@ -1,33 +1,52 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+
+import { getWarehouses, WarehouseOption } from "@/services/inventory-service";
+
 export default function WarehouseSelector() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-    return (
-        // Need to change these to a dropdown with warehouse options that fetches the warehouse data from backend later, now just hardcoded
-        <select
-            className="border border-border rounded-lg px-3 py-2 text-sm bg-card"
-            defaultValue=""
-        >
-            <option value="" disabled>
-                Select Warehouse
-            </option>
+  const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
+  const selected = searchParams.get("warehouse") ?? "";
 
-            <option value="1">
-                Warehouse 1
-            </option>
+  useEffect(() => {
+    getWarehouses().then(setWarehouses).catch(() => setWarehouses([]));
+  }, []);
 
-            <option value="2">
-                Warehouse 2
-            </option>
+  // Once warehouses load, default the URL to the first one if nothing's selected yet.
+  useEffect(() => {
+    if (!selected && warehouses.length > 0) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("warehouse", String(warehouses[0].id));
+      router.replace(`${pathname}?${params.toString()}`);
+    }
+  }, [warehouses, selected, pathname, router, searchParams]);
 
-            <option value="3">
-                Warehouse 3
-            </option>
+  function handleChange(value: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("warehouse", value);
+    router.push(`${pathname}?${params.toString()}`);
+  }
 
-            <option value="4">
-                Warehouse 4
-            </option>
+  return (
+    <select
+      className="border border-border rounded-lg px-3 py-2 text-sm bg-card"
+      value={selected}
+      onChange={(e) => handleChange(e.target.value)}
+    >
+      <option value="" disabled>
+        Select Warehouse
+      </option>
 
-        </select>
-    );
+      {warehouses.map((w) => (
+        <option key={w.id} value={w.id}>
+          {w.name}
+        </option>
+      ))}
+    </select>
+  );
 }

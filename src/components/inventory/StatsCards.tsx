@@ -1,6 +1,13 @@
 import { Package, AlertTriangle, CircleX } from "lucide-react";
+import { getInventoryStats } from "@/services/inventory-service";
 
-export default function StatsCards() {
+type Props = {
+  warehouseId: number;
+};
+
+export default async function StatsCards({ warehouseId }: Props) {
+  const stats = await getInventoryStats(warehouseId);
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
       {/* Total */}
@@ -11,7 +18,7 @@ export default function StatsCards() {
 
         <div>
           <p className="text-sm text-muted-foreground">Total Items</p>
-          <h2 className="text-3xl font-bold text-foreground">12</h2>
+          <h2 className="text-3xl font-bold text-foreground">{stats.totalItems}</h2>
         </div>
       </div>
 
@@ -23,7 +30,7 @@ export default function StatsCards() {
 
         <div>
           <p className="text-sm text-muted-foreground">Low Stock</p>
-          <h2 className="text-3xl font-bold text-foreground">3</h2>
+          <h2 className="text-3xl font-bold text-foreground">{stats.lowStock}</h2>
         </div>
       </div>
 
@@ -35,7 +42,7 @@ export default function StatsCards() {
 
         <div>
           <p className="text-sm text-muted-foreground">Out of Stock</p>
-          <h2 className="text-3xl font-bold text-foreground">2</h2>
+          <h2 className="text-3xl font-bold text-foreground">{stats.outOfStock}</h2>
         </div>
       </div>
     </div>

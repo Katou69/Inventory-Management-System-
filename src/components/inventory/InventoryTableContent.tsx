@@ -1,6 +1,8 @@
+// Save as: src/components/inventory/InventoryTableContent.tsx
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { Badge } from "@/components/ui";
 import { InventoryItem } from "@/types/inventory";
@@ -13,14 +15,21 @@ import Filters from "./Filters";
 
 interface Props {
   inventory: InventoryItem[];
+  warehouseId: number;
+  /** Staff shouldn't see "Edit Product" — the backend already blocks the
+   * PATCH for their role, this just hides the option client-side too. */
+  canEdit?: boolean;
 }
 
 
 export default function InventoryTableContent({
   inventory,
+  warehouseId,
+  canEdit = true,
 }: Props) {
 
 
+  const router = useRouter();
   const [search, setSearch] = useState("");
 
 
@@ -237,10 +246,10 @@ export default function InventoryTableContent({
 
                 <ProductMenu
 
-                  onEdit={()=>{
+                  onEdit={canEdit ? () => {
                     setSelectedProduct(item);
                     setEditOpen(true);
-                  }}
+                  } : undefined}
 
 
                   onHistory={()=>{
@@ -299,6 +308,7 @@ export default function InventoryTableContent({
           setEditOpen(false);
           setSelectedProduct(null);
         }}
+        onSaved={() => router.refresh()}
       />
 
 
@@ -307,6 +317,7 @@ export default function InventoryTableContent({
       <ViewHistoryModal
         open={historyOpen}
         product={selectedProduct}
+        warehouseId={warehouseId}
         onClose={()=>{
           setHistoryOpen(false);
           setSelectedProduct(null);
