@@ -36,7 +36,10 @@ def _sniff_extension(contents: bytes) -> str | None:
 
 @router.post("/warehouse-image", status_code=status.HTTP_201_CREATED)
 async def upload_warehouse_image(file: UploadFile) -> dict[str, str]:
-    contents = await file.read()
+    # Read one byte past the cap rather than the whole body: a client sending
+    # an arbitrarily large file could otherwise force the server to buffer all
+    # of it into memory before the size check ever ran.
+    contents = await file.read(MAX_FILE_SIZE + 1)
 
     if len(contents) > MAX_FILE_SIZE:
         raise HTTPException(
