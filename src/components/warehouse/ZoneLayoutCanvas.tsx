@@ -1575,7 +1575,7 @@ export default function ZoneLayoutCanvas({
                   </li>
                 ))}
               </ul>
-              <p className="text-sm text-muted-foreground mt-2 bg-accent border border-border rounded-lg px-3 py-2">"{selectedRequest.requestNote}"</p>
+              <p className="text-sm text-muted-foreground mt-2 bg-accent border border-border rounded-lg px-3 py-2">&quot;{selectedRequest.requestNote}&quot;</p>
             </div>
 
             {role === "admin" ? (

@@ -1,7 +1,7 @@
 """add notification targeting to activity_events
 
 Revision ID: f2c9b6a4d817
-Revises: ba71818cc1fb
+Revises: e7a3f9c15d22
 Create Date: 2026-07-29 00:00:00.000000
 
 """
@@ -13,13 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'f2c9b6a4d817'
-# NOTE: the live DB's alembic_version is actually stamped 'e7a3f9c15d22'
-# (from orphaned commit 171d077, not on this branch's history -- see the
-# "Alembic reconciliation" note left in this repo). down_revision is kept as
-# the local head so `alembic history` stays a valid chain for anyone running
-# this app from a clean DB; it does NOT match what's stamped on the shared DB
-# right now. Do not `alembic upgrade` against that DB until the gap is fixed.
-down_revision: Union[str, Sequence[str], None] = 'ba71818cc1fb'
+down_revision: Union[str, Sequence[str], None] = 'e7a3f9c15d22'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
