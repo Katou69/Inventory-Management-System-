@@ -1,6 +1,9 @@
+import re
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette_csrf import CSRFMiddleware
 
 from app.auth import router as auth
 from app.users import router as users
@@ -13,6 +16,22 @@ from app.orders import router as orders
 from app.purchases import router as purchases
 
 app = FastAPI(title="Inventory Management API")
+
+# CSRF only matters once a session cookie exists to be forged, so login/
+# register (no session yet) and refresh/logout (no browser JS context — called
+# server-side from Next's proxy.ts with only the raw cookie header forwarded)
+# are exempt. Everything else that carries access_token/refresh_token must
+# echo the csrftoken cookie back as a header, or a malicious site's forged
+# request rides on the auth cookie alone with no way to prove it's really us.
+app.add_middleware(
+    CSRFMiddleware,
+    secret=settings.csrf_secret_value,
+    sensitive_cookies={"access_token", "refresh_token"},
+    exempt_urls=[re.compile(r"^/auth/(login|register|refresh|logout)$")],
+    cookie_samesite=settings.cookie_samesite,
+    cookie_secure=settings.cookie_secure,
+    cookie_domain=settings.cookie_domain,
+)
 
 app.add_middleware(
     CORSMiddleware,
