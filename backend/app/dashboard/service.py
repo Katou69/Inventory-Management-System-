@@ -634,6 +634,16 @@ def get_notifications(db: Session, user: User, limit: int = 20) -> list[dict]:
     events = (
         db.query(ActivityEvent)
         .filter(ActivityEvent.is_alert.is_(True))
+        .filter(
+            (ActivityEvent.target_user_id.is_(None)) | (ActivityEvent.target_user_id == user.id)
+        )
+        .filter(
+            (ActivityEvent.target_roles.is_(None))
+            | (ActivityEvent.target_roles == user.role)
+            | (ActivityEvent.target_roles.like(f"{user.role},%"))
+            | (ActivityEvent.target_roles.like(f"%,{user.role}"))
+            | (ActivityEvent.target_roles.like(f"%,{user.role},%"))
+        )
         .order_by(ActivityEvent.occurred_at.desc())
         .limit(limit)
         .all()

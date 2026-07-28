@@ -3,24 +3,78 @@
 import { useEffect, useState } from "react";
 import { Building2, Package, Bell, Trash2, Plus, X, RefreshCw, PackageCheck, Globe } from "lucide-react";
 import { Role } from "@/types/user";
-import { CATEGORIES } from "@/data/users-data";
-import { getWarehouses } from "@/services/dashboard-service";
+import { Warehouse } from "@/types/dashboard";
+import { getWarehouses, createWarehouse, deleteWarehouse } from "@/services/dashboard-service";
+import {
+  getMySettings,
+  updateMySettings,
+  getCategories,
+  createCategory,
+  deleteCategory,
+  Category,
+} from "@/services/settings-service";
 
 export default function SettingsView({ role }: { role: Role; userWarehouseId: number | "all" }) {
   // System configuration state
-  const [warehouses, setWarehouses] = useState<string[]>([]);
-  useEffect(() => { void getWarehouses().then((w) => setWarehouses(w.map((wh) => wh.name))); }, []);
-  const [categories, setCategories] = useState<string[]>([...CATEGORIES]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [newWarehouse, setNewWarehouse] = useState("");
   const [newCategory, setNewCategory] = useState("");
   const [notifications, setNotifications] = useState({ lowStock: true, orderUpdate: true, poApproval: true });
   const [language, setLanguage] = useState("English");
   const [timezone, setTimezone] = useState("UTC");
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+  useEffect(() => {
+    void getWarehouses().then(setWarehouses);
+    void getCategories().then(setCategories);
+    void getMySettings().then((s) => {
+      setNotifications({ lowStock: s.notifyLowStock, orderUpdate: s.notifyOrderUpdate, poApproval: s.notifyPoApproval });
+      setLanguage(s.language);
+      setTimezone(s.timezone);
+    });
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await updateMySettings({
+        notifyLowStock: notifications.lowStock,
+        notifyOrderUpdate: notifications.orderUpdate,
+        notifyPoApproval: notifications.poApproval,
+        language,
+        timezone,
+      });
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAddWarehouse = async () => {
+    if (!newWarehouse) return;
+    const warehouse = await createWarehouse({ name: newWarehouse, location: "" });
+    setWarehouses((p) => [...p, warehouse]);
+    setNewWarehouse("");
+  };
+
+  const handleRemoveWarehouse = async (id: number) => {
+    await deleteWarehouse(id);
+    setWarehouses((p) => p.filter((w) => w.id !== id));
+  };
+
+  const handleAddCategory = async () => {
+    if (!newCategory) return;
+    const category = await createCategory(newCategory);
+    setCategories((p) => [...p, category]);
+    setNewCategory("");
+  };
+
+  const handleRemoveCategory = async (id: number) => {
+    await deleteCategory(id);
+    setCategories((p) => p.filter((c) => c.id !== id));
   };
 
   return (
@@ -31,7 +85,7 @@ export default function SettingsView({ role }: { role: Role; userWarehouseId: nu
           <h1 className="text-2xl font-bold">System Settings</h1>
           <p className="text-muted-foreground mt-1">Manage system configurations and preferences</p>
         </div>
-        <button onClick={handleSave} className="btn-primary flex items-center gap-1.5">
+        <button onClick={handleSave} disabled={saving} className="btn-primary flex items-center gap-1.5 disabled:opacity-60">
           <RefreshCw className="w-3.5 h-3.5" /> Save Changes
         </button>
       </div>
@@ -52,11 +106,11 @@ export default function SettingsView({ role }: { role: Role; userWarehouseId: nu
               <h4 className="font-semibold text-sm">Warehouses</h4>
             </div>
             <div className="space-y-2 mb-3">
-              {warehouses.map((w, idx) => (
-                <div key={idx} className="flex items-center justify-between bg-secondary/50 px-3 py-2 rounded-lg text-sm">
-                  <span>{w}</span>
+              {warehouses.map((w) => (
+                <div key={w.id} className="flex items-center justify-between bg-secondary/50 px-3 py-2 rounded-lg text-sm">
+                  <span>{w.name}</span>
                   {role === "admin" && (
-                    <button onClick={() => setWarehouses(p => p.filter((_, i) => i !== idx))} className="text-muted-foreground hover:text-destructive">
+                    <button onClick={() => handleRemoveWarehouse(w.id)} className="text-muted-foreground hover:text-destructive">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   )}
@@ -72,10 +126,7 @@ export default function SettingsView({ role }: { role: Role; userWarehouseId: nu
                   onChange={(e) => setNewWarehouse(e.target.value)}
                   className="modal-input flex-1"
                 />
-                <button
-                  onClick={() => { if (newWarehouse) { setWarehouses(p => [...p, newWarehouse]); setNewWarehouse(""); } }}
-                  className="btn-primary flex items-center gap-1"
-                >
+                <button onClick={handleAddWarehouse} className="btn-primary flex items-center gap-1">
                   <Plus className="w-3.5 h-3.5" /> Add
                 </button>
               </div>
@@ -89,11 +140,11 @@ export default function SettingsView({ role }: { role: Role; userWarehouseId: nu
               <h4 className="font-semibold text-sm">Product Categories</h4>
             </div>
             <div className="flex flex-wrap gap-2 mb-3">
-              {categories.map((c, idx) => (
-                <span key={idx} className="inline-flex items-center gap-1 px-3 py-1.5 bg-secondary rounded-full text-sm">
-                  {c}
+              {categories.map((c) => (
+                <span key={c.id} className="inline-flex items-center gap-1 px-3 py-1.5 bg-secondary rounded-full text-sm">
+                  {c.name}
                   {role === "admin" && (
-                    <button onClick={() => setCategories(p => p.filter((_, i) => i !== idx))} className="ml-1 hover:text-destructive">
+                    <button onClick={() => handleRemoveCategory(c.id)} className="ml-1 hover:text-destructive">
                       <X className="w-3.5 h-3.5" />
                     </button>
                   )}
@@ -109,10 +160,7 @@ export default function SettingsView({ role }: { role: Role; userWarehouseId: nu
                   onChange={(e) => setNewCategory(e.target.value)}
                   className="modal-input flex-1"
                 />
-                <button
-                  onClick={() => { if (newCategory) { setCategories(p => [...p, newCategory]); setNewCategory(""); } }}
-                  className="btn-primary flex items-center gap-1"
-                >
+                <button onClick={handleAddCategory} className="btn-primary flex items-center gap-1">
                   <Plus className="w-3.5 h-3.5" /> Add
                 </button>
               </div>

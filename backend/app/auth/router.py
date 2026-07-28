@@ -11,6 +11,7 @@ from app.auth.jwt import (
     hash_token,
     verify_password,
 )
+from app.activity.service import log_event
 from app.auth.dependencies import get_current_user
 from app.auth.models import RefreshSession
 from app.auth.schemas import LoginRequest, RegisterRequest
@@ -139,6 +140,16 @@ def register(body: RegisterRequest, response: Response, db: Session = Depends(ge
         joined_date=date.today(),
     )
     db.add(user)
+    db.flush()  # assigns user.id for the event's actor_id
+    log_event(
+        db,
+        kind="user",
+        title="New staff account pending approval",
+        description=f"{user.name} ({user.email}) signed up and is awaiting approval",
+        actor=user,
+        is_alert=True,
+        target_roles=["admin"],
+    )
     db.commit()
     db.refresh(user)
 

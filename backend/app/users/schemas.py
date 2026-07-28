@@ -51,3 +51,21 @@ class UserUpdate(BaseModel):
     role: Optional[Role] = None
     warehouse_id: Optional[int] = None
     status: Optional[Status] = None
+
+
+class UserSettingOut(BaseModel):
+    notifyLowStock: bool = Field(validation_alias="notify_low_stock")
+    notifyOrderUpdate: bool = Field(validation_alias="notify_order_update")
+    notifyPoApproval: bool = Field(validation_alias="notify_po_approval")
+    language: str
+    timezone: str
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
+class UserSettingUpdate(BaseModel):
+    notifyLowStock: Optional[bool] = None
+    notifyOrderUpdate: Optional[bool] = None
+    notifyPoApproval: Optional[bool] = None
+    language: Optional[str] = None
+    timezone: Optional[str] = None

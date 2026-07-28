@@ -1,6 +1,7 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_role
@@ -118,6 +119,24 @@ def create_warehouse(
     current_user: User = Depends(require_role("admin")),
 ) -> dict:
     return service.create_warehouse(db, body, current_user)
+
+
+@router.delete("/warehouses/{warehouse_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_warehouse(
+    warehouse_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+) -> None:
+    warehouse = _get_warehouse_or_404(db, warehouse_id)
+    db.delete(warehouse)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot delete a warehouse that still has staff, zones, or activity assigned to it",
+        ) from exc
 
 
 @router.put("/warehouses/{warehouse_id}/profile", response_model=UpdateWarehouseProfileIn)

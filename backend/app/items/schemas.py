@@ -72,3 +72,12 @@ class MovementTaskOut(BaseModel):
     requestedBy: str
     reason: str
     status: str
+
+
+class CategoryOut(BaseModel):
+    id: int
+    name: str
+
+
+class CategoryCreate(BaseModel):
+    name: str

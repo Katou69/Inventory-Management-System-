@@ -29,6 +29,12 @@ class ActivityEvent(Base, AuditMixin):
         DateTime(timezone=True), nullable=False, index=True, default=lambda: datetime.now(timezone.utc)
     )
     is_alert: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Bell visibility, both optional. NULL/NULL = everyone (today's behavior).
+    # target_user_id wins when set (e.g. "the manager who proposed this"); it is
+    # for a single, specific recipient rather than a role -- comma-separated
+    # roles can't express "this one manager, not all managers".
+    target_roles: Mapped[str | None] = mapped_column(String, nullable=True)  # e.g. "admin,manager"
+    target_user_id: Mapped[str | None] = mapped_column(String, ForeignKey("users.id"), nullable=True, index=True)
 
 
 class NotificationRead(Base, AuditMixin):

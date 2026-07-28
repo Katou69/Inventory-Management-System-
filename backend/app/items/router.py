@@ -7,8 +7,10 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import require_role
 from app.db.session import get_db
 from app.items import service
-from app.items.models import MovementTask, Product
+from app.items.models import Category, MovementTask, Product
 from app.items.schemas import (
+    CategoryCreate,
+    CategoryOut,
     InventoryStatsOut,
     MovementTaskCreateRequest,
     MovementTaskOut,
@@ -49,6 +51,43 @@ def _movement_task_to_out(db: Session, task: MovementTask, requester_name: str) 
         "reason": task.reason,
         "status": task.status,
     }
+
+
+@router.get("/categories", response_model=List[CategoryOut])
+def list_categories(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin", "manager", "staff")),
+) -> List[Category]:
+    return db.query(Category).order_by(Category.name).all()
+
+
+@router.post("/categories", response_model=CategoryOut, status_code=status.HTTP_201_CREATED)
+def create_category(
+    body: CategoryCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+) -> Category:
+    existing = db.query(Category).filter(Category.name == body.name).first()
+    if existing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Category already exists")
+    category = Category(name=body.name, created_by=current_user.id, updated_by=current_user.id)
+    db.add(category)
+    db.commit()
+    db.refresh(category)
+    return category
+
+
+@router.delete("/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_category(
+    category_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+) -> None:
+    category = db.get(Category, category_id)
+    if category is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+    db.delete(category)
+    db.commit()
 
 
 @router.get("/warehouses/{warehouse_id}/inventory", response_model=List[ProductInventoryOut])

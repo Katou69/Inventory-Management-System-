@@ -3,12 +3,50 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import require_role
+from app.auth.dependencies import get_current_user, require_role
 from app.db.session import get_db
-from app.users.models import User
-from app.users.schemas import UserOut, UserUpdate
+from app.users.models import User, UserSetting
+from app.users.schemas import UserOut, UserSettingOut, UserSettingUpdate, UserUpdate
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+
+# Declared before /{user_id} so "me" isn't swallowed as a user_id path param.
+@router.get("/me/settings", response_model=UserSettingOut)
+def get_my_settings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> UserSetting:
+    settings = current_user.settings
+    if settings is None:
+        settings = UserSetting(user_id=current_user.id)
+        db.add(settings)
+        db.commit()
+        db.refresh(settings)
+    return settings
+
+
+@router.put("/me/settings", response_model=UserSettingOut)
+def update_my_settings(
+    body: UserSettingUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> UserSetting:
+    settings = current_user.settings or UserSetting(user_id=current_user.id)
+    updates = {
+        "notify_low_stock": body.notifyLowStock,
+        "notify_order_update": body.notifyOrderUpdate,
+        "notify_po_approval": body.notifyPoApproval,
+        "language": body.language,
+        "timezone": body.timezone,
+    }
+    for column, value in updates.items():
+        if value is not None:
+            setattr(settings, column, value)
+    db.add(settings)
+    db.commit()
+    db.refresh(settings)
+    return settings
 
 
 @router.get("", response_model=List[UserOut])

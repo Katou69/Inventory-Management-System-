@@ -151,6 +151,7 @@ def propose_change(
         description=f"{actor.name} proposed {_describe(items)}: {request_note}",
         actor=actor,
         is_alert=True,
+        target_roles=["admin"],
     )
 
     db.commit()
@@ -191,6 +192,7 @@ def approve_request(db: Session, request_id: int, actor: User) -> None:
         description=f"{actor.name} approved a layout proposal ({_describe(request.items)})",
         actor=actor,
         is_alert=True,
+        target_user_id=request.requested_by,
     )
     db.commit()
 
@@ -214,5 +216,6 @@ def reject_request(db: Session, request_id: int, actor: User, review_note: str) 
         description=f"{actor.name} rejected a layout proposal: {review_note}",
         actor=actor,
         is_alert=True,
+        target_user_id=request.requested_by,
     )
     db.commit()

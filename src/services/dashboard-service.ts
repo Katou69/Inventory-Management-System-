@@ -134,6 +134,11 @@ export async function createWarehouse(input: CreateWarehouseInput): Promise<Ware
   })
 }
 
+export async function deleteWarehouse(id: number): Promise<void> {
+  if (config.useMock) return
+  await apiFetch(`/warehouses/${id}`, { method: "DELETE" })
+}
+
 /**
  * Uploads a warehouse image and returns its URL.
  *
