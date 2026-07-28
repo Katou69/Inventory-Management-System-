@@ -3,6 +3,8 @@ import re
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from starlette_csrf import CSRFMiddleware
 
 from app.auth import router as auth
@@ -14,8 +16,19 @@ from app.config import settings
 from app.items import router as items
 from app.orders import router as orders
 from app.purchases import router as purchases
+from app.rate_limit import limiter
 
 app = FastAPI(title="Inventory Management API")
+
+# Per-IP throttling on auth endpoints (see app/rate_limit.py + the
+# @limiter.limit(...) decorators in auth/router.py), complementing rather than
+# replacing the per-account login_attempts/lockout_until there: that stops one
+# attacker hammering ONE account, this stops one IP hammering MANY accounts
+# (credential stuffing) or spamming /register. In-memory storage is fine for
+# a single-process deploy; swap to Redis (RATELIMIT_STORAGE_URL) if this ever
+# runs multi-worker, since counts would otherwise be per-process, not global.
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CSRF only matters once a session cookie exists to be forged, so login/
 # register (no session yet) and refresh/logout (no browser JS context — called

@@ -1,6 +1,6 @@
 from datetime import date, datetime, timedelta, timezone
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.auth.jwt import (
@@ -17,6 +17,7 @@ from app.auth.models import RefreshSession
 from app.auth.schemas import LoginRequest, RegisterRequest
 from app.config import settings
 from app.db.session import get_db
+from app.rate_limit import limiter
 from app.users.models import User
 from app.users.schemas import UserOut
 
@@ -71,7 +72,8 @@ def _is_email_allowed(email: str) -> bool:
 
 
 @router.post("/login", response_model=UserOut)
-def login(body: LoginRequest, response: Response, db: Session = Depends(get_db)) -> User:
+@limiter.limit("10/minute")
+def login(request: Request, body: LoginRequest, response: Response, db: Session = Depends(get_db)) -> User:
     user = db.query(User).filter(User.email == body.email).first()
     
     # Check if user exists
@@ -119,7 +121,8 @@ def login(body: LoginRequest, response: Response, db: Session = Depends(get_db))
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-def register(body: RegisterRequest, response: Response, db: Session = Depends(get_db)) -> User:
+@limiter.limit("5/hour")
+def register(request: Request, body: RegisterRequest, response: Response, db: Session = Depends(get_db)) -> User:
     # Check if email is allowed
     if not _is_email_allowed(body.email):
         raise HTTPException(
@@ -158,7 +161,9 @@ def register(body: RegisterRequest, response: Response, db: Session = Depends(ge
 
 
 @router.post("/refresh", response_model=UserOut)
+@limiter.limit("30/minute")
 def refresh(
+    request: Request,
     response: Response,
     refresh_token: str | None = Cookie(default=None),
     db: Session = Depends(get_db),

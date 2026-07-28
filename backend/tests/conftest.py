@@ -6,6 +6,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.db.session import Base, get_db
 from app.main import app
+from app.rate_limit import limiter
 from app.auth import models as auth_models  # noqa: F401  (register tables on Base.metadata)
 from app.users import models as user_models  # noqa: F401
 from app.warehouses import models as warehouse_models  # noqa: F401
@@ -46,6 +47,9 @@ def client(db_session):
             pass
 
     app.dependency_overrides[get_db] = override_get_db
+    limiter.reset()  # TestClient always reports the same fake IP, so every
+    # test would otherwise share one rate-limit bucket and 429 on whichever
+    # test runs after the limit's already been hit by an earlier one.
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
