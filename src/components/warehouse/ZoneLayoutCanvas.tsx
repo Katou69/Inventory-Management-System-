@@ -201,6 +201,7 @@ export default function ZoneLayoutCanvas({
   const [stock, setStock] = useState<ZoneStockEntry[]>([])
   const [pending, setPending] = useState<ZoneChangeRequest[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const selectedZoneId = selectedIds.length === 1 ? selectedIds[0] : null
@@ -270,22 +271,29 @@ export default function ZoneLayoutCanvas({
   const activeTool: Tool = !canEdit && isDrawTool(tool) ? "select" : tool
 
   const refresh = useCallback(async () => {
-    const [z, s, p] = await Promise.all([
-      getZones(warehouseId),
-      getZoneStock(warehouseId),
-      getPendingRequests(warehouseId),
-    ])
-    setZones(z)
-    setStock(s)
-    setPending(p)
-    setDraftGeom({})
-    setStaged([])
-    setLoading(false)
-    return z
+    try {
+      const [z, s, p] = await Promise.all([
+        getZones(warehouseId),
+        getZoneStock(warehouseId),
+        getPendingRequests(warehouseId),
+      ])
+      setZones(z)
+      setStock(s)
+      setPending(p)
+      setDraftGeom({})
+      setStaged([])
+      setLoadError(null)
+      return z
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Failed to load warehouse map")
+      return []
+    } finally {
+      setLoading(false)
+    }
   }, [warehouseId])
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { void refresh() }, [refresh])
+  useEffect(() => { void refresh().then(() => requestAnimationFrame(fitToContent)) }, [refresh])
 
   // Any zone id that shows up after a mutation and has no floor yet belongs
   // to whichever floor was active when the edit was made.
@@ -1121,6 +1129,12 @@ export default function ZoneLayoutCanvas({
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
               <Loader2 className="size-4 animate-spin mr-2" /> Loading map…
+            </div>
+          )}
+
+          {!loading && loadError && (
+            <div className="absolute inset-0 flex items-center justify-center text-destructive text-sm text-center px-4">
+              {loadError}
             </div>
           )}
 

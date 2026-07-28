@@ -178,7 +178,7 @@ export default function OrdersTableClient({ orders, role }: Props) {
         />
 
         <div className="flex items-center justify-between gap-4">
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-muted-foreground">
             Showing {filteredOrders.length} of{" "}
             {orderList.length} orders
           </p>
@@ -187,26 +187,26 @@ export default function OrdersTableClient({ orders, role }: Props) {
             <button
               type="button"
               onClick={handleAddOrder}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+              className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90"
             >
               + New Order
             </button>
           )}
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
           <table className="min-w-full">
-            <thead className="border-b border-slate-200 bg-slate-50">
+            <thead className="border-b border-border bg-accent">
               <tr className="text-left">
                 {headers.map((header) => (
                   <th
                     key={header}
-                    className="whitespace-nowrap px-6 py-4 text-sm font-semibold text-slate-600"
+                    className="whitespace-nowrap px-6 py-4 text-sm font-semibold text-muted-foreground"
                   >
                     <div className="flex items-center gap-1">
                       {header}
 
-                      <ArrowUpDown className="h-3.5 w-3.5 text-slate-400" />
+                      <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
                     </div>
                   </th>
                 ))}
@@ -236,19 +236,19 @@ export default function OrdersTableClient({ orders, role }: Props) {
                   return (
                     <tr
                       key={order.id}
-                      className="border-b border-slate-100 transition-colors last:border-b-0 hover:bg-slate-50"
+                      className="border-b border-border transition-colors last:border-b-0 hover:bg-accent"
                     >
-                      <td className="px-6 py-4 text-slate-500">
+                      <td className="px-6 py-4 text-muted-foreground">
                         {index + 1}
                       </td>
 
                       <td className="px-6 py-4">
-                        <span className="inline-flex whitespace-nowrap rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs font-medium text-slate-600">
+                        <span className="inline-flex whitespace-nowrap rounded-md bg-accent px-2 py-0.5 font-mono text-xs font-medium text-muted-foreground">
                           {order.id}
                         </span>
                       </td>
 
-                      <td className="whitespace-nowrap px-6 py-4 font-medium text-slate-800">
+                      <td className="whitespace-nowrap px-6 py-4 font-medium text-foreground">
                         {order.customer}
                       </td>
 
@@ -258,12 +258,12 @@ export default function OrdersTableClient({ orders, role }: Props) {
                           onClick={() => handleProductClick(order)}
                           className="text-left"
                         >
-                          <p className="font-medium text-slate-700 hover:text-indigo-600 hover:underline">
+                          <p className="font-medium text-foreground hover:text-indigo-600 hover:underline">
                             {firstProduct}
                           </p>
 
                           {remainingProducts > 0 && (
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-muted-foreground">
                               +{remainingProducts} more
                             </p>
                           )}
@@ -282,7 +282,7 @@ export default function OrdersTableClient({ orders, role }: Props) {
                         <Badge status={order.status} />
                       </td>
 
-                      <td className="whitespace-nowrap px-6 py-4 text-slate-500">
+                      <td className="whitespace-nowrap px-6 py-4 text-muted-foreground">
                         {order.date}
                       </td>
 
@@ -306,11 +306,11 @@ export default function OrdersTableClient({ orders, role }: Props) {
                     colSpan={headers.length + 1}
                     className="px-6 py-14 text-center"
                   >
-                    <p className="font-medium text-slate-700">
+                    <p className="font-medium text-foreground">
                       No orders found
                     </p>
 
-                    <p className="mt-1 text-sm text-slate-500">
+                    <p className="mt-1 text-sm text-muted-foreground">
                       Try changing the status or date
                       filters.
                     </p>

@@ -528,6 +528,7 @@ def create_warehouse(db: Session, data, actor: User | None = None) -> dict:
         code="",  # needs the PK, so it is set after the flush below
         location=data.location,
         manager=data.manager,
+        phone=data.phone,
         status=_STATUS_VALUE.get(data.status, "active"),
         image=data.image or DEFAULT_AVATAR,
         last_inspection=datetime.now(timezone.utc).date(),
@@ -574,6 +575,7 @@ def update_warehouse_profile(db: Session, warehouse: Warehouse, data, actor: Use
     warehouse.phone = data.phone
     warehouse.email = data.email
     warehouse.next_inspection = _parse_date(data.nextInspection)
+    warehouse.status = _STATUS_VALUE.get(data.status, warehouse.status)
     if data.image:
         warehouse.image = data.image
     warehouse.updated_by = actor.id if actor else None
@@ -593,6 +595,7 @@ def update_warehouse_profile(db: Session, warehouse: Warehouse, data, actor: Use
         "phone": warehouse.phone,
         "email": warehouse.email,
         "nextInspection": _fmt_date(warehouse.next_inspection),
+        "status": _STATUS_LABEL.get(warehouse.status, "Active"),
         "image": warehouse.image,
     }
 

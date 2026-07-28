@@ -109,6 +109,7 @@ class CreateWarehouseIn(BaseModel):
     name: str
     location: str
     manager: str = ""
+    phone: str = ""
     status: WarehouseStatus = "Active"
     image: str | None = None
 
@@ -119,6 +120,7 @@ class UpdateWarehouseProfileIn(BaseModel):
     phone: str
     email: str
     nextInspection: str  # "DD-MM-YYYY"
+    status: WarehouseStatus
     image: str | None = None
 
 

@@ -217,6 +217,36 @@ def test_create_warehouse_derives_code_from_id(db_session):
     assert created["capacityTotal"] == 0  # no zones/shelves yet
 
 
+def test_create_warehouse_persists_phone(db_session):
+    from app.dashboard.schemas import CreateWarehouseIn
+
+    service.create_warehouse(
+        db_session,
+        CreateWarehouseIn(name="North", location="Bago", manager="Aye", phone="+95-9-123"),
+    )
+    wh = db_session.query(Warehouse).filter_by(name="North").one()
+    assert wh.phone == "+95-9-123"
+
+
+def test_update_warehouse_profile_updates_status(db_session):
+    from app.dashboard.schemas import UpdateWarehouseProfileIn
+
+    wh = Warehouse(id=1, name="Test WH", code="WH-001", status="active")
+    db_session.add(wh)
+    db_session.commit()
+
+    result = service.update_warehouse_profile(
+        db_session,
+        wh,
+        UpdateWarehouseProfileIn(
+            manager="Aye", address="Bago", phone="+95-9-123", email="a@b.com",
+            nextInspection="01-01-2027", status="Under Maintenance",
+        ),
+    )
+    assert wh.status == "maintenance"
+    assert result["status"] == "Under Maintenance"
+
+
 def test_warehouse_detail_stats_cover_the_window_they_claim(db_session):
     """throughput/pendingInbound must describe the same 7 days the chart plots.
 

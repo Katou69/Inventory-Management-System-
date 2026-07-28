@@ -75,7 +75,7 @@ def list_layout_requests(
     warehouse_id: int,
     status_filter: Optional[ZoneChangeStatus] = Query(default=None, alias="status"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("admin", "manager")),
+    current_user: User = Depends(require_role("admin", "manager", "staff")),
 ) -> List[LayoutRequest]:
     _scoped_warehouse_or_403(db, warehouse_id, current_user)
     query = db.query(LayoutRequest).filter(LayoutRequest.warehouse_id == warehouse_id)
