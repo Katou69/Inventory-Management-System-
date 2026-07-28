@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.activity.service import log_event
 from app.users.models import User
-from app.zones.models import LayoutRequest, LayoutRequestItem, ZoneSection
+from app.zones.models import Floor, LayoutRequest, LayoutRequestItem, ZoneSection
 from app.zones.schemas import ZoneChangeItemIn
 
 
@@ -24,6 +24,71 @@ def _describe(items: list[ZoneChangeItemIn] | list[LayoutRequestItem]) -> str:
     return ", ".join(parts) or "no changes"
 
 
+def get_floor_or_404(db: Session, floor_id: int) -> Floor:
+    floor = db.get(Floor, floor_id)
+    if floor is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Floor not found")
+    return floor
+
+
+def create_floor(db: Session, warehouse_id: int, level: int, name: str) -> Floor:
+    taken = (
+        db.query(Floor)
+        .filter(Floor.warehouse_id == warehouse_id, Floor.level == level)
+        .first()
+    )
+    if taken is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Floor level {level} already exists in this warehouse",
+        )
+    floor = Floor(warehouse_id=warehouse_id, level=level, name=name.strip() or f"Floor {level}")
+    db.add(floor)
+    db.commit()
+    db.refresh(floor)
+    return floor
+
+
+def rename_floor(db: Session, floor: Floor, name: str) -> Floor:
+    if not name.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Floor name is required")
+    floor.name = name.strip()
+    db.commit()
+    db.refresh(floor)
+    return floor
+
+
+def delete_floor(db: Session, floor: Floor) -> None:
+    """Drop the floor, keeping its boxes.
+
+    The sections are unassigned rather than deleted -- losing a floor label is
+    recoverable, losing the layout on it is not. The client warns first.
+    """
+    db.query(ZoneSection).filter(ZoneSection.floor_id == floor.id).update(
+        {ZoneSection.floor_id: None}, synchronize_session=False
+    )
+    db.delete(floor)
+    db.commit()
+
+
+def _checked_floor_id(db: Session, warehouse_id: int, floor_id: int | None) -> int | None:
+    """A section may only sit on a floor of its OWN warehouse.
+
+    Without this the floor id is caller-supplied and unvalidated, so a manager
+    could park a box on another warehouse's floor -- the same hole the
+    warehouse scoping in the router closes for sections.
+    """
+    if floor_id is None:
+        return None
+    floor = db.get(Floor, floor_id)
+    if floor is None or floor.warehouse_id != warehouse_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Floor does not belong to this warehouse",
+        )
+    return floor_id
+
+
 def _apply_item_to_section(db: Session, warehouse_id: int, item: ZoneChangeItemIn) -> None:
     """Apply one create/update/delete item to ZoneSection. Shared by apply_direct and approve_request."""
     if item.actionType == "create":
@@ -31,6 +96,7 @@ def _apply_item_to_section(db: Session, warehouse_id: int, item: ZoneChangeItemI
         section = ZoneSection(
             warehouse_id=warehouse_id,
             kind=proposed.kind if proposed else "shelf",
+            floor_id=_checked_floor_id(db, warehouse_id, proposed.floorId if proposed else None),
             code=proposed.code if proposed else "",
             name=proposed.name if proposed else "",
             x=proposed.x if proposed and proposed.x is not None else 0,
@@ -55,8 +121,12 @@ def _apply_item_to_section(db: Session, warehouse_id: int, item: ZoneChangeItemI
     if proposed is None:
         return
     for field, value in proposed.model_dump(exclude_unset=True).items():
-        if value is not None:
-            setattr(section, field, value)
+        if value is None:
+            continue
+        if field == "floorId":
+            section.floor_id = _checked_floor_id(db, warehouse_id, value)
+            continue
+        setattr(section, field, value)
 
 
 def apply_direct(

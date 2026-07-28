@@ -7,12 +7,34 @@ from app.db.session import Base
 from app.items.models import Product
 
 
+class Floor(Base):
+    """A physical floor of a warehouse building.
+
+    `level` is the ordinal the map sorts tabs by (1 = ground). It is unique per
+    warehouse, so two floors can't claim the same storey, while `name` is free
+    text ("Mezzanine", "Cold Level").
+    """
+
+    __tablename__ = "floors"
+    __table_args__ = (UniqueConstraint("warehouse_id", "level", name="uq_floor_warehouse_level"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id"), nullable=False, index=True)
+    level: Mapped[int] = mapped_column(Integer, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+
+    sections: Mapped[list["ZoneSection"]] = relationship(back_populates="floor")
+
+
 class ZoneSection(Base):
     __tablename__ = "zone_sections"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id"), nullable=False, index=True)
     kind: Mapped[str] = mapped_column(String, nullable=False)  # "shelf" | "zone"
+    # Nullable so deleting a floor doesn't cascade into deleting the boxes on
+    # it -- an unassigned section is recoverable, a deleted one is not.
+    floor_id: Mapped[int | None] = mapped_column(ForeignKey("floors.id"), nullable=True, index=True)
     code: Mapped[str] = mapped_column(String, nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
     x: Mapped[float] = mapped_column(Float, nullable=False)
@@ -20,6 +42,8 @@ class ZoneSection(Base):
     width: Mapped[float] = mapped_column(Float, nullable=False)
     height: Mapped[float] = mapped_column(Float, nullable=False)
     capacity: Mapped[int] = mapped_column(Integer, nullable=False)  # shelves only; ignored for "zone"
+
+    floor: Mapped["Floor | None"] = relationship(back_populates="sections")
 
 
 class ZoneStockEntry(Base):

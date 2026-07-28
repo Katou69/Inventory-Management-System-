@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Warehouse, Package, Building2, Shield, TrendingUp, User, Mail, Lock, Eye, EyeOff, Sun, Moon } from "lucide-react";
 import { Role } from "@/types/user";
 import type { Warehouse as WarehouseEntity } from "@/types/dashboard";
@@ -30,7 +30,6 @@ const PASSWORD_HINT = "At least 8 characters, with uppercase, lowercase, a numbe
 
 export default function AuthPage() {
   const { signIn, signUp, signInDemo, theme, setTheme } = useAuth();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [showPw, setShowPw] = useState(false);
@@ -67,8 +66,7 @@ export default function AuthPage() {
         // Reset form
         setForm({ name: "", email: "", password: "", warehouseId: 1 });
       } else {
-        await signIn(form.email, form.password);
-        router.push(searchParams.get("next") ?? "/dashboard");
+        await signIn(form.email, form.password, searchParams.get("next") ?? "/dashboard");
       }
     } catch (err) {
       let message = mode === "signup" ? "Sign up failed. Please try again." : "Sign in failed. Please try again.";
@@ -84,8 +82,7 @@ export default function AuthPage() {
   };
 
   const demoLogin = (role: Role) => {
-    signInDemo(role);
-    router.push(searchParams.get("next") ?? "/dashboard");
+    signInDemo(role, searchParams.get("next") ?? "/dashboard");
   };
 
   return (

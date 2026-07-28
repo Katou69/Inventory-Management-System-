@@ -35,20 +35,23 @@
  * bar under the quantity line shows the exact %, independent of that 3-tier
  * color.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   MousePointer2, Hand, Boxes, SquareDashed, Plus, Minus, Maximize, LocateFixed,
   X, Check, Loader2, Undo2, Redo2, Copy, Trash2, ImagePlus, Eye, EyeOff,
 } from "lucide-react"
 import {
   getZones, getZoneStock, getPendingRequests,
+  getFloors, createFloor, renameFloor, deleteFloor as deleteFloorApi,
   applyDirectChange, proposeChange, approveRequest, rejectRequest,
-  zoneOccupancy, zoneStockTotal,
+  zoneOccupancy, zoneStockTotal, stockTotals, occupancyOf,
 } from "@/services/zone-service"
 import type {
-  ViewerRole, ZoneSection, ZoneStockEntry, ZoneChangeRequest, ZoneChangeItem,
+  ViewerRole, Floor, ZoneSection, ZoneStockEntry, ZoneChangeRequest, ZoneChangeItem,
   ZoneChangeAction, ZoneFields, ZoneOccupancy,
 } from "@/types/dashboard"
+type PendingOverlay = { req: ZoneChangeRequest; item: ZoneChangeItem }
+
 const VIEW_H     = 560   // canvas window height (px)
 const GRID       = 20    // world units per grid cell
 const MIN_SIZE   = 40    // smallest zone (world units)
@@ -124,7 +127,7 @@ function snapToEdges(x: number, y: number, w: number, h: number, others: { x: nu
 }
 
 function snapshot(z: ZoneSection): ZoneFields {
-  return { kind: z.kind, code: z.code, name: z.name, x: z.x, y: z.y, width: z.width, height: z.height, capacity: z.capacity }
+  return { kind: z.kind, floorId: z.floorId, code: z.code, name: z.name, x: z.x, y: z.y, width: z.width, height: z.height, capacity: z.capacity }
 }
 
 /** Fields in `proposed` that differ from `previous`. */
@@ -179,18 +182,149 @@ function inverseDraft(d: CommitDraft): CommitDraft {
 }
 
 // ---------------------------------------------------------------------------
+// One box on the map
+// ---------------------------------------------------------------------------
+// Split out and memoized: the map re-renders on every pointer event during a
+// drag, and without this every box (~12 DOM nodes each, 8 of them resize
+// handles) reconciled every time — including the ~95% that didn't move.
+// `total` is passed as a number rather than the whole stock list so a box
+// re-renders only when its OWN quantity changes.
+type ZoneBoxProps = {
+  zone: ZoneSection
+  geom: ZoneFields | undefined
+  total: number
+  selected: boolean
+  stagedEdit: CommitDraft | null
+  req: ZoneChangeRequest | undefined
+  pItem: ZoneChangeItem | undefined
+  showHandles: boolean
+  canDrag: boolean
+  scale: Scale | null
+  selectedRequestId: number | null
+  onPointerDown: (e: React.PointerEvent, zone: ZoneSection, mode: DragMode) => void
+  onClick: (e: React.MouseEvent, zone: ZoneSection, req: ZoneChangeRequest | undefined) => void
+  onSelectRequest: (requestId: number) => void
+}
+
+const ZoneBox = memo(function ZoneBox({
+  zone, geom, total, selected, stagedEdit, req, pItem, showHandles, canDrag,
+  scale, selectedRequestId, onPointerDown, onClick, onSelectRequest,
+}: ZoneBoxProps) {
+  const x = geom?.x ?? zone.x
+  const y = geom?.y ?? zone.y
+  const w = geom?.width ?? zone.width
+  const h = geom?.height ?? zone.height
+  const isZone = zone.kind === "zone"
+  const occ: ZoneOccupancy = isZone ? "empty" : occupancyOf(total, zone.capacity)
+  const shownTotal = isZone ? 0 : total
+  const pct = isZone || zone.capacity <= 0 ? 0 : Math.min(100, Math.round((shownTotal / zone.capacity) * 100))
+  const liveIsDashed = !!req
+  const realSize = scale ? `${(w / scale.pxPerUnit).toFixed(1)} × ${(h / scale.pxPerUnit).toFixed(1)} ${scale.unit}` : null
+
+  return (
+    <div>
+      <div
+        onPointerDown={(e) => onPointerDown(e, zone, "move")}
+        onClick={(e) => onClick(e, zone, req)}
+        className={`absolute rounded-md border-2 ${
+          isZone ? "border-dashed border-slate-400 dark:border-slate-600 bg-slate-500/[0.04] dark:bg-slate-400/[0.06]" : `bg-transparent ${occupancyBorder[occ]}`
+        } ${liveIsDashed ? "border-dashed opacity-60" : ""} ${
+          stagedEdit ? "border-amber-500 border-dashed" : ""
+        } ${
+          selected ? "ring-2 ring-[#1A6B8A] dark:ring-primary ring-offset-1" : ""
+        } ${canDrag ? "cursor-move" : ""}`}
+        style={{ left: x, top: y, width: w, height: h }}
+      >
+        {isZone ? (
+          <span className="absolute top-1.5 left-1.5 bg-card/80 text-muted-foreground text-[10px] font-semibold uppercase tracking-wide px-1.5 py-px rounded pointer-events-none">
+            {zone.code} · {zone.name}
+          </span>
+        ) : (
+          <div className="absolute top-1 left-1.5 right-1 leading-tight pointer-events-none">
+            <p className="text-xs font-bold font-mono text-foreground">{zone.code}</p>
+            {h >= 52 && w >= 90 && (
+              <p className="text-[10px] font-medium text-muted-foreground truncate">{zone.name}</p>
+            )}
+            {h >= 40 && (
+              <>
+                <p className={`text-[10px] font-mono font-medium ${occupancyText[occ]}`}>
+                  {shownTotal.toLocaleString()} / {zone.capacity.toLocaleString()} · {pct}%
+                </p>
+                <div className="h-1 rounded-full bg-accent mt-0.5 overflow-hidden">
+                  <div className={`h-full rounded-full ${occupancyBar[occ]}`} style={{ width: `${pct}%` }} />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+        {showHandles && HANDLES.map((hd) => {
+          const pos = handleOffset(hd.dir, w, h)
+          return (
+            <div
+              key={hd.dir}
+              onPointerDown={(e) => onPointerDown(e, zone, hd.dir)}
+              className="absolute size-2 rounded-sm bg-card border-2 border-slate-400 dark:border-slate-600"
+              style={{ left: pos.left, top: pos.top, cursor: hd.cursor }}
+            />
+          )
+        })}
+      </div>
+
+      {realSize && selected && (
+        <span className="absolute text-[10px] font-medium text-muted-foreground bg-card/90 px-1 rounded pointer-events-none" style={{ left: x, top: y + h + 3 }}>
+          {realSize}
+        </span>
+      )}
+
+      {stagedEdit && (
+        <span className="absolute px-1.5 py-px rounded bg-amber-500 text-white text-[10px] font-semibold pointer-events-none" style={{ left: x + 4, top: y - 10 }}>
+          {stagedEdit.actionType === "create" ? "New · draft" : "Draft"}
+        </span>
+      )}
+
+      {pItem && pItem.actionType === "update" && pItem.proposedData && (
+        <div
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); onSelectRequest(req!.id) }}
+          className={`absolute rounded-md border-2 bg-transparent border-[#1A6B8A] dark:border-primary cursor-pointer ${
+            selectedRequestId === req!.id ? "ring-2 ring-[#1A6B8A] dark:ring-primary ring-offset-1" : ""
+          }`}
+          style={{
+            left:   pItem.proposedData.x ?? zone.x,
+            top:    pItem.proposedData.y ?? zone.y,
+            width:  pItem.proposedData.width ?? zone.width,
+            height: pItem.proposedData.height ?? zone.height,
+          }}
+        >
+          <div className="absolute top-1 left-1.5 leading-tight pointer-events-none">
+            <p className="text-xs font-bold text-[#1A6B8A] dark:text-primary">{pItem.proposedData.code ?? zone.code}</p>
+          </div>
+          <span className="absolute -top-2.5 right-1 px-1.5 py-px rounded bg-[#1A6B8A] dark:bg-primary text-white dark:text-primary-foreground text-[10px] font-semibold pointer-events-none">Pending</span>
+        </div>
+      )}
+
+      {pItem && pItem.actionType === "delete" && (
+        <span className="absolute px-1.5 py-px rounded bg-red-600 text-white text-[10px] font-semibold pointer-events-none" style={{ left: x + 4, top: y - 10 }}>
+          Delete pending
+        </span>
+      )}
+    </div>
+  )
+})
+
+// ---------------------------------------------------------------------------
 // Floors
 // ---------------------------------------------------------------------------
-// A warehouse building can span multiple physical floors, but `ZoneSection`
-// (and the mock backend) has no floor concept yet — only `warehouseId`.
-// Rather than block this on a schema/API change, floors are modeled here as a
-// client-side grouping over the existing flat zone list: `floorAssignment`
-// maps each zone id to a floor id (defaulting to the first floor for any zone
-// that predates floors). Blueprint images and the grid-to-real-world scale
-// are floor-scoped the same way. None of this is sent to the server yet —
-// TODO once the backend grows a `floors` table: swap `floorAssignment` for a
-// real `zone.floorId` column and persist floors/blueprints server-side.
-type Floor = { id: number; name: string }
+// Floors are a real server-side table: a section points at one via `floorId`,
+// and floors carry their own `level` (tab order) and `name`. Adding, renaming
+// and deleting a floor are immediate, persisted operations for both roles —
+// they are not part of the maker-checker layout proposal, which covers only
+// the boxes on a floor. Deleting a floor unassigns its sections rather than
+// deleting them (see delete_floor in the backend service).
+//
+// ponytail: blueprint images and the grid scale are still client-only —
+// they're presentational aids, and persisting images needs an upload endpoint.
+// Add when someone needs a blueprint to survive a reload.
 type BlueprintImage = { dataUrl: string; x: number; y: number; width: number; height: number }
 type Scale = { pxPerUnit: number; unit: "ft" | "m" }
 
@@ -244,17 +378,14 @@ export default function ZoneLayoutCanvas({
   const [adminHistory, setAdminHistory] = useState<CommitDraft[]>([])
   const [adminFuture, setAdminFuture] = useState<CommitDraft[]>([])
 
-  // Floors (client-side grouping — see the "Floors" comment above)
-  const [floors, setFloors] = useState<Floor[]>([{ id: 1, name: "Floor 1" }])
-  const [activeFloorId, setActiveFloorId] = useState(1)
+  // Floors — server-owned (see comment above). activeFloorId is null only
+  // before the first load resolves.
+  const [floors, setFloors] = useState<Floor[]>([])
+  const [activeFloorId, setActiveFloorId] = useState<number | null>(null)
   const activeFloorIdRef = useRef(activeFloorId)
   useEffect(() => { activeFloorIdRef.current = activeFloorId }, [activeFloorId])
-  const [floorAssignment, setFloorAssignment] = useState<Record<number, number>>({})
-  const floorAssignmentRef = useRef(floorAssignment)
-  useEffect(() => { floorAssignmentRef.current = floorAssignment }, [floorAssignment])
   const [renamingFloorId, setRenamingFloorId] = useState<number | null>(null)
   const [floorNameDraft, setFloorNameDraft] = useState("")
-  const zoneFloorId = useCallback((zoneId: number) => floorAssignment[zoneId] ?? floors[0]?.id ?? 1, [floorAssignment, floors])
 
   // Blueprint image + real-world scale, per floor
   const [blueprints, setBlueprints] = useState<Record<number, BlueprintImage>>({})
@@ -271,18 +402,25 @@ export default function ZoneLayoutCanvas({
   const activeTool: Tool = !canEdit && isDrawTool(tool) ? "select" : tool
 
   const refresh = useCallback(async () => {
+    // Staff have no pending-request access (the backend restricts
+    // GET /layout-requests to admin/manager) and never render the overlays
+    // anyway — fetching it here 403s and takes the whole Promise.all down.
     try {
-      const [z, s, p] = await Promise.all([
+      const [f, z, s, p] = await Promise.all([
+        getFloors(warehouseId),
         getZones(warehouseId),
         getZoneStock(warehouseId),
-        getPendingRequests(warehouseId),
+        role === "staff" ? Promise.resolve([]) : getPendingRequests(warehouseId),
       ])
+      setFloors(f)
       setZones(z)
       setStock(s)
       setPending(p)
       setDraftGeom({})
       setStaged([])
       setLoadError(null)
+      // Keep the current floor if it still exists, else fall back to the lowest.
+      setActiveFloorId((cur) => (cur != null && f.some((fl) => fl.id === cur) ? cur : f[0]?.id ?? null))
       return z
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Failed to load warehouse map")
@@ -290,70 +428,102 @@ export default function ZoneLayoutCanvas({
     } finally {
       setLoading(false)
     }
-  }, [warehouseId])
+  }, [warehouseId, role])
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void refresh().then(() => requestAnimationFrame(fitToContent)) }, [refresh])
 
-  // Any zone id that shows up after a mutation and has no floor yet belongs
-  // to whichever floor was active when the edit was made.
-  const adoptNewZoneFloors = useCallback((beforeIds: Set<number>, afterZones: ZoneSection[]) => {
-    const newIds = afterZones.map((z) => z.id).filter((id) => !beforeIds.has(id) && !(id in floorAssignmentRef.current))
-    if (newIds.length === 0) return
-    setFloorAssignment((prev) => {
-      const next = { ...prev }
-      for (const id of newIds) next[id] = activeFloorIdRef.current
-      return next
-    })
-  }, [])
+  /** zoneId -> its first pending request/item. First-wins, matching the .find() this
+   *  replaced; built once per `pending` change instead of a flatMap per box per render. */
+  const pendingByZone = useMemo(() => {
+    const byZone = new Map<number, { req: ZoneChangeRequest; item: ZoneChangeItem }>()
+    for (const req of pending) {
+      for (const item of req.items) {
+        if (item.sectionId != null && !byZone.has(item.sectionId)) {
+          byZone.set(item.sectionId, { req, item })
+        }
+      }
+    }
+    return byZone
+  }, [pending])
 
-  const pendingForZone = (zoneId: number) =>
-    pending.find((r) => r.items.some((it) => it.sectionId === zoneId))
+  const pendingForZone = (zoneId: number) => pendingByZone.get(zoneId)?.req
   const pendingItemForZone = (zoneId: number): ZoneChangeItem | undefined =>
-    pending.flatMap((r) => r.items).find((it) => it.sectionId === zoneId)
-  /** Which floor a pending item concerns — used to scope the map to one floor at a time. */
-  const itemFloorId = (item: ZoneChangeItem): number => {
-    if (item.actionType === "create") return activeFloorIdRef.current // no live zone yet; assume current floor
+    pendingByZone.get(zoneId)?.item
+  /** Which floor a pending item concerns — used to scope the map to one floor at a time.
+   *  useCallback'd so the pendingCreates memo below can actually cache. */
+  const itemFloorId = useCallback((item: ZoneChangeItem): number | null => {
+    if (item.actionType === "create") return item.proposedData?.floorId ?? activeFloorIdRef.current
     const z = zones.find((zz) => zz.id === item.sectionId)
-    return z ? zoneFloorId(z.id) : activeFloorIdRef.current
-  }
+    return z?.floorId ?? activeFloorIdRef.current
+  }, [zones])
 
   const stagedFor = (zoneId: number) => staged.find((d) => d.sectionId === zoneId) ?? null
-  const stagedDeleteIds = new Set(
-    staged.filter((d) => d.actionType === "delete").map((d) => d.sectionId),
+  const stagedDeleteIds = useMemo(
+    () => new Set(staged.filter((d) => d.actionType === "delete").map((d) => d.sectionId)),
+    [staged],
   )
 
-  const allDisplayZones: ZoneSection[] =
-    role === "manager"
-      ? [
-          ...zones
-            .filter((z) => !stagedDeleteIds.has(z.id))
-            .map((z) => {
-              const s = stagedFor(z.id)
-              return s?.actionType === "update" && s.proposed ? { ...z, ...s.proposed } : z
-            }),
-          ...staged
-            .filter((d) => d.actionType === "create" && d.sectionId != null)
-            .map((d) => ({
-              id: d.sectionId as number,
-              warehouseId,
-              kind: d.proposed?.kind ?? "shelf",
-              code: d.proposed?.code ?? "NEW",
-              name: d.proposed?.name ?? "",
-              x: d.proposed?.x ?? 20,
-              y: d.proposed?.y ?? 20,
-              width: d.proposed?.width ?? 150,
-              height: d.proposed?.height ?? 150,
-              capacity: d.proposed?.capacity ?? 100,
-            } satisfies ZoneSection)),
-        ]
-      : zones
+  // Memoized so `displayZones` below can actually hit its cache: a fresh array here
+  // every render meant its dep changed identity every render, defeating it entirely.
+  const allDisplayZones: ZoneSection[] = useMemo(
+    () =>
+      role === "manager"
+        ? [
+            ...zones
+              .filter((z) => !stagedDeleteIds.has(z.id))
+              .map((z) => {
+                const s = staged.find((d) => d.sectionId === z.id) ?? null
+                return s?.actionType === "update" && s.proposed ? { ...z, ...s.proposed } : z
+              }),
+            ...staged
+              .filter((d) => d.actionType === "create" && d.sectionId != null)
+              .map((d) => ({
+                id: d.sectionId as number,
+                warehouseId,
+                kind: d.proposed?.kind ?? "shelf",
+                floorId: d.proposed?.floorId ?? activeFloorId,
+                code: d.proposed?.code ?? "NEW",
+                name: d.proposed?.name ?? "",
+                x: d.proposed?.x ?? 20,
+                y: d.proposed?.y ?? 20,
+                width: d.proposed?.width ?? 150,
+                height: d.proposed?.height ?? 150,
+                capacity: d.proposed?.capacity ?? 100,
+              } satisfies ZoneSection)),
+          ]
+        : zones, // identity-stable for non-managers: the same `zones` array back
+    [role, zones, staged, stagedDeleteIds, warehouseId, activeFloorId],
+  )
+
+  /** sectionId -> total units, built once per stock load instead of per box per render. */
+  const totals = useMemo(() => stockTotals(stock), [stock])
 
   // The map only ever shows the active floor's zones.
   const displayZones = useMemo(
-    () => allDisplayZones.filter((z) => zoneFloorId(z.id) === activeFloorId),
-    [allDisplayZones, zoneFloorId, activeFloorId],
+    () => allDisplayZones.filter((z) => z.floorId === activeFloorId),
+    [allDisplayZones, activeFloorId],
   )
+
+  // zone-kind boxes first so they sit behind shelf blocks. sort() is stable, so
+  // boxes of the same kind keep their relative order.
+  const sortedDisplayZones = useMemo(
+    () => [...displayZones].sort((a, b) => (a.kind === "zone" ? 0 : 1) - (b.kind === "zone" ? 0 : 1)),
+    [displayZones],
+  )
+
+  // Mirrored for the pointer handlers below: reading these from a ref keeps the
+  // handlers' identity stable ([] deps), so a memoized ZoneBox isn't re-rendered
+  // by every box just because the selection changed.
+  // (canEdit derives from `role`, a prop — no mirror needed, it can't change here.)
+  const displayZonesRef = useRef(displayZones)
+  const selectedIdsRef = useRef(selectedIds)
+  const activeToolRef = useRef(activeTool)
+  const pendingByZoneRef = useRef(pendingByZone)
+  useEffect(() => { displayZonesRef.current = displayZones }, [displayZones])
+  useEffect(() => { selectedIdsRef.current = selectedIds }, [selectedIds])
+  useEffect(() => { activeToolRef.current = activeTool }, [activeTool])
+  useEffect(() => { pendingByZoneRef.current = pendingByZone }, [pendingByZone])
 
   const selectedZone = displayZones.find((z) => z.id === selectedZoneId) ?? null
   const selectedRequest = pending.find((r) => r.id === selectedRequestId) ?? null
@@ -403,7 +573,7 @@ export default function ZoneLayoutCanvas({
 
   function fitToContent() {
     const boxes = [
-      ...zones.filter((z) => zoneFloorId(z.id) === activeFloorId).map((z) => ({ x: z.x, y: z.y, w: z.width, h: z.height })),
+      ...zones.filter((z) => z.floorId === activeFloorId).map((z) => ({ x: z.x, y: z.y, w: z.width, h: z.height })),
       ...pending
         .flatMap((r) => r.items)
         .filter((it) => it.actionType === "create" && itemFloorId(it) === activeFloorId)
@@ -436,7 +606,6 @@ export default function ZoneLayoutCanvas({
     try {
       await applyDirectChange({ warehouseId, item: toChangeItem(draft), requestedBy: viewerName })
       const afterZones = await refresh()
-      adoptNewZoneFloors(beforeIds, afterZones)
       let resolved = draft
       if (draft.actionType === "create") {
         const newId = afterZones.map((z) => z.id).find((id) => !beforeIds.has(id)) ?? null
@@ -460,9 +629,6 @@ export default function ZoneLayoutCanvas({
   function stageChange(draft: CommitDraft) {
     setManagerHistory((h) => [...h, staged.map((d) => ({ ...d }))])
     setManagerFuture([])
-    if (draft.actionType === "create" && draft.sectionId != null) {
-      setFloorAssignment((prev) => ({ ...prev, [draft.sectionId as number]: activeFloorId }))
-    }
     setStaged((prev) => {
       if (draft.actionType === "delete" && draft.sectionId != null && draft.sectionId < 0) {
         return prev.filter((d) => d.sectionId !== draft.sectionId)
@@ -570,8 +736,12 @@ export default function ZoneLayoutCanvas({
   // -------------------------------------------------------------------------
   // Pointer handling — select / move / 8-point resize / marquee / pan / draw
   // -------------------------------------------------------------------------
-  function onZonePointerDown(e: React.PointerEvent, zone: ZoneSection, mode: DragMode) {
-    if (pendingForZone(zone.id)) { e.stopPropagation(); return }
+  // Reads its inputs from refs so its identity is stable: as a prop on a memoized
+  // ZoneBox, a changing identity here would re-render every box on every selection.
+  const onZonePointerDown = useCallback((e: React.PointerEvent, zone: ZoneSection, mode: DragMode) => {
+    const activeTool = activeToolRef.current
+    const selectedIds = selectedIdsRef.current
+    if (pendingByZoneRef.current.has(zone.id)) { e.stopPropagation(); return }
     if (!canEdit || activeTool === "pan") return
     if (isDrawTool(activeTool) && mode === "move") return
     e.preventDefault()
@@ -581,15 +751,15 @@ export default function ZoneLayoutCanvas({
     const groupIds = inMultiSelection ? selectedIds.slice() : [zone.id]
     const origByZoneId: DragState["origByZoneId"] = {}
     for (const id of groupIds) {
-      const z = displayZones.find((zz) => zz.id === id)
+      const z = displayZonesRef.current.find((zz) => zz.id === id)
       if (z) origByZoneId[id] = { x: z.x, y: z.y, width: z.width, height: z.height }
     }
     dragRef.current = { zoneId: zone.id, mode, startX: e.clientX, startY: e.clientY, groupIds, origByZoneId }
     dragMovedRef.current = false
-  }
+  }, [canEdit])
 
   function onBgPointerDown(e: React.PointerEvent, mode: "move" | ResizeDir) {
-    if (!bgEditing) return
+    if (!bgEditing || activeFloorId == null) return
     const bg = blueprints[activeFloorId]
     if (!bg) return
     e.preventDefault()
@@ -650,7 +820,7 @@ export default function ZoneLayoutCanvas({
       setDrawRect(next)
       return
     }
-    if (bgDragRef.current) {
+    if (bgDragRef.current && activeFloorId != null) {
       const bd = bgDragRef.current
       const dx = (e.clientX - bd.startX) / view.zoom
       const dy = (e.clientY - bd.startY) / view.zoom
@@ -708,7 +878,7 @@ export default function ZoneLayoutCanvas({
         void submitChange({
           actionType: "create",
           sectionId,
-          proposed: { kind, code, name: kind === "zone" ? "New zone" : "New shelf", x, y, width, height, capacity: kind === "zone" ? 0 : 100 },
+          proposed: { kind, floorId: activeFloorId, code, name: kind === "zone" ? "New zone" : "New shelf", x, y, width, height, capacity: kind === "zone" ? 0 : 100 },
           previous: null,
         })
       }
@@ -737,7 +907,13 @@ export default function ZoneLayoutCanvas({
     }
   }
 
-  function onZoneClick(e: React.MouseEvent, zone: ZoneSection, req: ZoneChangeRequest | undefined) {
+  const selectRequest = useCallback((requestId: number) => {
+    setSelectedRequestId(requestId)
+    setSelectedIds([])
+  }, [])
+
+  // Only touches state setters, so [] deps keep it stable for the memoized ZoneBox.
+  const onZoneClick = useCallback((e: React.MouseEvent, zone: ZoneSection, req: ZoneChangeRequest | undefined) => {
     e.stopPropagation()
     if (req) { setSelectedRequestId(req.id); setSelectedIds([]); return }
     if (e.shiftKey) {
@@ -747,7 +923,7 @@ export default function ZoneLayoutCanvas({
       setSelectedIds([zone.id])
       setSelectedRequestId(null)
     }
-  }
+  }, [])
 
   function nextCode(prefix: string) {
     const codes = new Set(displayZones.map((z) => z.code))
@@ -775,7 +951,7 @@ export default function ZoneLayoutCanvas({
       void submitChange({
         actionType: "create",
         sectionId,
-        proposed: { kind: z.kind, code: nextDupeCode(z.code), name: z.name, x: z.x + GRID * 2, y: z.y + GRID * 2, width: z.width, height: z.height, capacity: z.capacity },
+        proposed: { kind: z.kind, floorId: z.floorId, code: nextDupeCode(z.code), name: z.name, x: z.x + GRID * 2, y: z.y + GRID * 2, width: z.width, height: z.height, capacity: z.capacity },
         previous: null,
       })
     }
@@ -814,7 +990,8 @@ export default function ZoneLayoutCanvas({
   }
 
   // -------------------------------------------------------------------------
-  // Floors — add / rename / delete / switch (client-side; see header comment)
+  // Floors — add / rename / delete / switch. Persisted immediately for both
+  // editor roles; not part of the layout proposal flow (see header comment).
   // -------------------------------------------------------------------------
   function switchFloor(id: number) {
     setActiveFloorId(id)
@@ -823,32 +1000,41 @@ export default function ZoneLayoutCanvas({
     setBgEditing(false)
     requestAnimationFrame(fitToContent)
   }
-  function addFloor() {
-    const id = Date.now()
-    setFloors((prev) => [...prev, { id, name: `Floor ${prev.length + 1}` }])
-    switchFloor(id)
+  async function addFloor() {
+    const level = Math.max(0, ...floors.map((f) => f.level)) + 1
+    setBusy(true)
+    try {
+      const floor = await createFloor(warehouseId, level, `Floor ${level}`)
+      setFloors((prev) => [...prev, floor].sort((a, b) => a.level - b.level))
+      switchFloor(floor.id)
+    } finally { setBusy(false) }
   }
   function startRenameFloor(f: Floor) { setRenamingFloorId(f.id); setFloorNameDraft(f.name) }
-  function commitRenameFloor() {
+  async function commitRenameFloor() {
+    const id = renamingFloorId
     const name = floorNameDraft.trim()
-    if (name) setFloors((prev) => prev.map((f) => (f.id === renamingFloorId ? { ...f, name } : f)))
     setRenamingFloorId(null)
+    const current = floors.find((f) => f.id === id)
+    if (id == null || !name || name === current?.name) return
+    const updated = await renameFloor(id, name)
+    setFloors((prev) => prev.map((f) => (f.id === id ? updated : f)))
   }
-  function deleteFloor(id: number) {
+  async function removeFloor(id: number) {
     if (floors.length <= 1) return
-    const hasZones = zones.some((z) => zoneFloorId(z.id) === id)
-    if (hasZones && !window.confirm("This floor has zones/shelves on it. Delete the floor and everything on it?")) return
-    const idsOnFloor = zones.filter((z) => zoneFloorId(z.id) === id).map((z) => z.id)
-    for (const zid of idsOnFloor) {
-      const z = zones.find((zz) => zz.id === zid)
-      if (z) void submitChange({ actionType: "delete", sectionId: zid, proposed: null, previous: snapshot(z) })
-    }
-    setFloors((prev) => prev.filter((f) => f.id !== id))
-    setBlueprints((prev) => { const next = { ...prev }; delete next[id]; return next })
-    if (activeFloorId === id) {
+    const count = zones.filter((z) => z.floorId === id).length
+    if (count > 0 && !window.confirm(
+      `This floor has ${count} zone/shelf box${count === 1 ? "" : "es"} on it. ` +
+      `Deleting the floor keeps the boxes but leaves them unassigned. Continue?`,
+    )) return
+    setBusy(true)
+    try {
+      await deleteFloorApi(id)
+      setBlueprints((prev) => { const next = { ...prev }; delete next[id]; return next })
       const remaining = floors.filter((f) => f.id !== id)
-      if (remaining[0]) switchFloor(remaining[0].id)
-    }
+      setFloors(remaining)
+      if (activeFloorId === id && remaining[0]) switchFloor(remaining[0].id)
+      await refresh()
+    } finally { setBusy(false) }
   }
 
   // -------------------------------------------------------------------------
@@ -856,7 +1042,11 @@ export default function ZoneLayoutCanvas({
   // -------------------------------------------------------------------------
   function onBgFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (!file) return
+    // Pin the target floor now: reading + decoding is async, and the user can
+    // switch tabs before it finishes -- the blueprint belongs to the floor that
+    // was active when they picked the file.
+    const floorId = activeFloorId
+    if (!file || floorId == null) return
     const reader = new FileReader()
     reader.onload = () => {
       const dataUrl = reader.result as string
@@ -864,7 +1054,7 @@ export default function ZoneLayoutCanvas({
       img.onload = () => {
         const maxDim = 1400
         const f = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight))
-        setBlueprints((prev) => ({ ...prev, [activeFloorId]: { dataUrl, x: 0, y: 0, width: Math.round(img.naturalWidth * f), height: Math.round(img.naturalHeight * f) } }))
+        setBlueprints((prev) => ({ ...prev, [floorId]: { dataUrl, x: 0, y: 0, width: Math.round(img.naturalWidth * f), height: Math.round(img.naturalHeight * f) } }))
         setBgEditing(true)
         setBgVisible(true)
       }
@@ -874,6 +1064,7 @@ export default function ZoneLayoutCanvas({
     e.target.value = ""
   }
   function removeBlueprint() {
+    if (activeFloorId == null) return
     setBlueprints((prev) => { const next = { ...prev }; delete next[activeFloorId]; return next })
     setBgEditing(false)
     setBgVisible(true)
@@ -881,7 +1072,7 @@ export default function ZoneLayoutCanvas({
   // The blueprint <img> never gets a templated/derived `src` — it's set
   // imperatively once real image data exists, so there's nothing for the
   // browser to eagerly (and wrongly) fetch before that data is ready.
-  const currentBlueprint = blueprints[activeFloorId] ?? null
+  const currentBlueprint = activeFloorId == null ? null : blueprints[activeFloorId] ?? null
   useEffect(() => {
     if (bgImgElRef.current) {
       if (currentBlueprint?.dataUrl) bgImgElRef.current.src = currentBlueprint.dataUrl
@@ -905,13 +1096,11 @@ export default function ZoneLayoutCanvas({
   // Admin review actions
   // -------------------------------------------------------------------------
   async function onApprove(req: ZoneChangeRequest) {
-    const beforeIds = new Set(zones.map((z) => z.id))
     setBusy(true)
     try {
       await approveRequest(req.id, viewerName)
       setSelectedRequestId(null)
-      const afterZones = await refresh()
-      adoptNewZoneFloors(beforeIds, afterZones)
+      await refresh()
     }
     finally { setBusy(false) }
   }
@@ -926,14 +1115,20 @@ export default function ZoneLayoutCanvas({
   // Rendering
   // -------------------------------------------------------------------------
   const showPendingOverlays = role !== "staff"
-  type PendingOverlay = { req: ZoneChangeRequest; item: ZoneChangeItem }
-  const pendingOverlays: PendingOverlay[] = showPendingOverlays
-    ? pending.flatMap((req) => req.items.map((item) => ({ req, item }))).filter((o) => itemFloorId(o.item) === activeFloorId)
-    : []
-  const pendingCreates = pendingOverlays.filter((o) => o.item.actionType === "create")
-  const floorPendingCount = showPendingOverlays
-    ? pending.filter((r) => r.items.some((it) => itemFloorId(it) === activeFloorId)).length
-    : 0
+  // itemFloorId reads `zones` and activeFloorIdRef; both are covered by the deps below
+  // (the ref tracks activeFloorId, which is already a dep).
+  const { pendingCreates, floorPendingCount } = useMemo(() => {
+    if (!showPendingOverlays) {
+      return { pendingCreates: [] as PendingOverlay[], floorPendingCount: 0 }
+    }
+    const overlays = pending
+      .flatMap((req) => req.items.map((item) => ({ req, item })))
+      .filter((o) => itemFloorId(o.item) === activeFloorId)
+    return {
+      pendingCreates: overlays.filter((o) => o.item.actionType === "create"),
+      floorPendingCount: pending.filter((r) => r.items.some((it) => itemFloorId(it) === activeFloorId)).length,
+    }
+  }, [showPendingOverlays, pending, activeFloorId, itemFloorId])
 
   const cursor =
     activeTool === "pan"    ? (isPanning ? "grabbing" : "grab") :
@@ -996,22 +1191,25 @@ export default function ZoneLayoutCanvas({
               {renamingFloorId === f.id ? (
                 <input
                   autoFocus value={floorNameDraft} onChange={(e) => setFloorNameDraft(e.target.value)}
-                  onBlur={commitRenameFloor} onKeyDown={(e) => e.key === "Enter" && commitRenameFloor()}
-                  className="w-24 px-1.5 py-0.5 text-xs font-semibold rounded border border-border text-foreground bg-input-background focus:outline-none"
+                  onBlur={() => void commitRenameFloor()}
+                  onKeyDown={(e) => { if (e.key === "Enter") void commitRenameFloor(); if (e.key === "Escape") setRenamingFloorId(null) }}
+                  className="w-28 px-1.5 py-0.5 text-xs font-semibold rounded border border-border text-foreground bg-input-background focus:outline-none"
                 />
               ) : (
                 <span
                   onClick={() => switchFloor(f.id)}
-                  onDoubleClick={() => startRenameFloor(f)}
+                  onDoubleClick={() => canEdit && startRenameFloor(f)}
+                  title={canEdit ? "Double-click to rename" : undefined}
                   className={`text-xs font-semibold select-none ${active ? "text-white dark:text-primary-foreground" : "text-foreground/80"}`}
                 >
                   {f.name}
                 </span>
               )}
-              {floors.length > 1 && (
+              {canEdit && floors.length > 1 && (
                 <button
-                  title="Delete floor" onClick={(e) => { e.stopPropagation(); deleteFloor(f.id) }}
-                  className={`text-xs px-1 leading-none ${active ? "text-white/70 dark:text-primary-foreground/70" : "text-muted-foreground"}`}
+                  title="Delete floor" disabled={busy}
+                  onClick={(e) => { e.stopPropagation(); void removeFloor(f.id) }}
+                  className={`text-xs px-1 leading-none disabled:opacity-40 ${active ? "text-white/70 dark:text-primary-foreground/70" : "text-muted-foreground"}`}
                 >
                   ×
                 </button>
@@ -1019,9 +1217,11 @@ export default function ZoneLayoutCanvas({
             </div>
           )
         })}
-        <button onClick={addFloor} className="text-xs font-medium text-[#1A6B8A] dark:text-primary border border-dashed border-[#1A6B8A]/40 dark:border-primary/40 rounded-lg px-2.5 py-1.5 hover:bg-accent transition-colors">
-          + Add floor
-        </button>
+        {canEdit && (
+          <button onClick={() => void addFloor()} disabled={busy} className="text-xs font-medium text-[#1A6B8A] dark:text-primary border border-dashed border-[#1A6B8A]/40 dark:border-primary/40 rounded-lg px-2.5 py-1.5 hover:bg-accent transition-colors disabled:opacity-40">
+            + Add floor
+          </button>
+        )}
       </div>
 
       {/* Actions bar: undo/redo, duplicate/delete, blueprint import, grid scale */}
@@ -1172,112 +1372,26 @@ export default function ZoneLayoutCanvas({
             )}
 
             {/* zone-kind boxes render first so they sit behind shelf blocks */}
-            {[...displayZones].sort((a, b) => (a.kind === "zone" ? 0 : 1) - (b.kind === "zone" ? 0 : 1)).map((zone) => {
+            {sortedDisplayZones.map((zone) => {
               const req = showPendingOverlays ? pendingForZone(zone.id) : undefined
-              const pItem = req ? pendingItemForZone(zone.id) : undefined
-              const stagedEdit = stagedFor(zone.id)
-              const geom = draftGeom[zone.id]
-              const x = geom?.x ?? zone.x
-              const y = geom?.y ?? zone.y
-              const w = geom?.width ?? zone.width
-              const h = geom?.height ?? zone.height
-              const isZone = zone.kind === "zone"
-              const occ = isZone ? "empty" : zoneOccupancy(zone, stock)
-              const total = isZone ? 0 : zoneStockTotal(zone.id, stock)
-              const pct = isZone || zone.capacity <= 0 ? 0 : Math.min(100, Math.round((total / zone.capacity) * 100))
-              const selected = selectedIds.includes(zone.id)
-              const liveIsDashed = !!req
-              const showHandles = canEdit && !req && activeTool !== "pan" && selectedIds.length <= 1
-              const realSize = scale ? `${(w / scale.pxPerUnit).toFixed(1)} × ${(h / scale.pxPerUnit).toFixed(1)} ${scale.unit}` : null
-
               return (
-                <div key={zone.id}>
-                  <div
-                    onPointerDown={(e) => onZonePointerDown(e, zone, "move")}
-                    onClick={(e) => onZoneClick(e, zone, req)}
-                    className={`absolute rounded-md border-2 ${
-                      isZone ? "border-dashed border-slate-400 dark:border-slate-600 bg-slate-500/[0.04] dark:bg-slate-400/[0.06]" : `bg-transparent ${occupancyBorder[occ]}`
-                    } ${liveIsDashed ? "border-dashed opacity-60" : ""} ${
-                      stagedEdit ? "border-amber-500 border-dashed" : ""
-                    } ${
-                      selected ? "ring-2 ring-[#1A6B8A] dark:ring-primary ring-offset-1" : ""
-                    } ${canEdit && !req && activeTool !== "pan" ? "cursor-move" : ""}`}
-                    style={{ left: x, top: y, width: w, height: h }}
-                  >
-                    {isZone ? (
-                      <span className="absolute top-1.5 left-1.5 bg-card/80 text-muted-foreground text-[10px] font-semibold uppercase tracking-wide px-1.5 py-px rounded pointer-events-none">
-                        {zone.code} · {zone.name}
-                      </span>
-                    ) : (
-                      <div className="absolute top-1 left-1.5 right-1 leading-tight pointer-events-none">
-                        <p className="text-xs font-bold font-mono text-foreground">{zone.code}</p>
-                        {h >= 52 && w >= 90 && (
-                          <p className="text-[10px] font-medium text-muted-foreground truncate">{zone.name}</p>
-                        )}
-                        {h >= 40 && (
-                          <>
-                            <p className={`text-[10px] font-mono font-medium ${occupancyText[occ]}`}>
-                              {total.toLocaleString()} / {zone.capacity.toLocaleString()} · {pct}%
-                            </p>
-                            <div className="h-1 rounded-full bg-accent mt-0.5 overflow-hidden">
-                              <div className={`h-full rounded-full ${occupancyBar[occ]}`} style={{ width: `${pct}%` }} />
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    )}
-                    {showHandles && HANDLES.map((hd) => {
-                      const pos = handleOffset(hd.dir, w, h)
-                      return (
-                        <div
-                          key={hd.dir}
-                          onPointerDown={(e) => onZonePointerDown(e, zone, hd.dir)}
-                          className="absolute size-2 rounded-sm bg-card border-2 border-slate-400 dark:border-slate-600"
-                          style={{ left: pos.left, top: pos.top, cursor: hd.cursor }}
-                        />
-                      )
-                    })}
-                  </div>
-
-                  {realSize && selected && (
-                    <span className="absolute text-[10px] font-medium text-muted-foreground bg-card/90 px-1 rounded pointer-events-none" style={{ left: x, top: y + h + 3 }}>
-                      {realSize}
-                    </span>
-                  )}
-
-                  {stagedEdit && (
-                    <span className="absolute px-1.5 py-px rounded bg-amber-500 text-white text-[10px] font-semibold pointer-events-none" style={{ left: x + 4, top: y - 10 }}>
-                      {stagedEdit.actionType === "create" ? "New · draft" : "Draft"}
-                    </span>
-                  )}
-
-                  {pItem && pItem.actionType === "update" && pItem.proposedData && (
-                    <div
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onClick={(e) => { e.stopPropagation(); setSelectedRequestId(req!.id); setSelectedIds([]) }}
-                      className={`absolute rounded-md border-2 bg-transparent border-[#1A6B8A] dark:border-primary cursor-pointer ${
-                        selectedRequestId === req!.id ? "ring-2 ring-[#1A6B8A] dark:ring-primary ring-offset-1" : ""
-                      }`}
-                      style={{
-                        left:   pItem.proposedData.x ?? zone.x,
-                        top:    pItem.proposedData.y ?? zone.y,
-                        width:  pItem.proposedData.width ?? zone.width,
-                        height: pItem.proposedData.height ?? zone.height,
-                      }}
-                    >
-                      <div className="absolute top-1 left-1.5 leading-tight pointer-events-none">
-                        <p className="text-xs font-bold text-[#1A6B8A] dark:text-primary">{pItem.proposedData.code ?? zone.code}</p>
-                      </div>
-                      <span className="absolute -top-2.5 right-1 px-1.5 py-px rounded bg-[#1A6B8A] dark:bg-primary text-white dark:text-primary-foreground text-[10px] font-semibold pointer-events-none">Pending</span>
-                    </div>
-                  )}
-
-                  {pItem && pItem.actionType === "delete" && (
-                    <span className="absolute px-1.5 py-px rounded bg-red-600 text-white text-[10px] font-semibold pointer-events-none" style={{ left: x + 4, top: y - 10 }}>
-                      Delete pending
-                    </span>
-                  )}
-                </div>
+                <ZoneBox
+                  key={zone.id}
+                  zone={zone}
+                  geom={draftGeom[zone.id]}
+                  total={totals.get(zone.id) ?? 0}
+                  selected={selectedIds.includes(zone.id)}
+                  stagedEdit={stagedFor(zone.id)}
+                  req={req}
+                  pItem={req ? pendingItemForZone(zone.id) : undefined}
+                  showHandles={canEdit && !req && activeTool !== "pan" && selectedIds.length <= 1}
+                  canDrag={canEdit && !req && activeTool !== "pan"}
+                  scale={scale}
+                  selectedRequestId={selectedRequestId}
+                  onPointerDown={onZonePointerDown}
+                  onClick={onZoneClick}
+                  onSelectRequest={selectRequest}
+                />
               )
             })}
 
@@ -1299,7 +1413,7 @@ export default function ZoneLayoutCanvas({
             ))}
 
             {role === "manager" && staged
-              .filter((d) => d.actionType === "delete" && d.sectionId != null && d.sectionId >= 0 && zoneFloorId(d.sectionId) === activeFloorId)
+              .filter((d) => d.actionType === "delete" && d.sectionId != null && d.sectionId >= 0 && d.previous?.floorId === activeFloorId)
               .map((d) => d.previous && (
                 <div
                   key={`staged-delete-${d.sectionId}`}
