@@ -6,8 +6,11 @@ from app.orders.models import Order
 from app.zones.models import ZoneSection
 
 
-def get_orders(db: Session) -> list[dict]:
-    orders = db.query(Order).order_by(Order.placed_at.desc()).all()
+def get_orders(db: Session, warehouse_id: int | None = None) -> list[dict]:
+    query = db.query(Order)
+    if warehouse_id is not None:
+        query = query.filter(Order.warehouse_id == warehouse_id)
+    orders = query.order_by(Order.placed_at.desc()).all()
     return [
         {
             "id": order.order_no,

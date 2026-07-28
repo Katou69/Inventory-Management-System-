@@ -35,6 +35,19 @@ def _get_warehouse_or_404(db: Session, warehouse_id: int) -> Warehouse:
     return warehouse
 
 
+def _scoped_warehouse_or_403(db: Session, warehouse_id: int, user: User) -> Warehouse:
+    """Same pattern as zones/items routers: admins are global, everyone else is
+    pinned to their assigned warehouse. Without this a manager/staff of
+    warehouse 1 could view, edit, or delete any other warehouse by ID."""
+    warehouse = _get_warehouse_or_404(db, warehouse_id)
+    if user.role != "admin" and user.warehouse_id != warehouse_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not assigned to this warehouse",
+        )
+    return warehouse
+
+
 @router.get("/status-cards", response_model=List[StatusCardOut])
 def status_cards(
     db: Session = Depends(get_db),
@@ -80,7 +93,7 @@ def warehouse_detail(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin", "manager", "staff")),
 ) -> dict:
-    warehouse = _get_warehouse_or_404(db, warehouse_id)
+    warehouse = _scoped_warehouse_or_403(db, warehouse_id, current_user)
     return service.get_warehouse_detail(db, warehouse)
 
 @router.get("/sales/overview", response_model=SalesOverview)
@@ -127,7 +140,7 @@ def delete_warehouse(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin")),
 ) -> None:
-    warehouse = _get_warehouse_or_404(db, warehouse_id)
+    warehouse = _scoped_warehouse_or_403(db, warehouse_id, current_user)
     db.delete(warehouse)
     try:
         db.commit()
@@ -146,7 +159,7 @@ def update_warehouse_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin", "manager")),
 ) -> dict:
-    warehouse = _get_warehouse_or_404(db, warehouse_id)
+    warehouse = _scoped_warehouse_or_403(db, warehouse_id, current_user)
     return service.update_warehouse_profile(db, warehouse, body, current_user)
 
 
