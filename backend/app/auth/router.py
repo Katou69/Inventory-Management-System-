@@ -75,42 +75,52 @@ def _is_email_allowed(email: str) -> bool:
 @limiter.limit("10/minute")
 def login(request: Request, body: LoginRequest, response: Response, db: Session = Depends(get_db)) -> User:
     user = db.query(User).filter(User.email == body.email).first()
-    
-    # Check if user exists
-    if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
-    
-    # Check if email is allowed (just in case, but should already be handled at registration)
-    if not _is_email_allowed(body.email):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
-    
-    # Check if user is locked out
+
+    invalid_credentials = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password"
+    )
+
+    # A missing user or disallowed domain must fail exactly like a wrong
+    # password -- same status, same message -- otherwise the response itself
+    # tells a prober which emails are registered.
+    if not user or not _is_email_allowed(body.email):
+        raise invalid_credentials
+
+    # Locked-out state is only revealed *after* the password checks out --
+    # otherwise submitting any password for a locked account leaks that the
+    # account exists and is locked, without ever needing the real password.
+    locked_out = False
     if user.lockout_until:
         if user.lockout_until.tzinfo is None:
             user.lockout_until = user.lockout_until.replace(tzinfo=timezone.utc)
         if user.lockout_until > datetime.now(timezone.utc):
-            remaining = (user.lockout_until - datetime.now(timezone.utc)).total_seconds()
-            remaining_min = int(remaining // 60) + 1
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Too many login attempts. Please try again in {remaining_min} minutes."
-            )
-    
-    # Check if user is active
+            locked_out = True
+
+    if not verify_password(body.password, user.hashed_password):
+        if not locked_out:
+            user.login_attempts += 1
+            if user.login_attempts >= MAX_LOGIN_ATTEMPTS:
+                user.lockout_until = datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_MINUTES)
+            db.commit()
+        raise invalid_credentials
+
+    if locked_out:
+        remaining = (user.lockout_until - datetime.now(timezone.utc)).total_seconds()
+        remaining_min = int(remaining // 60) + 1
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Too many login attempts. Please try again in {remaining_min} minutes."
+        )
+
+    # Same reasoning as lockout: only reveal "pending approval" once the
+    # password is confirmed correct, so a prober can't use this endpoint to
+    # test whether a guessed email/password pair is valid but unapproved.
     if user.status != "active":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Your account is not activated yet. Please wait for admin approval."
         )
-    
-    # Verify password
-    if not verify_password(body.password, user.hashed_password):
-        user.login_attempts += 1
-        if user.login_attempts >= MAX_LOGIN_ATTEMPTS:
-            user.lockout_until = datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_MINUTES)
-        db.commit()
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
-    
+
     # Reset login attempts on successful login
     user.login_attempts = 0
     user.lockout_until = None
