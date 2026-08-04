@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.activity.service import log_event
 from app.auth.dependencies import require_role
 from . import service
 from app.dashboard.schemas import (
@@ -141,10 +142,20 @@ def delete_warehouse(
     current_user: User = Depends(require_role("admin")),
 ) -> None:
     warehouse = _scoped_warehouse_or_403(db, warehouse_id, current_user)
+    log_event(
+        db,
+        kind="user",
+        title="Warehouse deleted",
+        description=f"{current_user.name} deleted {warehouse.name} ({warehouse.code})",
+        actor=current_user,
+        target_roles=["admin"],
+    )
     db.delete(warehouse)
     try:
         db.commit()
     except IntegrityError as exc:
+        # Rolls back the whole transaction, including the log_event() above --
+        # a failed delete must not leave a "deleted" record behind.
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
