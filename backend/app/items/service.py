@@ -4,6 +4,7 @@ from typing import Optional
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.activity.service import log_event
 from app.items.models import MovementTask, Product, StockMovement
 from app.users.models import User
 from app.zones.models import ZoneSection, ZoneStockEntry
@@ -210,6 +211,19 @@ def complete_movement_task(db: Session, task: MovementTask, completed_by: User) 
 
     task.status = "completed"
     task.updated_by = completed_by.id
+
+    product = db.get(Product, task.product_id)
+    log_event(
+        db,
+        kind="stock",
+        title="Stock moved between shelves",
+        description=(
+            f"{completed_by.name} moved {task.quantity} x {product.name if product else 'unknown item'} "
+            f"from {from_section.name} to {to_section.name}"
+        ),
+        actor=completed_by,
+    )
+
     db.commit()
     db.refresh(task)
     return task

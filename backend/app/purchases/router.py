@@ -17,4 +17,7 @@ def list_purchase_orders(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin", "manager", "staff")),
 ) -> List[dict]:
-    return service.get_purchase_orders(db)
+    # Same scoping as /orders: admins see everything, everyone else only
+    # their own warehouse's purchase orders.
+    warehouse_id = None if current_user.role == "admin" else current_user.warehouse_id
+    return service.get_purchase_orders(db, warehouse_id)

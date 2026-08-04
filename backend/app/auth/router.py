@@ -1,6 +1,6 @@
 from datetime import date, datetime, timedelta, timezone
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.auth.jwt import (
@@ -17,6 +17,7 @@ from app.auth.models import RefreshSession
 from app.auth.schemas import LoginRequest, RegisterRequest
 from app.config import settings
 from app.db.session import get_db
+from app.rate_limit import limiter
 from app.users.models import User
 from app.users.schemas import UserOut
 
@@ -54,7 +55,7 @@ def _clear_auth_cookie(response: Response, key: str) -> None:
 
 def _issue_session(db: Session, user: User, response: Response) -> None:
     """Create access + refresh tokens, record the refresh session, and set both cookies."""
-    access = create_access_token(user.id)
+    access = create_access_token(user.id, user.token_version)
     refresh = create_refresh_token(user.id)
 
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.refresh_token_expire_minutes)
@@ -71,44 +72,55 @@ def _is_email_allowed(email: str) -> bool:
 
 
 @router.post("/login", response_model=UserOut)
-def login(body: LoginRequest, response: Response, db: Session = Depends(get_db)) -> User:
+@limiter.limit("10/minute")
+def login(request: Request, body: LoginRequest, response: Response, db: Session = Depends(get_db)) -> User:
     user = db.query(User).filter(User.email == body.email).first()
-    
-    # Check if user exists
-    if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
-    
-    # Check if email is allowed (just in case, but should already be handled at registration)
-    if not _is_email_allowed(body.email):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
-    
-    # Check if user is locked out
+
+    invalid_credentials = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password"
+    )
+
+    # A missing user or disallowed domain must fail exactly like a wrong
+    # password -- same status, same message -- otherwise the response itself
+    # tells a prober which emails are registered.
+    if not user or not _is_email_allowed(body.email):
+        raise invalid_credentials
+
+    # Locked-out state is only revealed *after* the password checks out --
+    # otherwise submitting any password for a locked account leaks that the
+    # account exists and is locked, without ever needing the real password.
+    locked_out = False
     if user.lockout_until:
         if user.lockout_until.tzinfo is None:
             user.lockout_until = user.lockout_until.replace(tzinfo=timezone.utc)
         if user.lockout_until > datetime.now(timezone.utc):
-            remaining = (user.lockout_until - datetime.now(timezone.utc)).total_seconds()
-            remaining_min = int(remaining // 60) + 1
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Too many login attempts. Please try again in {remaining_min} minutes."
-            )
-    
-    # Check if user is active
+            locked_out = True
+
+    if not verify_password(body.password, user.hashed_password):
+        if not locked_out:
+            user.login_attempts += 1
+            if user.login_attempts >= MAX_LOGIN_ATTEMPTS:
+                user.lockout_until = datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_MINUTES)
+            db.commit()
+        raise invalid_credentials
+
+    if locked_out:
+        remaining = (user.lockout_until - datetime.now(timezone.utc)).total_seconds()
+        remaining_min = int(remaining // 60) + 1
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Too many login attempts. Please try again in {remaining_min} minutes."
+        )
+
+    # Same reasoning as lockout: only reveal "pending approval" once the
+    # password is confirmed correct, so a prober can't use this endpoint to
+    # test whether a guessed email/password pair is valid but unapproved.
     if user.status != "active":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Your account is not activated yet. Please wait for admin approval."
         )
-    
-    # Verify password
-    if not verify_password(body.password, user.hashed_password):
-        user.login_attempts += 1
-        if user.login_attempts >= MAX_LOGIN_ATTEMPTS:
-            user.lockout_until = datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_MINUTES)
-        db.commit()
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
-    
+
     # Reset login attempts on successful login
     user.login_attempts = 0
     user.lockout_until = None
@@ -119,7 +131,8 @@ def login(body: LoginRequest, response: Response, db: Session = Depends(get_db))
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-def register(body: RegisterRequest, response: Response, db: Session = Depends(get_db)) -> User:
+@limiter.limit("5/hour")
+def register(request: Request, body: RegisterRequest, response: Response, db: Session = Depends(get_db)) -> User:
     # Check if email is allowed
     if not _is_email_allowed(body.email):
         raise HTTPException(
@@ -158,7 +171,9 @@ def register(body: RegisterRequest, response: Response, db: Session = Depends(ge
 
 
 @router.post("/refresh", response_model=UserOut)
+@limiter.limit("30/minute")
 def refresh(
+    request: Request,
     response: Response,
     refresh_token: str | None = Cookie(default=None),
     db: Session = Depends(get_db),
@@ -217,6 +232,15 @@ def logout(
         if session_row is not None and not session_row.revoked:
             session_row.revoked = True
             db.add(session_row)
+
+            # Revoking the refresh session alone leaves the current access
+            # token valid for up to its remaining ~30min lifetime. Bumping
+            # token_version kills it immediately too, not just on next refresh.
+            user = db.get(User, session_row.user_id)
+            if user is not None:
+                user.token_version += 1
+                db.add(user)
+
             db.commit()
 
     _clear_auth_cookie(response, ACCESS_COOKIE)

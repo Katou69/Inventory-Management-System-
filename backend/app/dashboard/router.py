@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.activity.service import log_event
 from app.auth.dependencies import require_role
 from . import service
 from app.dashboard.schemas import (
@@ -32,6 +33,19 @@ def _get_warehouse_or_404(db: Session, warehouse_id: int) -> Warehouse:
     warehouse = db.get(Warehouse, warehouse_id)
     if warehouse is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Warehouse not found")
+    return warehouse
+
+
+def _scoped_warehouse_or_403(db: Session, warehouse_id: int, user: User) -> Warehouse:
+    """Same pattern as zones/items routers: admins are global, everyone else is
+    pinned to their assigned warehouse. Without this a manager/staff of
+    warehouse 1 could view, edit, or delete any other warehouse by ID."""
+    warehouse = _get_warehouse_or_404(db, warehouse_id)
+    if user.role != "admin" and user.warehouse_id != warehouse_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not assigned to this warehouse",
+        )
     return warehouse
 
 
@@ -80,7 +94,7 @@ def warehouse_detail(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin", "manager", "staff")),
 ) -> dict:
-    warehouse = _get_warehouse_or_404(db, warehouse_id)
+    warehouse = _scoped_warehouse_or_403(db, warehouse_id, current_user)
     return service.get_warehouse_detail(db, warehouse)
 
 @router.get("/sales/overview", response_model=SalesOverview)
@@ -127,11 +141,21 @@ def delete_warehouse(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin")),
 ) -> None:
-    warehouse = _get_warehouse_or_404(db, warehouse_id)
+    warehouse = _scoped_warehouse_or_403(db, warehouse_id, current_user)
+    log_event(
+        db,
+        kind="user",
+        title="Warehouse deleted",
+        description=f"{current_user.name} deleted {warehouse.name} ({warehouse.code})",
+        actor=current_user,
+        target_roles=["admin"],
+    )
     db.delete(warehouse)
     try:
         db.commit()
     except IntegrityError as exc:
+        # Rolls back the whole transaction, including the log_event() above --
+        # a failed delete must not leave a "deleted" record behind.
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -146,7 +170,7 @@ def update_warehouse_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin", "manager")),
 ) -> dict:
-    warehouse = _get_warehouse_or_404(db, warehouse_id)
+    warehouse = _scoped_warehouse_or_403(db, warehouse_id, current_user)
     return service.update_warehouse_profile(db, warehouse, body, current_user)
 
 

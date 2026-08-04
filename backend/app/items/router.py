@@ -4,6 +4,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.activity.service import log_event
 from app.auth.dependencies import require_role
 from app.db.session import get_db
 from app.items import service
@@ -121,13 +122,26 @@ def update_product(
     if product is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
-    if body.name is not None:
+    changes: list[str] = []
+    if body.name is not None and body.name != product.name:
+        changes.append(f"name: {product.name!r} -> {body.name!r}")
         product.name = body.name
-    if body.price is not None:
+    if body.price is not None and body.price != float(product.unit_price):
+        changes.append(f"price: {product.unit_price} -> {body.price}")
         product.unit_price = body.price
-    if body.minStock is not None:
+    if body.minStock is not None and body.minStock != product.reorder_level:
+        changes.append(f"minStock: {product.reorder_level} -> {body.minStock}")
         product.reorder_level = body.minStock
     product.updated_by = current_user.id
+
+    if changes:
+        log_event(
+            db,
+            kind="stock",
+            title="Product updated",
+            description=f"{current_user.name} updated {product.name} ({product.sku}): {'; '.join(changes)}",
+            actor=current_user,
+        )
 
     db.commit()
     db.refresh(product)

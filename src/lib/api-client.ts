@@ -64,6 +64,19 @@ async function serverCookieHeader(): Promise<Record<string, string>> {
   return cookie ? { cookie } : {}
 }
 
+/**
+ * The backend's CSRF middleware (double-submit cookie) hands out a
+ * `csrftoken` cookie and expects it echoed back as this header on any
+ * state-changing request. Browser-only: a Server Component's fetch is
+ * server-to-server, so there's no forged-request risk to defend against and
+ * no `document.cookie` to read from.
+ */
+function csrfHeader(): Record<string, string> {
+  if (typeof window === "undefined") return {}
+  const match = document.cookie.match(/(?:^|; )csrftoken=([^;]*)/)
+  return match ? { "x-csrftoken": decodeURIComponent(match[1]) } : {}
+}
+
 async function doFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${config.apiBaseUrl}${path}`
   const res = await fetch(url, {
@@ -73,6 +86,7 @@ async function doFetch<T>(path: string, init?: RequestInit): Promise<T> {
     headers: {
       "Content-Type": "application/json",
       ...(await serverCookieHeader()), // Server: forward them by hand.
+      ...csrfHeader(),
       ...init?.headers,
     },
   })

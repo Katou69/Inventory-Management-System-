@@ -151,7 +151,7 @@ def test_logout_revokes_refresh_token(client, db_session):
     login = client.post("/auth/login", json={"email": "user@grandroyal.com", "password": "secret123"})
     old_refresh = login.cookies["refresh_token"]
 
-    logout = client.post("/auth/logout")
+    logout = client.post("/auth/logout", headers={"x-csrftoken": client.cookies.get("csrftoken")})
     assert logout.status_code == 200
 
     # Reusing the revoked refresh token must fail, even if replayed directly.
