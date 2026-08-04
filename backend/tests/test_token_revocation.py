@@ -45,7 +45,7 @@ def test_replaying_an_access_token_captured_before_logout_is_rejected(client, db
     stolen_token = login_resp.cookies.get("access_token")
     assert stolen_token is not None
 
-    client.post("/auth/logout")
+    client.post("/auth/logout", headers={"x-csrftoken": client.cookies.get("csrftoken")})
 
     # Attacker replays the captured (still cryptographically valid, unexpired)
     # token in a fresh client with no other cookies.

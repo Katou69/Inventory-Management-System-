@@ -30,17 +30,25 @@ app = FastAPI(title="Inventory Management API")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CSRF only matters once a session cookie exists to be forged, so login/
-# register (no session yet) and refresh/logout (no browser JS context — called
-# server-side from Next's proxy.ts with only the raw cookie header forwarded)
-# are exempt. Everything else that carries access_token/refresh_token must
-# echo the csrftoken cookie back as a header, or a malicious site's forged
-# request rides on the auth cookie alone with no way to prove it's really us.
+# CSRF only matters once a session cookie exists to be forged. login/register
+# are exempt (no session yet). /auth/refresh is exempt because proxy.ts calls
+# it server-side (Next middleware, forwarding only the raw cookie header —
+# no browser JS context to read the csrftoken cookie from). It's also called
+# from the browser (api-client.ts's silent-refresh-on-401), but that path
+# can't be gated on a CSRF header either: it fires before the app necessarily
+# holds a fresh csrftoken, and a forged cross-site refresh only rotates the
+# session — no data exposure or privilege change.
+#
+# /auth/logout is NOT exempt: it's only ever called from the browser
+# (auth-service.ts -> apiFetch), which already attaches x-csrftoken on every
+# request via csrfHeader() — so requiring it here costs nothing and closes
+# off a forced-logout CSRF (a malicious page silently POSTing a victim's
+# session cookie to log them out).
 app.add_middleware(
     CSRFMiddleware,
     secret=settings.csrf_secret_value,
     sensitive_cookies={"access_token", "refresh_token"},
-    exempt_urls=[re.compile(r"^/auth/(login|register|refresh|logout)$")],
+    exempt_urls=[re.compile(r"^/auth/(login|register|refresh)$")],
     cookie_samesite=settings.cookie_samesite,
     cookie_secure=settings.cookie_secure,
     cookie_domain=settings.cookie_domain,

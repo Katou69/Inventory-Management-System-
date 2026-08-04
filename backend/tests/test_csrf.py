@@ -2,9 +2,10 @@
 
 CSRFMiddleware only enforces the check when the request carries a session
 cookie (access_token/refresh_token) AND isn't an exempt URL — login/register
-have no session yet, and refresh/logout are called server-to-server (Next's
-proxy.ts forwards only the raw cookie header, with no browser JS context to
-read a CSRF cookie from) so they stay exempt too.
+have no session yet, and /auth/refresh is called server-to-server from Next's
+proxy.ts (forwards only the raw cookie header, no browser JS context to read
+a CSRF cookie from) so it stays exempt too. /auth/logout is NOT exempt: it's
+only ever called from the browser, which already attaches x-csrftoken.
 """
 
 from datetime import date
@@ -80,4 +81,24 @@ def test_get_requests_never_require_csrf(client, db_session):
     client.post("/auth/login", json={"email": "user@grandroyal.com", "password": "secret123"})
 
     response = client.get("/auth/me")
+    assert response.status_code == 200
+
+
+def test_logout_without_csrf_header_is_rejected(client, db_session):
+    # Unlike /auth/refresh, logout is only ever called from the browser
+    # (which always attaches x-csrftoken) -- so it must NOT be exempt, or a
+    # malicious page could force a victim's session to log out cross-site.
+    _create_user(db_session, email="user@grandroyal.com", password="secret123")
+    client.post("/auth/login", json={"email": "user@grandroyal.com", "password": "secret123"})
+
+    response = client.post("/auth/logout")
+    assert response.status_code == 403
+
+
+def test_logout_with_correct_csrf_header_succeeds(client, db_session):
+    _create_user(db_session, email="user@grandroyal.com", password="secret123")
+    client.post("/auth/login", json={"email": "user@grandroyal.com", "password": "secret123"})
+
+    csrf_token = client.cookies.get("csrftoken")
+    response = client.post("/auth/logout", headers={"x-csrftoken": csrf_token})
     assert response.status_code == 200
