@@ -28,6 +28,12 @@ class User(Base):
     )
     login_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     lockout_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Baked into every access token at mint time (auth/jwt.py create_access_token)
+    # and checked on every request (auth/dependencies.py get_current_user).
+    # Bumping this instantly invalidates every access token issued before the
+    # bump -- logout and admin role/status changes both do this, since a JWT's
+    # signature alone can't be revoked before its natural expiry otherwise.
+    token_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     settings: Mapped["UserSetting | None"] = relationship(
         back_populates="user", cascade="all, delete-orphan", uselist=False

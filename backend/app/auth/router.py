@@ -55,7 +55,7 @@ def _clear_auth_cookie(response: Response, key: str) -> None:
 
 def _issue_session(db: Session, user: User, response: Response) -> None:
     """Create access + refresh tokens, record the refresh session, and set both cookies."""
-    access = create_access_token(user.id)
+    access = create_access_token(user.id, user.token_version)
     refresh = create_refresh_token(user.id)
 
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.refresh_token_expire_minutes)
@@ -222,6 +222,15 @@ def logout(
         if session_row is not None and not session_row.revoked:
             session_row.revoked = True
             db.add(session_row)
+
+            # Revoking the refresh session alone leaves the current access
+            # token valid for up to its remaining ~30min lifetime. Bumping
+            # token_version kills it immediately too, not just on next refresh.
+            user = db.get(User, session_row.user_id)
+            if user is not None:
+                user.token_version += 1
+                db.add(user)
+
             db.commit()
 
     _clear_auth_cookie(response, ACCESS_COOKIE)

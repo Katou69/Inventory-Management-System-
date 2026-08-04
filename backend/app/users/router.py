@@ -95,7 +95,14 @@ def update_user(
         user.warehouse_id = user_update.warehouse_id
     if user_update.status is not None:
         user.status = user_update.status
-    
+
+    # role/status changed => any access token already issued to this user was
+    # minted under the OLD permissions and would otherwise keep working for
+    # up to its remaining lifetime (e.g. a just-deactivated or demoted
+    # account could still act as before for ~30 more minutes).
+    if user_update.role is not None or user_update.status is not None:
+        user.token_version += 1
+
     db.commit()
     db.refresh(user)
     return user

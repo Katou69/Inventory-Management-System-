@@ -31,6 +31,13 @@ def get_current_user(
     user = db.get(User, user_id) if user_id else None
     if user is None:
         raise unauthorized
+
+    # Token was minted before the user's most recent logout/role-or-status
+    # change (both bump token_version) -- treat it as revoked even though its
+    # signature and exp are still individually valid.
+    if payload.get("tv") != user.token_version:
+        raise unauthorized
+
     return user
 
 
