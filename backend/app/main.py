@@ -46,12 +46,16 @@ app.add_middleware(
     cookie_domain=settings.cookie_domain,
 )
 
+# allow_origins is the real gate (browsers only skip CORS checks for these
+# origins); methods/headers are narrowed too, on general least-privilege
+# grounds, to just what the frontend actually sends -- Content-Type and the
+# CSRF double-submit header (see api-client.ts's csrfHeader()).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allow_headers=["Content-Type", "x-csrftoken"],
 )
 
 app.include_router(auth.router)
