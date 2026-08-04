@@ -2,7 +2,7 @@
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 StockStatus = Literal["in_stock", "low_stock", "out_of_stock"]
 
@@ -38,8 +38,10 @@ class ProductOut(BaseModel):
     id: int
     sku: str
     name: str
-    price: float
-    minStock: int
+    price: float = Field(validation_alias="unit_price")
+    minStock: int = Field(validation_alias="reorder_level")
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 class StockMovementOut(BaseModel):
