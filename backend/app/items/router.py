@@ -8,13 +8,14 @@ from app.activity.service import log_event
 from app.auth.dependencies import require_role
 from app.db.session import get_db
 from app.items import service
-from app.items.models import Category, MovementTask, Product
+from app.items.models import Category, MovementTask, Product, Supplier
 from app.items.schemas import (
     CategoryCreate,
     CategoryOut,
     InventoryStatsOut,
     MovementTaskCreateRequest,
     MovementTaskOut,
+    ProductCreateRequest,
     ProductInventoryOut,
     ProductOut,
     ProductUpdateRequest,
@@ -146,6 +147,60 @@ def update_product(
     db.commit()
     db.refresh(product)
     return product
+
+
+@router.post("/items", response_model=ProductInventoryOut, status_code=status.HTTP_201_CREATED)
+def create_product(
+    body: ProductCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin", "manager")),
+) -> dict:
+    if db.query(Product).filter(Product.sku == body.sku).first():
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="SKU already in use")
+    if body.categoryId is not None and db.get(Category, body.categoryId) is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Category not found")
+    if body.supplierId is not None and db.get(Supplier, body.supplierId) is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Supplier not found")
+
+    product = Product(
+        sku=body.sku,
+        name=body.name,
+        category_id=body.categoryId,
+        supplier_id=body.supplierId,
+        unit_price=body.unitPrice,
+        unit_cost=body.unitCost,
+        reorder_level=body.reorderLevel,
+        created_by=current_user.id,
+        updated_by=current_user.id,
+    )
+    if body.image:
+        product.image = body.image
+    db.add(product)
+    db.flush()
+
+    log_event(
+        db,
+        kind="stock",
+        title="Product created",
+        description=f"{current_user.name} created {product.name} ({product.sku})",
+        actor=current_user,
+    )
+
+    db.commit()
+    db.refresh(product)
+
+    return {
+        "id": product.id,
+        "name": product.name,
+        "sku": product.sku,
+        "price": float(product.unit_price),
+        "category": product.category_name,
+        "supplier": product.supplier.name if product.supplier else "",
+        "supplierId": product.supplier_id,
+        "stock": 0,
+        "minStock": product.reorder_level,
+        "status": "out_of_stock",
+    }
 
 
 @router.get("/items/{product_id}/history", response_model=List[StockMovementOut])

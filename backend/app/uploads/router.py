@@ -8,7 +8,10 @@ one is wired up; the response shape (`{"url": ...}`) can stay the same.
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+
+from app.auth.dependencies import require_role
+from app.users.models import User
 
 router = APIRouter(prefix="/uploads", tags=["uploads"])
 
@@ -35,7 +38,10 @@ def _sniff_extension(contents: bytes) -> str | None:
 
 
 @router.post("/warehouse-image", status_code=status.HTTP_201_CREATED)
-async def upload_warehouse_image(file: UploadFile) -> dict[str, str]:
+async def upload_warehouse_image(
+    file: UploadFile,
+    current_user: User = Depends(require_role("admin", "manager")),
+) -> dict[str, str]:
     # Read one byte past the cap rather than the whole body: a client sending
     # an arbitrarily large file could otherwise force the server to buffer all
     # of it into memory before the size check ever ran.

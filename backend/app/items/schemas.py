@@ -34,6 +34,17 @@ class ProductUpdateRequest(BaseModel):
     minStock: Optional[int] = None
 
 
+class ProductCreateRequest(BaseModel):
+    sku: str
+    name: str
+    categoryId: Optional[int] = None
+    supplierId: Optional[int] = None
+    unitPrice: float
+    unitCost: float = 0
+    reorderLevel: int = 0
+    image: Optional[str] = None
+
+
 class ProductOut(BaseModel):
     id: int
     sku: str

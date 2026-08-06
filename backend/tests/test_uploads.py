@@ -1,9 +1,15 @@
-"""Warehouse image upload: size cap, magic-byte sniffing, and that the size
-check now happens on a bounded read instead of buffering the whole body."""
+"""Warehouse image upload: size cap, magic-byte sniffing, that the size
+check now happens on a bounded read instead of buffering the whole body,
+and that the endpoint requires admin/manager auth (it previously had none)."""
+
+from datetime import date
 
 import pytest
 
+from app.auth.dependencies import get_current_user
+from app.main import app
 from app.uploads.router import MAX_FILE_SIZE, WAREHOUSE_DIR
+from app.users.models import User
 
 JPEG_HEADER = b"\xff\xd8\xff"
 PNG_HEADER = b"\x89PNG\r\n\x1a\n"
@@ -15,6 +21,18 @@ def _cleanup_uploaded_files():
     yield
     for path in set(WAREHOUSE_DIR.iterdir()) - before:
         path.unlink()
+
+
+@pytest.fixture(autouse=True)
+def _authenticate_as_admin(db_session):
+    admin = User(id="u-admin", name="Admin User", email="admin@grandroyal.com",
+                 hashed_password="x", role="admin", warehouse_id=None,
+                 status="active", joined_date=date(2024, 1, 1))
+    db_session.add(admin)
+    db_session.commit()
+    app.dependency_overrides[get_current_user] = lambda: admin
+    yield
+    app.dependency_overrides.pop(get_current_user, None)
 
 
 def test_valid_jpeg_uploads_successfully(client):
@@ -72,3 +90,30 @@ def test_oversized_upload_does_not_buffer_the_full_body(client, monkeypatch):
     assert response.status_code == 413
     assert seen_sizes, "file.read() was never called"
     assert seen_sizes[0] == MAX_FILE_SIZE + 1
+
+
+def test_upload_rejected_for_staff(client, db_session):
+    staff = User(id="u-staff", name="Staff User", email="staff@grandroyal.com",
+                 hashed_password="x", role="staff", warehouse_id=None,
+                 status="active", joined_date=date(2024, 1, 1))
+    db_session.add(staff)
+    db_session.commit()
+    app.dependency_overrides[get_current_user] = lambda: staff
+
+    contents = JPEG_HEADER + b"\x00" * 100
+    response = client.post(
+        "/uploads/warehouse-image",
+        files={"file": ("photo.jpg", contents, "image/jpeg")},
+    )
+    assert response.status_code == 403
+
+
+def test_upload_rejected_without_authentication(client):
+    app.dependency_overrides.pop(get_current_user, None)
+
+    contents = JPEG_HEADER + b"\x00" * 100
+    response = client.post(
+        "/uploads/warehouse-image",
+        files={"file": ("photo.jpg", contents, "image/jpeg")},
+    )
+    assert response.status_code in (401, 403)

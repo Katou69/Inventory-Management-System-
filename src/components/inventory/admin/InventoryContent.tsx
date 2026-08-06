@@ -4,6 +4,7 @@ import {
     MovementInbox,
 } from "..";
 import CreateMovementModal from "../CreateMovementModal";
+import CreateProductModal from "../CreateProductModal";
 import { getMovementTasks, getInventory } from "@/services/inventory-service";
 import WarehouseSelector from "./WarehouseSelector";
 
@@ -36,7 +37,10 @@ export default async function AdminInventoryContent({ warehouseId }: Props) {
             <StatsCards warehouseId={warehouseId} />
             <div className="flex flex-wrap items-center justify-between gap-4">
 
-                <CreateMovementModal inventory={inventory} warehouseId={warehouseId} />
+                <div className="flex flex-wrap items-center gap-3">
+                    <CreateMovementModal inventory={inventory} warehouseId={warehouseId} />
+                    <CreateProductModal warehouseId={warehouseId} />
+                </div>
                 <WarehouseSelector />
 
             </div>

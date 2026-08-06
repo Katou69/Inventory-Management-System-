@@ -9,17 +9,16 @@ import {
   getMySettings,
   updateMySettings,
   getCategories,
-  createCategory,
   deleteCategory,
   Category,
 } from "@/services/settings-service";
+import CreateCategoryModal from "./CreateCategoryModal";
 
 export default function SettingsView({ role }: { role: Role; userWarehouseId: number | "all" }) {
   // System configuration state
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [newWarehouse, setNewWarehouse] = useState("");
-  const [newCategory, setNewCategory] = useState("");
   const [notifications, setNotifications] = useState({ lowStock: true, orderUpdate: true, poApproval: true });
   const [language, setLanguage] = useState("English");
   const [timezone, setTimezone] = useState("UTC");
@@ -63,13 +62,6 @@ export default function SettingsView({ role }: { role: Role; userWarehouseId: nu
   const handleRemoveWarehouse = async (id: number) => {
     await deleteWarehouse(id);
     setWarehouses((p) => p.filter((w) => w.id !== id));
-  };
-
-  const handleAddCategory = async () => {
-    if (!newCategory) return;
-    const category = await createCategory(newCategory);
-    setCategories((p) => [...p, category]);
-    setNewCategory("");
   };
 
   const handleRemoveCategory = async (id: number) => {
@@ -152,18 +144,7 @@ export default function SettingsView({ role }: { role: Role; userWarehouseId: nu
               ))}
             </div>
             {role === "admin" && (
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Add new category…"
-                  value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value)}
-                  className="modal-input flex-1"
-                />
-                <button onClick={handleAddCategory} className="btn-primary flex items-center gap-1">
-                  <Plus className="w-3.5 h-3.5" /> Add
-                </button>
-              </div>
+              <CreateCategoryModal onCreated={(c) => setCategories((p) => [...p, c])} />
             )}
           </div>
         </div>

@@ -5,6 +5,7 @@ import {
     MovementInbox,
 } from "..";
 import CreateMovementModal from "../CreateMovementModal";
+import CreateProductModal from "../CreateProductModal";
 
 type Props = {
     warehouseId: number;
@@ -33,7 +34,10 @@ export default async function ManagerInventoryContent({ warehouseId }: Props) {
             </div>
 
             <StatsCards warehouseId={warehouseId} />
-            <CreateMovementModal inventory={inventory} warehouseId={warehouseId} />
+            <div className="flex flex-wrap items-center gap-3">
+                <CreateMovementModal inventory={inventory} warehouseId={warehouseId} />
+                <CreateProductModal warehouseId={warehouseId} />
+            </div>
 
             <MovementInbox tasks={tasks} />
             <InventoryTable warehouseId={warehouseId} />

@@ -16,6 +16,7 @@ from app.config import settings
 from app.items import router as items
 from app.orders import router as orders
 from app.purchases import router as purchases
+from app.suppliers import router as suppliers
 from app.rate_limit import limiter
 
 app = FastAPI(title="Inventory Management API")
@@ -74,6 +75,7 @@ app.include_router(dashboard.router)
 app.include_router(items.router)
 app.include_router(orders.router)
 app.include_router(purchases.router)
+app.include_router(suppliers.router)
 
 app.mount("/uploads", StaticFiles(directory=uploads.UPLOAD_ROOT), name="uploads")
 

@@ -36,13 +36,8 @@ type ProductInventoryApiRow = {
   status: string
 }
 
-export async function getInventory(warehouseId: number): Promise<InventoryItem[]> {
-  if (config.useMockInventory) {
-    return clone(inventory).filter((i) => i.warehouseId === warehouseId)
-  }
-
-  const rows = await apiFetch<ProductInventoryApiRow[]>(`/warehouses/${warehouseId}/inventory`)
-  return rows.map((r) => ({
+function toInventoryItem(r: ProductInventoryApiRow, warehouseId: number): InventoryItem {
+  return {
     id: String(r.id),
     sku: r.sku,
     name: r.name,
@@ -55,7 +50,59 @@ export async function getInventory(warehouseId: number): Promise<InventoryItem[]
     minStock: r.minStock,
     status: toHyphenStatus(r.status),
     lastUpdated: "", // backend doesn't return this yet; not rendered by the table today
-  }))
+  }
+}
+
+export async function getInventory(warehouseId: number): Promise<InventoryItem[]> {
+  if (config.useMockInventory) {
+    return clone(inventory).filter((i) => i.warehouseId === warehouseId)
+  }
+
+  const rows = await apiFetch<ProductInventoryApiRow[]>(`/warehouses/${warehouseId}/inventory`)
+  return rows.map((r) => toInventoryItem(r, warehouseId))
+}
+
+// ---- Create product ----
+
+export type CreateProductBody = {
+  sku: string
+  name: string
+  categoryId?: number
+  supplierId?: number
+  unitPrice: number
+  unitCost?: number
+  reorderLevel?: number
+  image?: string
+}
+
+export async function createProduct(
+  body: CreateProductBody,
+  warehouseId: number
+): Promise<InventoryItem> {
+  if (config.useMockInventory) {
+    const item: InventoryItem = {
+      id: crypto.randomUUID(),
+      sku: body.sku,
+      name: body.name,
+      category: "",
+      supplier: "",
+      supplierId: body.supplierId != null ? String(body.supplierId) : "",
+      warehouseId,
+      price: body.unitPrice,
+      stock: 0,
+      minStock: body.reorderLevel ?? 0,
+      status: "out-of-stock",
+      lastUpdated: "",
+    }
+    inventory.push(item)
+    return clone(item)
+  }
+
+  const row = await apiFetch<ProductInventoryApiRow>("/items", {
+    method: "POST",
+    body: JSON.stringify(body),
+  })
+  return toInventoryItem(row, warehouseId)
 }
 
 // ---- Stats cards ----
@@ -269,6 +316,23 @@ export async function getWarehouses(): Promise<WarehouseOption[]> {
     return [1, 2, 3, 4].map((id) => ({ id, name: `Warehouse ${id}` }))
   }
   return apiFetch<WarehouseOption[]>("/warehouses")
+}
+
+// ---- Suppliers dropdown (Create Product modal) ----
+
+export type SupplierOption = { id: number; name: string }
+
+export async function getSuppliers(): Promise<SupplierOption[]> {
+  if (config.useMockInventory) {
+    const seen = new Map<string, SupplierOption>()
+    for (const item of inventory) {
+      if (item.supplierId && !seen.has(item.supplierId)) {
+        seen.set(item.supplierId, { id: Number(item.supplierId), name: item.supplier })
+      }
+    }
+    return [...seen.values()]
+  }
+  return apiFetch<SupplierOption[]>("/suppliers")
 }
 
 // ---- Existing "Move to Ship" picking helpers (Orders flow) — unchanged ----
