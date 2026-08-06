@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import { ArrowUpDown } from "lucide-react";
 
 import { PurchaseOrder } from "@/types/purchases";
-import { Badge } from "@/components/ui";
+import { Badge, Pagination } from "@/components/ui";
+import { usePagination } from "@/lib/use-pagination";
 import Filters, { PurchaseFilterStatus } from "./Filters";
 import PurchaseActionsMenu, { Role } from "./PurchaseActionsMenu";
 import PurchaseFormModal from "./PurchaseFormModal";
@@ -59,6 +60,8 @@ export default function PurchaseTableClient({ purchases, role }: Props) {
     setEditingPurchase(null);
     setIsFormOpen(true);
   };
+
+  const { page, pageCount, setPage, pageItems: pagedPurchases, startIndex } = usePagination(filteredPurchases);
 
   const handleEditPurchase = (purchase: PurchaseOrder) => {
     setEditingPurchase(purchase);
@@ -198,7 +201,7 @@ export default function PurchaseTableClient({ purchases, role }: Props) {
 
             <tbody>
               {filteredPurchases.length > 0 ? (
-                filteredPurchases.map((purchase, index) => {
+                pagedPurchases.map((purchase, index) => {
                   const totalQuantity = purchase.items.reduce(
                     (sum, item) => sum + item.quantity,
                     0
@@ -212,7 +215,7 @@ export default function PurchaseTableClient({ purchases, role }: Props) {
                       key={purchase.id}
                       className="border-b border-border transition-colors last:border-b-0 hover:bg-accent"
                     >
-                      <td className="px-6 py-4 text-muted-foreground">{index + 1}</td>
+                      <td className="px-6 py-4 text-muted-foreground">{startIndex + index + 1}</td>
 
                       <td className="px-6 py-4">
                         <span className="inline-flex whitespace-nowrap rounded-md bg-accent px-2 py-0.5 font-mono text-xs font-medium text-muted-foreground">
@@ -295,6 +298,8 @@ export default function PurchaseTableClient({ purchases, role }: Props) {
               )}
             </tbody>
           </table>
+
+          <Pagination page={page} pageCount={pageCount} onPageChange={setPage} totalItems={filteredPurchases.length} pageSize={10} />
         </div>
       </div>
 

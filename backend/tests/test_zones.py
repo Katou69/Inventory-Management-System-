@@ -213,6 +213,55 @@ def test_a_reviewed_request_cannot_be_reviewed_twice(client, setup):
     assert client.post(f"/layout-requests/{rid}/approve").status_code == 409
 
 
+def test_approving_twice_does_not_double_apply_the_layout_change(client, setup, db_session):
+    """Guards the race-condition fix at the data level, not just the status
+    check: even if approve were called twice, the section must reflect
+    exactly one application of the change, not two (e.g. a relative delta
+    applied twice would silently corrupt the layout)."""
+    as_user(setup["manager"])
+    rid = client.post(
+        "/warehouses/1/layout-requests",
+        json={"items": [_update(10, capacity=150)], "requestNote": "once"},
+    ).json()["id"]
+
+    as_user(setup["admin"])
+    client.post(f"/layout-requests/{rid}/approve")
+    client.post(f"/layout-requests/{rid}/approve")  # rejected, must not double-apply
+
+    section = db_session.get(ZoneSection, 10)
+    assert section.capacity == 150  # applied exactly once, not left at 100 or doubled
+
+    request = db_session.get(LayoutRequest, rid)
+    assert request.status == "approved"
+
+
+def test_approve_then_reject_race_does_not_leave_layout_and_status_inconsistent(client, setup, db_session):
+    """The specific failure mode this fixes: approve mutates the layout, then
+    a same-moment reject overwrites status to "rejected" while the layout
+    change from approve has already landed. With the lock, the second call
+    (whichever it is) must see the reviewed status and be rejected outright —
+    never allowed to record a status that contradicts what actually happened
+    to the section."""
+    as_user(setup["manager"])
+    rid = client.post(
+        "/warehouses/1/layout-requests",
+        json={"items": [_update(10, capacity=150)], "requestNote": "once"},
+    ).json()["id"]
+
+    as_user(setup["admin"])
+    approve = client.post(f"/layout-requests/{rid}/approve")
+    reject = client.post(f"/layout-requests/{rid}/reject", json={"reviewNote": "too late"})
+
+    assert approve.status_code == 204
+    assert reject.status_code == 409
+
+    request = db_session.get(LayoutRequest, rid)
+    section = db_session.get(ZoneSection, 10)
+    # status must match what actually happened to the section -- approved and applied.
+    assert request.status == "approved"
+    assert section.capacity == 150
+
+
 def test_proposal_requires_a_note_and_at_least_one_change(client, setup):
     as_user(setup["manager"])
     assert client.post(

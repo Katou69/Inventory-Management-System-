@@ -12,16 +12,18 @@ from app.zones.models import ZoneSection, ZoneStockEntry
 RANGE_DAYS = {"7d": 7, "30d": 30}
 
 
-def _product_stock_in_warehouse(db: Session, product_id: int, warehouse_id: int) -> int:
-    """On-hand quantity = SUM(signed quantity) over the ledger, per the
-    StockMovement model's own docstring. This is the source of truth, not
-    ZoneStockEntry (which is only a per-shelf read cache)."""
-    total = (
-        db.query(func.coalesce(func.sum(StockMovement.quantity), 0))
-        .filter(StockMovement.product_id == product_id, StockMovement.warehouse_id == warehouse_id)
-        .scalar()
+def _on_hand_by_product_in_warehouse(db: Session, warehouse_id: int) -> dict[int, int]:
+    """product_id -> on-hand qty in this warehouse. On-hand quantity =
+    SUM(signed quantity) over the ledger, per the StockMovement model's own
+    docstring -- the source of truth, not ZoneStockEntry (a per-shelf read
+    cache). One grouped query for every product, not one query per product."""
+    rows = (
+        db.query(StockMovement.product_id, func.coalesce(func.sum(StockMovement.quantity), 0))
+        .filter(StockMovement.warehouse_id == warehouse_id)
+        .group_by(StockMovement.product_id)
+        .all()
     )
-    return int(total or 0)
+    return {pid: int(qty) for pid, qty in rows}
 
 
 def _status_for(stock: int, reorder_level: int) -> str:
@@ -34,9 +36,10 @@ def _status_for(stock: int, reorder_level: int) -> str:
 
 def list_inventory(db: Session, warehouse_id: int) -> list[dict]:
     products = db.query(Product).all()
+    on_hand = _on_hand_by_product_in_warehouse(db, warehouse_id)
     rows = []
     for product in products:
-        stock = _product_stock_in_warehouse(db, product.id, warehouse_id)
+        stock = on_hand.get(product.id, 0)
         rows.append(
             {
                 "id": product.id,
@@ -149,12 +152,39 @@ def create_movement_task(
         status="pending",
     )
     db.add(task)
+    db.flush()
+
+    product = db.get(Product, product_id)
+    from_section = db.get(ZoneSection, from_section_id)
+    to_section = db.get(ZoneSection, to_section_id)
+    log_event(
+        db,
+        kind="stock",
+        title="Movement task requested",
+        description=(
+            f"{requested_by.name} requested moving {quantity} x "
+            f"{product.name if product else 'unknown item'} "
+            f"from {from_section.name if from_section else 'unknown shelf'} "
+            f"to {to_section.name if to_section else 'unknown shelf'}"
+        ),
+        actor=requested_by,
+    )
+
     db.commit()
     db.refresh(task)
     return task
 
 
 def complete_movement_task(db: Session, task: MovementTask, completed_by: User) -> MovementTask:
+    # Re-fetch under a row lock: without this, two concurrent completions of
+    # the same task (double-click, or two staff racing) can both read
+    # status == "pending" before either commits, and both go on to write the
+    # transfer_out/transfer_in pair and decrement from_entry.quantity a
+    # second time -- silently double-moving stock. The lock makes the second
+    # request block until the first commits, so it then correctly sees
+    # status == "completed" and raises instead of double-applying the move.
+    task = db.query(MovementTask).filter(MovementTask.id == task.id).with_for_update().one()
+
     if task.status != "pending":
         raise ValueError("Task is not pending")
 

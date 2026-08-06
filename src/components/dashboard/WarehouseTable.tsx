@@ -7,7 +7,8 @@ import { createWarehouse } from "@/services/dashboard-service"
 import { createWarehouseSchema } from "@/schemas/warehouse"
 import WarehousePreviewPanel from "@/components/warehouse/WarehousePreviewPanel"
 import ModalTabs from "@/components/warehouse/ModalTabs"
-import { Modal, ModalFooter, FormField } from "@/components/ui"
+import { Modal, ModalFooter, FormField, Pagination } from "@/components/ui"
+import { usePagination } from "@/lib/use-pagination"
 import type { Warehouse, WarehouseStatus } from "@/types/dashboard"
 
 function CapacityBar({ used, total }: { used: number; total: number }) {
@@ -48,6 +49,8 @@ export default function WarehouseTable({ initialWarehouses }: { initialWarehouse
   const [tab, setTab] = useState(0)
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const [confirmingClose, setConfirmingClose] = useState(false)
+
+  const { page, pageCount, setPage, pageItems: pagedWarehouses } = usePagination(warehouses)
 
   const isDirty = !!(form.name || form.location || form.manager || form.phone || imagePreview || form.status !== emptyForm.status)
 
@@ -145,7 +148,7 @@ export default function WarehouseTable({ initialWarehouses }: { initialWarehouse
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {warehouses.map((wh) => (
+            {pagedWarehouses.map((wh) => (
               <tr key={wh.id} className="hover:bg-accent transition-colors">
                 <td className="px-5 py-3 text-muted-foreground text-xs">{wh.id}</td>
                 <td className="px-3 py-3">
@@ -181,6 +184,8 @@ export default function WarehouseTable({ initialWarehouses }: { initialWarehouse
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} pageCount={pageCount} onPageChange={setPage} totalItems={warehouses.length} pageSize={10} />
 
       {modalOpen && (
         <Modal title="Add Warehouse" onClose={requestClose} size="lg">

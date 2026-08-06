@@ -80,6 +80,13 @@ function csrfHeader(): Record<string, string> {
 async function doFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${config.apiBaseUrl}${path}`
   const res = await fetch(url, {
+    // Next.js caches a bare fetch() in Server Components indefinitely
+    // (force-cache) unless told otherwise. Without this, router.refresh()
+    // after a create/update re-runs the Server Component but still gets the
+    // stale cached response -- e.g. a newly created product never appearing
+    // in the inventory table until the dev server restarts. This is live,
+    // per-request backend data, never a candidate for Next's Data Cache.
+    cache: "no-store",
     ...init,
     // Browser: send the httpOnly auth cookies cross-origin (:3000 -> :8000).
     credentials: "include",

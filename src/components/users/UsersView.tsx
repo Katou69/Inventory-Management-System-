@@ -7,7 +7,8 @@ import type { Warehouse } from "@/types/dashboard";
 import { getUsers, updateUser, deleteUser } from "@/services/users-service";
 import { getWarehouses } from "@/services/dashboard-service";
 import { initials, avatarColor } from "@/lib/format";
-import { Badge, ActionBtn, Modal, ModalFooter, FormField } from "@/components/ui";
+import { Badge, ActionBtn, Modal, ModalFooter, FormField, Pagination } from "@/components/ui";
+import { usePagination } from "@/lib/use-pagination";
 
 export default function UsersView({ role, userWarehouseId }: { role: Role; userWarehouseId: number | "all" }) {
   const [users, setUsers] = useState<UserType[]>([]);
@@ -53,6 +54,8 @@ export default function UsersView({ role, userWarehouseId }: { role: Role; userW
     (sf === "All" || u.status === sf) &&
     (u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase()))
   );
+
+  const { page, pageCount, setPage, pageItems: pagedUsers } = usePagination(filtered, 12);
 
   const handleApprove = async (user: UserType) => {
     setLoading(true);
@@ -197,7 +200,7 @@ export default function UsersView({ role, userWarehouseId }: { role: Role; userW
 
       {/* User cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map(u => (
+        {pagedUsers.map(u => (
           <div key={u.id} className="bg-card border border-border rounded-xl p-4 hover:border-primary/30 transition-all group">
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-3">
@@ -261,6 +264,8 @@ export default function UsersView({ role, userWarehouseId }: { role: Role; userW
           <div className="col-span-3 py-16 text-center text-muted-foreground text-sm">No users found</div>
         )}
       </div>
+
+      <Pagination page={page} pageCount={pageCount} onPageChange={setPage} totalItems={filtered.length} pageSize={12} />
 
       {/* Add User Modal */}
       {showAdd && (

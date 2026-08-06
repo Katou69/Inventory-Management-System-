@@ -230,7 +230,15 @@ def propose_change(
 
 
 def _get_pending_request(db: Session, request_id: int) -> LayoutRequest:
-    request = db.get(LayoutRequest, request_id)
+    # with_for_update: without this, two admins racing approve/reject on the
+    # same request (or a double-click) can both read status == "pending"
+    # before either commits -- one applies the layout change, the other
+    # records a rejection, and whichever commits last silently overwrites the
+    # other's status/reviewed_by/reviewed_at while the layout mutation from
+    # the approve side has already happened regardless. The lock makes the
+    # second request block until the first commits, so it then correctly
+    # sees the reviewed status and raises instead of racing it.
+    request = db.query(LayoutRequest).filter(LayoutRequest.id == request_id).with_for_update().one_or_none()
     if request is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Layout request not found")
     if request.status != "pending":

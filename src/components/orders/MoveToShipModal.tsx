@@ -135,17 +135,17 @@ export default function MoveToShipModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-2xl rounded-xl bg-white shadow-xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between border-b p-6">
+      <div className="w-full max-w-2xl rounded-xl bg-card shadow-xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between border-b border-border p-6">
           <div>
-            <h2 className="text-xl font-semibold">
+            <h2 className="text-xl font-semibold text-foreground">
               Move Order to Shipping Bay
             </h2>
-            <p className="text-sm text-slate-500">{order.id}</p>
+            <p className="text-sm text-muted-foreground">{order.id}</p>
           </div>
 
-          <button onClick={onClose} className="rounded-lg p-2 hover:bg-slate-100">
-            <X className="h-5 w-5 text-slate-500" />
+          <button onClick={onClose} className="rounded-lg p-2 hover:bg-accent">
+            <X className="h-5 w-5 text-muted-foreground" />
           </button>
         </div>
 
@@ -155,13 +155,13 @@ export default function MoveToShipModal({
             const remaining = getRemaining(item);
 
             return (
-              <div key={item.product} className="rounded-xl border p-4">
+              <div key={item.product} className="rounded-xl border border-border p-4">
                 <div className="flex items-center justify-between">
-                  <p className="font-semibold">{item.product}</p>
+                  <p className="font-semibold text-foreground">{item.product}</p>
 
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-muted-foreground">
                     Need{" "}
-                    <span className="font-medium text-slate-700">
+                    <span className="font-medium text-foreground">
                       {item.quantity.toLocaleString()}
                     </span>
                   </p>
@@ -190,7 +190,7 @@ export default function MoveToShipModal({
                           onChange={(event) =>
                             updateShelf(item.product, rowIndex, event.target.value)
                           }
-                          className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                          className="rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
                         >
                           <option value="">Choose Shelf</option>
 
@@ -215,14 +215,14 @@ export default function MoveToShipModal({
                               maxQuantity
                             )
                           }
-                          className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:bg-slate-50"
+                          className="rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 disabled:bg-accent"
                         />
 
                         <button
                           type="button"
                           onClick={() => removeRow(item.product, rowIndex)}
                           disabled={rows.length === 1}
-                          className="flex items-center justify-center rounded-lg p-2 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                          className="flex items-center justify-center rounded-lg p-2 hover:bg-red-50 dark:hover:bg-red-950 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <Trash2 className="h-4 w-4 text-red-500" />
                         </button>
@@ -236,7 +236,7 @@ export default function MoveToShipModal({
                     type="button"
                     onClick={() => addRow(item.product)}
                     disabled={remaining === 0}
-                    className="flex items-center gap-1 text-sm text-blue-600 hover:underline disabled:cursor-not-allowed disabled:text-slate-300 disabled:no-underline"
+                    className="flex items-center gap-1 text-sm text-primary hover:underline disabled:cursor-not-allowed disabled:text-muted-foreground disabled:no-underline"
                   >
                     <Plus className="h-3.5 w-3.5" />
                     Add shelf
@@ -244,7 +244,7 @@ export default function MoveToShipModal({
 
                   <p
                     className={`text-sm font-medium ${
-                      remaining === 0 ? "text-emerald-600" : "text-amber-600"
+                      remaining === 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
                     }`}
                   >
                     Remaining: {remaining.toLocaleString()}
@@ -255,11 +255,11 @@ export default function MoveToShipModal({
           })}
         </div>
 
-        <div className="flex justify-end gap-3 border-t p-6">
+        <div className="flex justify-end gap-3 border-t border-border p-6">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm hover:bg-slate-50"
+            className="rounded-lg border border-border px-4 py-2 text-sm hover:bg-accent"
           >
             Cancel
           </button>
@@ -268,7 +268,7 @@ export default function MoveToShipModal({
             type="button"
             onClick={handleConfirm}
             disabled={!allItemsFullyAllocated}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Move Products
           </button>

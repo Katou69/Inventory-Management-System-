@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { Order } from "@/types/orders";
-import { Badge } from "@/components/ui";
+import { Badge, Pagination } from "@/components/ui";
+import { usePagination } from "@/lib/use-pagination";
 import { ArrowUpDown } from "lucide-react";
 
 import Filters, { OrderFilterStatus } from "./Filters";
@@ -67,6 +68,8 @@ export default function OrdersTableClient({ orders, role }: Props) {
       );
     });
   }, [orderList, activeStatus, startDate, endDate]);
+
+  const { page, pageCount, setPage, pageItems: pagedOrders, startIndex } = usePagination(filteredOrders);
 
   const handleClearDates = () => {
     setStartDate("");
@@ -219,7 +222,7 @@ export default function OrdersTableClient({ orders, role }: Props) {
 
             <tbody>
               {filteredOrders.length > 0 ? (
-                filteredOrders.map((order, index) => {
+                pagedOrders.map((order, index) => {
                   const totalQuantity = order.items.reduce(
                     (sum, item) =>
                       sum + item.quantity,
@@ -239,7 +242,7 @@ export default function OrdersTableClient({ orders, role }: Props) {
                       className="border-b border-border transition-colors last:border-b-0 hover:bg-accent"
                     >
                       <td className="px-6 py-4 text-muted-foreground">
-                        {index + 1}
+                        {startIndex + index + 1}
                       </td>
 
                       <td className="px-6 py-4">
@@ -258,7 +261,7 @@ export default function OrdersTableClient({ orders, role }: Props) {
                           onClick={() => handleProductClick(order)}
                           className="text-left"
                         >
-                          <p className="font-medium text-foreground hover:text-indigo-600 hover:underline">
+                          <p className="font-medium text-foreground hover:text-primary hover:underline">
                             {firstProduct}
                           </p>
 
@@ -319,7 +322,7 @@ export default function OrdersTableClient({ orders, role }: Props) {
                       <button
                         type="button"
                         onClick={handleClearDates}
-                        className="mt-4 text-sm font-medium text-indigo-600 hover:underline"
+                        className="mt-4 text-sm font-medium text-primary hover:underline"
                       >
                         Clear date filters
                       </button>
@@ -329,6 +332,8 @@ export default function OrdersTableClient({ orders, role }: Props) {
               )}
             </tbody>
           </table>
+
+          <Pagination page={page} pageCount={pageCount} onPageChange={setPage} totalItems={filteredOrders.length} pageSize={10} />
         </div>
       </div>
 

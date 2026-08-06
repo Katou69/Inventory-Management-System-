@@ -122,7 +122,7 @@ export default function CreateMovementModal({
 
 
                         <select
-                            className="border border-border rounded-lg p-2"
+                            className="modal-input"
                             value={productId}
                             onChange={(e) => {
                                 setProductId(e.target.value);
@@ -158,7 +158,7 @@ export default function CreateMovementModal({
 
                         <input
                             type="number"
-                            className="border border-border rounded-lg p-2"
+                            className="modal-input"
                             placeholder="Quantity"
                             min={1}
                             max={selectedProduct?.stock}
@@ -180,7 +180,7 @@ export default function CreateMovementModal({
 
 
                         <select
-                            className="border border-border rounded-lg p-2"
+                            className="modal-input"
                             value={fromShelfId}
                             onChange={(e)=>
                                 setFromShelfId(Number(e.target.value))
@@ -211,7 +211,7 @@ export default function CreateMovementModal({
 
 
                         <select
-                            className="border border-border rounded-lg p-2"
+                            className="modal-input"
                             value={toShelfId}
                             onChange={(e)=>
                                 setToShelfId(Number(e.target.value))
@@ -244,7 +244,7 @@ export default function CreateMovementModal({
 
 
                         <textarea
-                            className="border border-border rounded-lg p-2"
+                            className="modal-input"
                             placeholder="Reason"
                             value={reason}
                             onChange={(e)=>
@@ -253,7 +253,7 @@ export default function CreateMovementModal({
                         />
 
                         {error && (
-                            <p className="text-sm text-red-600">{error}</p>
+                            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
                         )}
 
 

@@ -1,5 +1,9 @@
+"use client"
+
 import type { WarehouseDetail } from "@/types/dashboard"
 import { productStatusStyle } from "./statusStyles"
+import { Pagination } from "@/components/ui"
+import { usePagination } from "@/lib/use-pagination"
 
 const categoryColors: Record<string, string> = {
   "Whisky":      "bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:ring-amber-900",
@@ -7,6 +11,8 @@ const categoryColors: Record<string, string> = {
 }
 
 export default function WarehouseProductsTable({ wh }: { wh: WarehouseDetail }) {
+  const { page, pageCount, setPage, pageItems: pagedProducts } = usePagination(wh.products)
+
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="flex items-center justify-between px-5 py-4 border-b border-border">
@@ -29,7 +35,7 @@ export default function WarehouseProductsTable({ wh }: { wh: WarehouseDetail }) 
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {wh.products.map((p) => (
+            {pagedProducts.map((p) => (
               <tr key={p.id} className="hover:bg-accent transition-colors">
                 <td className="px-5 py-3">
                   <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-accent text-muted-foreground text-xs font-mono font-medium">
@@ -53,6 +59,8 @@ export default function WarehouseProductsTable({ wh }: { wh: WarehouseDetail }) 
             ))}
           </tbody>
         </table>
+
+        <Pagination page={page} pageCount={pageCount} onPageChange={setPage} totalItems={wh.products.length} pageSize={10} />
       </div>
     </div>
   )

@@ -139,19 +139,19 @@ export default function OrderFormModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-lg">
+      <div className="w-full max-w-2xl rounded-xl bg-card p-6 shadow-lg">
         <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-800">
+          <h2 className="text-lg font-semibold text-foreground">
             {isEditing ? "Edit Order" : "New Order"}
           </h2>
 
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-2 hover:bg-slate-100"
+            className="rounded-lg p-2 hover:bg-accent"
             aria-label="Close order form"
           >
-            <X className="h-5 w-5 text-slate-500" />
+            <X className="h-5 w-5 text-muted-foreground" />
           </button>
         </div>
 
@@ -159,7 +159,7 @@ export default function OrderFormModal({
           <div>
             <label
               htmlFor="order-customer"
-              className="text-sm text-slate-600"
+              className="text-sm text-muted-foreground"
             >
               Customer
             </label>
@@ -170,7 +170,7 @@ export default function OrderFormModal({
               onChange={(event) =>
                 setCustomer(event.target.value)
               }
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+              className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
               placeholder="Customer name"
             />
           </div>
@@ -178,7 +178,7 @@ export default function OrderFormModal({
           <div>
             <label
               htmlFor="order-date"
-              className="text-sm text-slate-600"
+              className="text-sm text-muted-foreground"
             >
               Order Date
             </label>
@@ -190,14 +190,14 @@ export default function OrderFormModal({
               onChange={(event) =>
                 setDate(event.target.value)
               }
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+              className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
             />
           </div>
 
           <div>
             <label
               htmlFor="order-status"
-              className="text-sm text-slate-600"
+              className="text-sm text-muted-foreground"
             >
               Status
             </label>
@@ -210,7 +210,7 @@ export default function OrderFormModal({
                   event.target.value as OrderStatus
                 )
               }
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+              className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
             >
               {statuses.map((orderStatus) => (
                 <option
@@ -229,7 +229,7 @@ export default function OrderFormModal({
           <div>
             <label
               htmlFor="order-total"
-              className="text-sm text-slate-600"
+              className="text-sm text-muted-foreground"
             >
               Total Amount
             </label>
@@ -242,21 +242,21 @@ export default function OrderFormModal({
               onChange={(event) =>
                 setTotal(Number(event.target.value))
               }
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+              className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
             />
           </div>
         </div>
 
         <div className="mt-5">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="font-semibold text-slate-800">
+            <h3 className="font-semibold text-foreground">
               Products
             </h3>
 
             <button
               type="button"
               onClick={addItem}
-              className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
+              className="flex items-center gap-1 text-sm text-primary hover:underline"
             >
               <Plus className="h-4 w-4" />
               Add Product
@@ -278,7 +278,7 @@ export default function OrderFormModal({
                       event.target.value
                     )
                   }
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                  className="rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
                   placeholder="Product name"
                 />
 
@@ -293,7 +293,7 @@ export default function OrderFormModal({
                       Number(event.target.value)
                     )
                   }
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                  className="rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
                   placeholder="Qty"
                 />
 
@@ -301,7 +301,7 @@ export default function OrderFormModal({
                   type="button"
                   onClick={() => removeItem(index)}
                   disabled={items.length === 1}
-                  className="flex items-center justify-center rounded-lg hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="flex items-center justify-center rounded-lg hover:bg-red-50 dark:hover:bg-red-950 disabled:cursor-not-allowed disabled:opacity-40"
                   aria-label={`Remove product ${index + 1}`}
                 >
                   <Trash2 className="h-4 w-4 text-red-500" />
@@ -315,7 +315,7 @@ export default function OrderFormModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm hover:bg-slate-50"
+            className="rounded-lg border border-border px-4 py-2 text-sm hover:bg-accent"
           >
             Cancel
           </button>
@@ -323,7 +323,7 @@ export default function OrderFormModal({
           <button
             type="button"
             onClick={handleSave}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800"
+            className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:opacity-90"
           >
             Save Order
           </button>

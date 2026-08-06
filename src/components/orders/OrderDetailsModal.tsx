@@ -37,19 +37,19 @@ export default function OrderDetailsModal({
         }
       }}
     >
-      <div className="w-full max-w-3xl rounded-xl bg-white shadow-xl max-h-[90vh] overflow-y-auto">
+      <div className="w-full max-w-3xl rounded-xl bg-card shadow-xl max-h-[90vh] overflow-y-auto">
 
         {/* Header */}
 
-        <div className="flex items-center justify-between border-b p-6">
+        <div className="flex items-center justify-between border-b border-border p-6">
 
           <div>
 
-            <h2 className="text-xl font-semibold">
+            <h2 className="text-xl font-semibold text-foreground">
               Order Details
             </h2>
 
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-muted-foreground">
               {order.id}
             </p>
 
@@ -57,9 +57,9 @@ export default function OrderDetailsModal({
 
           <button
             onClick={onClose}
-            className="rounded-lg p-2 hover:bg-slate-100"
+            className="rounded-lg p-2 hover:bg-accent"
           >
-            <X className="h-5 w-5 text-slate-500" />
+            <X className="h-5 w-5 text-muted-foreground" />
           </button>
 
         </div>
@@ -77,7 +77,7 @@ export default function OrderDetailsModal({
 
             <div>
 
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-muted-foreground">
                 Status
               </p>
 
@@ -106,11 +106,11 @@ export default function OrderDetailsModal({
 
           <div>
 
-            <h3 className="font-semibold mb-3">
+            <h3 className="font-semibold mb-3 text-foreground">
               Products
             </h3>
 
-            <div className="rounded-xl border divide-y">
+            <div className="rounded-xl border border-border divide-y divide-border">
 
               {order.items.map((item) => (
 
@@ -120,7 +120,7 @@ export default function OrderDetailsModal({
                 >
                   <div>
 
-                    <p className="font-medium">
+                    <p className="font-medium text-foreground">
                       {item.product}
                     </p>
 
@@ -131,7 +131,7 @@ export default function OrderDetailsModal({
 
                                 <p
                                     key={pick.shelf}
-                                    className="text-sm text-slate-500"
+                                    className="text-sm text-muted-foreground"
                                 >
                                     {pick.shelf} ({pick.quantity})
                                 </p>
@@ -141,7 +141,7 @@ export default function OrderDetailsModal({
                         </div>
                     ) : (
 
-                        <p className="text-sm text-slate-400">
+                        <p className="text-sm text-muted-foreground">
                             Shelf not selected yet
                         </p>
 
@@ -149,7 +149,7 @@ export default function OrderDetailsModal({
 
                   </div>
 
-                  <div className="font-semibold">
+                  <div className="font-semibold text-foreground">
                     {item.quantity.toLocaleString()}
                   </div>
 
@@ -189,11 +189,11 @@ function InfoRow({
 }) {
   return (
     <div>
-      <p className="text-sm text-slate-500">
+      <p className="text-sm text-muted-foreground">
         {label}
       </p>
 
-      <p className="font-medium">
+      <p className="font-medium text-foreground">
         {value}
       </p>
     </div>

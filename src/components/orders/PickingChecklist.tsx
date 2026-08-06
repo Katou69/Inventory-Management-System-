@@ -40,15 +40,15 @@ export default function PickingChecklist({
   }
 
   return (
-    <div className="rounded-xl border p-5">
+    <div className="rounded-xl border border-border p-5">
 
       <div className="mb-5">
 
-        <h3 className="font-semibold">
+        <h3 className="font-semibold text-foreground">
           Picking Checklist
         </h3>
 
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted-foreground">
           Move every item from its shelf to the Shipping Bay.
         </p>
 

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.mixins import AuditMixin
@@ -39,7 +39,7 @@ class Product(Base, AuditMixin):
     reorder_level: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # frontend calls this minStock
 
     category: Mapped["Category | None"] = relationship(lazy="joined")
-    supplier: Mapped["Supplier | None"] = relationship()
+    supplier: Mapped["Supplier | None"] = relationship(lazy="joined")
 
     @property
     def category_name(self) -> str:
@@ -61,6 +61,12 @@ class StockMovement(Base, AuditMixin):
     """
 
     __tablename__ = "stock_movements"
+    __table_args__ = (
+        # Every real query filters product_id + warehouse_id together (on-hand
+        # lookups, product history) -- a composite index serves those directly
+        # instead of the planner intersecting two single-column indexes.
+        Index("ix_stock_movements_product_warehouse", "product_id", "warehouse_id"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), nullable=False, index=True)

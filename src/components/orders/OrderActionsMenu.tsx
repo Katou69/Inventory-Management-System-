@@ -114,9 +114,9 @@ export default function OrderActionsMenu({
       <button
         ref={buttonRef}
         onClick={() => (open ? setOpen(false) : openMenu())}
-        className="hover:bg-slate-100 p-2 rounded-lg"
+        className="hover:bg-accent p-2 rounded-lg"
       >
-        <MoreHorizontal className="w-4 h-4 text-slate-500" />
+        <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
       </button>
 
       {open &&
@@ -130,14 +130,14 @@ export default function OrderActionsMenu({
               left: position.left,
               visibility: ready ? "visible" : "hidden",
             }}
-            className="z-50 w-48 bg-white border border-slate-200 rounded-lg shadow-lg py-1"
+            className="z-50 w-48 rounded-lg border border-border bg-card py-1 shadow-lg"
           >
             <button
               onClick={() => {
                 onView(order);
                 setOpen(false);
               }}
-              className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-50"
+              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-accent"
             >
               <Eye className="w-4 h-4" />
               View Details
@@ -149,7 +149,7 @@ export default function OrderActionsMenu({
                   onMoveToShip(order);
                   setOpen(false);
                 }}
-                className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-50"
+                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-accent"
               >
                 <PackageCheck className="w-4 h-4" />
                 Move to Ship
@@ -162,7 +162,7 @@ export default function OrderActionsMenu({
                   onEdit(order);
                   setOpen(false);
                 }}
-                className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-50"
+                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-accent"
               >
                 <Pencil className="w-4 h-4" />
                 Edit Order
