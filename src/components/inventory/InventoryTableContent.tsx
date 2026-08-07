@@ -4,8 +4,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { Badge } from "@/components/ui";
+import { Badge, Pagination } from "@/components/ui";
 import { InventoryItem } from "@/types/inventory";
+import { usePagination } from "@/lib/use-pagination";
 
 import ProductMenu from "./ProductMenu";
 import EditProductModal from "./EditProductModal";
@@ -62,6 +63,8 @@ export default function InventoryTableContent({
     );
 
   });
+
+  const { page, pageCount, setPage, pageItems } = usePagination(filteredInventory);
 
 
 
@@ -146,7 +149,7 @@ export default function InventoryTableContent({
           <tbody className="divide-y divide-border">
 
 
-          {filteredInventory.map((item)=>(
+          {pageItems.map((item)=>(
 
             <tr
               key={item.id}
@@ -295,6 +298,7 @@ export default function InventoryTableContent({
 
         </table>
 
+        <Pagination page={page} pageCount={pageCount} onPageChange={setPage} totalItems={filteredInventory.length} pageSize={10} />
 
       </div>
 
