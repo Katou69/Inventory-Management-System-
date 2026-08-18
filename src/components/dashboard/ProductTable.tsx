@@ -21,12 +21,14 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
     <div className="bg-card rounded-xl border border-border shadow-sm flex-1 min-w-0 overflow-hidden">
       <div className="flex items-center justify-between px-5 py-4 border-b border-border">
         <div>
-          <h3 className="text-base font-semibold text-foreground">Top Ordered Products</h3>
+          <h2 className="text-base font-semibold text-foreground">Top Ordered Products</h2>
           <p className="text-xs text-muted-foreground mt-0.5">By revenue · {period.toLowerCase()}</p>
         </div>
         <div className="relative">
           <button
             onClick={() => setPeriodOpen((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={periodOpen}
             className="flex items-center gap-1.5 text-sm text-muted-foreground border border-border rounded-lg px-3 py-1.5 hover:bg-accent transition-colors"
           >
             {period}
@@ -54,12 +56,12 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-accent border-b border-border">
-            <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-5 py-3 w-10">#</th>
-            <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">Product</th>
-            <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">Category</th>
-            <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">Qty</th>
-            <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">Revenue</th>
-            <th className="w-10 px-4 py-3" />
+            <th scope="col" className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-5 py-3 w-10">#</th>
+            <th scope="col" className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">Product</th>
+            <th scope="col" className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">Category</th>
+            <th scope="col" className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">Qty</th>
+            <th scope="col" className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">Revenue</th>
+            <th scope="col" className="w-10 px-4 py-3" aria-label="Actions" />
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
@@ -94,7 +96,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setSelected(null)} />
           <div className="relative bg-card rounded-2xl shadow-xl w-full max-w-sm p-6 border border-border">
-            <button onClick={() => setSelected(null)} className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-accent transition-colors">
+            <button onClick={() => setSelected(null)} aria-label="Close" className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-accent transition-colors">
               <X className="size-4 text-muted-foreground" />
             </button>
             <div className="flex items-center gap-3 mb-5">

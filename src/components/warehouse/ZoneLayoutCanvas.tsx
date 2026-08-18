@@ -42,7 +42,7 @@ import {
 } from "lucide-react"
 import {
   getZones, getZoneStock, getPendingRequests,
-  getFloors, createFloor, renameFloor, deleteFloor as deleteFloorApi,
+  getFloors, createFloor, renameFloor, updateFloor, deleteFloor as deleteFloorApi,
   applyDirectChange, proposeChange, approveRequest, rejectRequest,
   zoneOccupancy, zoneStockTotal, stockTotals, occupancyOf,
 } from "@/services/zone-service"
@@ -322,11 +322,20 @@ const ZoneBox = memo(function ZoneBox({
 // the boxes on a floor. Deleting a floor unassigns its sections rather than
 // deleting them (see delete_floor in the backend service).
 //
-// ponytail: blueprint images and the grid scale are still client-only —
-// they're presentational aids, and persisting images needs an upload endpoint.
-// Add when someone needs a blueprint to survive a reload.
+// Blueprint image + scale are stored on the floor row (blueprint_data_url as
+// a data URL, plus placement and scale), so they survive a reload. Persisted
+// on drop/drag-end/scale-change, not on every pointermove.
 type BlueprintImage = { dataUrl: string; x: number; y: number; width: number; height: number }
 type Scale = { pxPerUnit: number; unit: "ft" | "m" }
+
+function blueprintFromFloor(f: Floor): BlueprintImage | null {
+  if (!f.blueprintDataUrl || f.blueprintWidth == null || f.blueprintHeight == null) return null
+  return { dataUrl: f.blueprintDataUrl, x: f.blueprintX ?? 0, y: f.blueprintY ?? 0, width: f.blueprintWidth, height: f.blueprintHeight }
+}
+function scaleFromFloor(f: Floor | undefined): Scale | null {
+  if (!f?.scalePxPerUnit || !f.scaleUnit) return null
+  return { pxPerUnit: f.scalePxPerUnit, unit: f.scaleUnit }
+}
 
 export default function ZoneLayoutCanvas({
   warehouseId, role, viewerName,
@@ -419,8 +428,22 @@ export default function ZoneLayoutCanvas({
       setDraftGeom({})
       setStaged([])
       setLoadError(null)
+      const bp: Record<number, BlueprintImage> = {}
+      for (const fl of f) {
+        const b = blueprintFromFloor(fl)
+        if (b) bp[fl.id] = b
+      }
+      setBlueprints(bp)
       // Keep the current floor if it still exists, else fall back to the lowest.
-      setActiveFloorId((cur) => (cur != null && f.some((fl) => fl.id === cur) ? cur : f[0]?.id ?? null))
+      // (activeFloorIdRef, not the `activeFloorId` state, so this stays out of
+      // refresh's deps below — see the ref's own comment.)
+      const cur = activeFloorIdRef.current
+      const nextActive = cur != null && f.some((fl) => fl.id === cur) ? cur : f[0]?.id ?? null
+      setActiveFloorId(nextActive)
+      const sc = scaleFromFloor(f.find((fl) => fl.id === nextActive))
+      setScale(sc)
+      setScaleUnit(sc?.unit ?? "ft")
+      setGridUnitInput(sc ? String(Math.round((GRID / sc.pxPerUnit) * 100) / 100) : "")
       return z
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Failed to load warehouse map")
@@ -884,7 +907,14 @@ export default function ZoneLayoutCanvas({
       }
       return
     }
-    if (bgDragRef.current) { bgDragRef.current = null; return }
+    if (bgDragRef.current) {
+      bgDragRef.current = null
+      if (activeFloorId != null) {
+        const bp = blueprints[activeFloorId]
+        if (bp) void updateFloor(activeFloorId, { blueprintX: bp.x, blueprintY: bp.y, blueprintWidth: bp.width, blueprintHeight: bp.height })
+      }
+      return
+    }
     if (marqueeRef.current) {
       const m = marqueeRef.current
       marqueeRef.current = null
@@ -998,6 +1028,10 @@ export default function ZoneLayoutCanvas({
     setSelectedIds([])
     setSelectedRequestId(null)
     setBgEditing(false)
+    const sc = scaleFromFloor(floors.find((fl) => fl.id === id))
+    setScale(sc)
+    setScaleUnit(sc?.unit ?? "ft")
+    setGridUnitInput(sc ? String(Math.round((GRID / sc.pxPerUnit) * 100) / 100) : "")
     requestAnimationFrame(fitToContent)
   }
   async function addFloor() {
@@ -1054,9 +1088,13 @@ export default function ZoneLayoutCanvas({
       img.onload = () => {
         const maxDim = 1400
         const f = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight))
-        setBlueprints((prev) => ({ ...prev, [floorId]: { dataUrl, x: 0, y: 0, width: Math.round(img.naturalWidth * f), height: Math.round(img.naturalHeight * f) } }))
+        const bp: BlueprintImage = { dataUrl, x: 0, y: 0, width: Math.round(img.naturalWidth * f), height: Math.round(img.naturalHeight * f) }
+        setBlueprints((prev) => ({ ...prev, [floorId]: bp }))
         setBgEditing(true)
         setBgVisible(true)
+        void updateFloor(floorId, {
+          blueprintDataUrl: bp.dataUrl, blueprintX: bp.x, blueprintY: bp.y, blueprintWidth: bp.width, blueprintHeight: bp.height,
+        })
       }
       img.src = dataUrl
     }
@@ -1065,9 +1103,11 @@ export default function ZoneLayoutCanvas({
   }
   function removeBlueprint() {
     if (activeFloorId == null) return
-    setBlueprints((prev) => { const next = { ...prev }; delete next[activeFloorId]; return next })
+    const floorId = activeFloorId
+    setBlueprints((prev) => { const next = { ...prev }; delete next[floorId]; return next })
     setBgEditing(false)
     setBgVisible(true)
+    void updateFloor(floorId, { blueprintDataUrl: null, blueprintX: null, blueprintY: null, blueprintWidth: null, blueprintHeight: null })
   }
   // The blueprint <img> never gets a templated/derived `src` — it's set
   // imperatively once real image data exists, so there's nothing for the
@@ -1086,10 +1126,20 @@ export default function ZoneLayoutCanvas({
     const n = parseFloat(v)
     setScale(n > 0 ? { pxPerUnit: GRID / n, unit: scaleUnit } : null)
   }
+  // Saved on blur, not per keystroke -- typing "5" fires three onChange
+  // events before it settles, and only the final value is worth a request.
+  function onGridUnitBlur() {
+    if (activeFloorId == null) return
+    const n = parseFloat(gridUnitInput)
+    void updateFloor(activeFloorId, n > 0 ? { scalePxPerUnit: GRID / n, scaleUnit } : { scalePxPerUnit: null, scaleUnit: null })
+  }
   function onScaleUnitChange(u: "ft" | "m") {
     setScaleUnit(u)
     const n = parseFloat(gridUnitInput)
-    if (n > 0) setScale({ pxPerUnit: GRID / n, unit: u })
+    if (n > 0) {
+      setScale({ pxPerUnit: GRID / n, unit: u })
+      if (activeFloorId != null) void updateFloor(activeFloorId, { scalePxPerUnit: GRID / n, scaleUnit: u })
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -1264,8 +1314,8 @@ export default function ZoneLayoutCanvas({
         )}
         <div className="w-px h-4 bg-border" />
         <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium text-muted-foreground">Grid square =</span>
-          <input value={gridUnitInput} onChange={onGridUnitChange} placeholder="e.g. 5" className="w-14 px-2 py-1 text-xs font-semibold bg-input-background border border-border rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
+          <span id="grid-scale-label" className="text-xs font-medium text-muted-foreground">Grid square =</span>
+          <input aria-labelledby="grid-scale-label" value={gridUnitInput} onChange={onGridUnitChange} onBlur={onGridUnitBlur} placeholder="e.g. 5" className="w-14 px-2 py-1 text-xs font-semibold bg-input-background border border-border rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
           <div className="flex items-center bg-accent rounded-md p-0.5">
             {(["ft", "m"] as const).map((u) => (
               <button key={u} onClick={() => onScaleUnitChange(u)} className={`px-2 py-0.5 text-xs font-medium rounded ${scaleUnit === u ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}`}>

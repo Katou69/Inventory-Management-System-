@@ -144,7 +144,7 @@ export default function MoveToShipModal({
             <p className="text-sm text-muted-foreground">{order.id}</p>
           </div>
 
-          <button onClick={onClose} className="rounded-lg p-2 hover:bg-accent">
+          <button onClick={onClose} aria-label="Close" className="rounded-lg p-2 hover:bg-accent">
             <X className="h-5 w-5 text-muted-foreground" />
           </button>
         </div>

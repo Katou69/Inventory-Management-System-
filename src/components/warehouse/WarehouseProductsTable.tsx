@@ -26,12 +26,12 @@ export default function WarehouseProductsTable({ wh }: { wh: WarehouseDetail }) 
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-accent border-b border-border">
-              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-5 py-3">SKU</th>
-              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">Product</th>
-              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">Category</th>
-              <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">Quantity</th>
-              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">Status</th>
-              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-5 py-3">Last Updated</th>
+              <th scope="col" className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-5 py-3">SKU</th>
+              <th scope="col" className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">Product</th>
+              <th scope="col" className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">Category</th>
+              <th scope="col" className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">Quantity</th>
+              <th scope="col" className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">Status</th>
+              <th scope="col" className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-5 py-3">Last Updated</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">

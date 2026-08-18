@@ -183,7 +183,7 @@ export default function InventoryStatisticsChart({
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm p-5">
       <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
-        <h3 className="text-base font-semibold text-foreground">Inventory Statistics</h3>
+        <h2 className="text-base font-semibold text-foreground">Inventory Statistics</h2>
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">

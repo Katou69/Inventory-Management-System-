@@ -1,0 +1,8 @@
+{
+  "default": "dev",
+  "targets": {
+    "dev": {
+      "url": "http://localhost:3000"
+    }
+  }
+}

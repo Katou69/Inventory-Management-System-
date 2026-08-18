@@ -32,12 +32,12 @@ export default function ActivityFeed({ activities }: { activities: ActivityEntry
     <div className="bg-card rounded-xl border border-border shadow-sm w-[380px] shrink-0 overflow-hidden">
       <div className="flex items-center justify-between px-5 py-4 border-b border-border">
         <div>
-          <h3 className="text-base font-semibold text-foreground">Recent Activity</h3>
+          <h2 className="text-base font-semibold text-foreground">Recent Activity</h2>
           <p className="text-xs text-muted-foreground mt-0.5">Latest user actions</p>
         </div>
       </div>
 
-      <div className="divide-y divide-border overflow-y-auto max-h-[420px]">
+      <div tabIndex={0} role="region" aria-label="Recent activity" className="divide-y divide-border overflow-y-auto max-h-[420px] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-inset">
         {activities.slice(0, 5).map((a) => (
           <ActivityRow key={a.id} a={a} />
         ))}
@@ -62,7 +62,7 @@ export default function ActivityFeed({ activities }: { activities: ActivityEntry
                 <h3 className="text-base font-semibold text-foreground">All Activity</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">{activities.length} recent actions</p>
               </div>
-              <button onClick={() => setShowAll(false)} className="p-1.5 rounded-lg hover:bg-accent transition-colors">
+              <button onClick={() => setShowAll(false)} aria-label="Close" className="p-1.5 rounded-lg hover:bg-accent transition-colors">
                 <X className="size-4 text-muted-foreground" />
               </button>
             </div>

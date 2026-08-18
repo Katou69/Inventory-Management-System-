@@ -190,7 +190,7 @@ export default function OrdersTableClient({ orders, role }: Props) {
             <button
               type="button"
               onClick={handleAddOrder}
-              className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90"
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90"
             >
               + New Order
             </button>
@@ -204,6 +204,7 @@ export default function OrdersTableClient({ orders, role }: Props) {
                 {headers.map((header) => (
                   <th
                     key={header}
+                    scope="col"
                     className="whitespace-nowrap px-6 py-4 text-sm font-semibold text-muted-foreground"
                   >
                     <div className="flex items-center gap-1">
@@ -214,7 +215,7 @@ export default function OrdersTableClient({ orders, role }: Props) {
                   </th>
                 ))}
 
-                <th className="px-6 py-4">
+                <th scope="col" className="px-6 py-4">
                   <span className="sr-only">Actions</span>
                 </th>
               </tr>

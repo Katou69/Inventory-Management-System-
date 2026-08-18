@@ -1,7 +1,7 @@
 "use client"
 import Link from "next/link"
 import { useState, useMemo } from "react"
-import { Bell, Search, Package, Warehouse as WarehouseIcon, X, LogOut, Settings, Sun, Moon } from "lucide-react"
+import { Bell, Search, Package, Warehouse as WarehouseIcon, X, LogOut, Settings, Sun, Moon, User } from "lucide-react"
 import { markAllNotificationsRead, markNotificationRead } from "@/services/dashboard-service"
 import type { NotificationType, Product, Warehouse, NotificationItem } from "@/types/dashboard"
 import { useAuth } from "@/lib/auth/auth-context"
@@ -59,6 +59,7 @@ export default function Header({
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <input
             type="text"
+            aria-label="Search products, warehouses"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setSearchFocused(true)}
@@ -67,7 +68,7 @@ export default function Header({
             className="w-full pl-9 pr-8 py-2 text-sm bg-input-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
           />
           {query && (
-            <button onClick={() => setQuery("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-accent transition-colors">
+            <button onClick={() => setQuery("")} aria-label="Clear search" className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-accent transition-colors">
               <X className="size-3.5 text-muted-foreground" />
             </button>
           )}
@@ -128,6 +129,9 @@ export default function Header({
         <div className="relative">
           <button
             onClick={() => { setBellOpen((v) => !v); setUserOpen(false) }}
+            aria-label="Notifications"
+            aria-haspopup="menu"
+            aria-expanded={bellOpen}
             className="relative p-2 rounded-lg hover:bg-accent transition-colors"
           >
             <Bell className="size-5 text-muted-foreground" />
@@ -170,6 +174,13 @@ export default function Header({
                     </button>
                   ))}
                 </div>
+                <Link
+                  href="/dashboard/notifications"
+                  onClick={() => setBellOpen(false)}
+                  className="block text-center px-4 py-2.5 text-sm text-primary hover:bg-accent transition-colors border-t border-border"
+                >
+                  View all
+                </Link>
               </div>
             </>
           )}
@@ -179,6 +190,8 @@ export default function Header({
         <div className="relative">
           <button
             onClick={() => { setUserOpen((v) => !v); setBellOpen(false) }}
+            aria-haspopup="menu"
+            aria-expanded={userOpen}
             className="flex items-center gap-2.5 rounded-lg hover:bg-accent transition-colors py-1 px-1.5"
           >
             <div className="size-9 bg-[#E5F0F5] dark:bg-primary/20 rounded-full flex items-center justify-center ring-2 ring-primary/20">
@@ -199,6 +212,9 @@ export default function Header({
                     <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                   </div>
                 )}
+                <Link href="/dashboard/profile" onClick={() => setUserOpen(false)} className="flex items-center gap-2.5 px-3 py-2 text-sm text-muted-foreground hover:bg-accent transition-colors">
+                  <User className="size-4 text-muted-foreground" /> Profile
+                </Link>
                 {user?.role !== "staff" && (
                   <Link href="/dashboard/settings" onClick={() => setUserOpen(false)} className="flex items-center gap-2.5 px-3 py-2 text-sm text-muted-foreground hover:bg-accent transition-colors">
                     <Settings className="size-4 text-muted-foreground" /> Settings

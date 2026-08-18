@@ -205,6 +205,23 @@ def test_notifications_read_state_is_per_user(db_session):
     service.mark_notification_read(db_session, alice, event_id)
 
 
+def test_notifications_limit_caps_returned_rows(db_session):
+    """The notifications inbox page asks for more than the header dropdown's
+    default 20 -- confirm the limit param is actually threaded through."""
+    from app.activity.models import ActivityEvent
+    from app.users.models import User
+
+    alice = User(name="a@grandroyal.com", email="a@grandroyal.com", hashed_password="x",
+                 role="staff", warehouse_id=1, status="active", joined_date=date(2024, 1, 1))
+    db_session.add(alice)
+    for i in range(5):
+        db_session.add(ActivityEvent(kind="alert", title=f"Event {i}", description="x", is_alert=True))
+    db_session.commit()
+
+    assert len(service.get_notifications(db_session, alice, limit=5)) == 5
+    assert len(service.get_notifications(db_session, alice, limit=2)) == 2
+
+
 def test_create_warehouse_derives_code_from_id(db_session):
     from app.dashboard.schemas import CreateWarehouseIn
 

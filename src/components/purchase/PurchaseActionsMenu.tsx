@@ -114,6 +114,8 @@ export default function PurchaseActionsMenu({
         onClick={() => (open ? setOpen(false) : openMenu())}
         className="rounded-lg p-2 transition hover:bg-accent"
         aria-label={`Open actions for ${purchase.id}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
       >
         <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
       </button>

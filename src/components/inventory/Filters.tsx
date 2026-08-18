@@ -33,6 +33,7 @@ export default function Filters({
           value={search}
           onChange={(e)=>setSearch(e.target.value)}
           type="text"
+          aria-label="Search by name, SKU, supplier"
           placeholder="Search by name, SKU, supplier..."
           className="
             w-full

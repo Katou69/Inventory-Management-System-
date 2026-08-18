@@ -7,6 +7,7 @@ import { Plus, Trash2, X } from "lucide-react";
 type FormItem = {
   product: string;
   quantity: number;
+  unitPrice: number;
 };
 
 type Props = {
@@ -42,16 +43,24 @@ export default function OrderFormModal({
     order?.status ?? "pending"
   );
 
-  const [total, setTotal] = useState(order?.total ?? 0);
+  const [error, setError] = useState<string | null>(null);
 
+  // unitPrice doesn't exist on the persisted OrderItem (no per-line price is
+  // stored anywhere yet -- see ISSUES.md), so editing an existing order
+  // always starts each row's price at 0 and total recomputes from there.
   const [items, setItems] = useState<FormItem[]>(
-  order?.items ?? [
-    {
-      product: "",
-      quantity: 0,
-    },
-  ]
-);
+    order?.items.map((item) => ({ ...item, unitPrice: 0 })) ?? [
+      {
+        product: "",
+        quantity: 0,
+        unitPrice: 0,
+      },
+    ]
+  );
+
+  // Total Amount is derived, not typed -- it must always equal what the
+  // rows below actually add up to, never a value someone entered separately.
+  const total = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
   if (!open) return null;
 
@@ -75,14 +84,15 @@ export default function OrderFormModal({
   };
 
   const addItem = () => {
-  setItems((current) => [
-    ...current,
-    {
-      product: "",
-      quantity: 0,
-    },
-  ]);
-};
+    setItems((current) => [
+      ...current,
+      {
+        product: "",
+        quantity: 0,
+        unitPrice: 0,
+      },
+    ]);
+  };
 
   const removeItem = (index: number) => {
     setItems((currentItems) =>
@@ -91,6 +101,7 @@ export default function OrderFormModal({
   };
 
   const handleSave = () => {
+    setError(null);
     const cleanedCustomer = customer.trim();
 
     const validItems = items
@@ -105,22 +116,22 @@ export default function OrderFormModal({
       );
 
     if (!cleanedCustomer) {
-      alert("Please enter a customer name.");
+      setError("Please enter a customer name.");
       return;
     }
 
     if (!date) {
-      alert("Please select an order date.");
+      setError("Please select an order date.");
       return;
     }
 
     if (validItems.length === 0) {
-      alert("Please add at least one valid product.");
+      setError("Please add at least one valid product.");
       return;
     }
 
     if (total < 0) {
-      alert("Total amount cannot be negative.");
+      setError("Total amount cannot be negative.");
       return;
     }
 
@@ -234,15 +245,14 @@ export default function OrderFormModal({
               Total Amount
             </label>
 
+            {/* Derived from the rows below (qty × unit price) -- never typed
+                directly, so it can't drift from what the order actually contains. */}
             <input
               id="order-total"
-              type="number"
-              min="0"
-              value={total}
-              onChange={(event) =>
-                setTotal(Number(event.target.value))
-              }
-              className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+              type="text"
+              readOnly
+              value={total.toFixed(2)}
+              className="mt-1 w-full cursor-not-allowed rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground outline-none"
             />
           </div>
         </div>
@@ -263,11 +273,18 @@ export default function OrderFormModal({
             </button>
           </div>
 
+          <div className="mb-1.5 grid grid-cols-[minmax(0,1fr)_90px_110px_40px] gap-3 px-0.5 text-xs text-muted-foreground">
+            <span>Product</span>
+            <span>Qty</span>
+            <span>Unit Price</span>
+            <span />
+          </div>
+
           <div className="max-h-72 space-y-3 overflow-y-auto pr-1">
             {items.map((item, index) => (
               <div
                 key={index}
-                className="grid grid-cols-[minmax(0,1fr)_140px_40px] gap-3"
+                className="grid grid-cols-[minmax(0,1fr)_90px_110px_40px] gap-3"
               >
                 <input
                   value={item.product}
@@ -280,6 +297,7 @@ export default function OrderFormModal({
                   }
                   className="rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
                   placeholder="Product name"
+                  aria-label={`Product ${index + 1} name`}
                 />
 
                 <input
@@ -295,6 +313,24 @@ export default function OrderFormModal({
                   }
                   className="rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
                   placeholder="Qty"
+                  aria-label={`Product ${index + 1} quantity`}
+                />
+
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={item.unitPrice}
+                  onChange={(event) =>
+                    updateItem(
+                      index,
+                      "unitPrice",
+                      Number(event.target.value)
+                    )
+                  }
+                  className="rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+                  placeholder="0.00"
+                  aria-label={`Product ${index + 1} unit price`}
                 />
 
                 <button
@@ -310,6 +346,12 @@ export default function OrderFormModal({
             ))}
           </div>
         </div>
+
+        {error && (
+          <p className="mt-4 text-sm text-red-600 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">
+            {error}
+          </p>
+        )}
 
         <div className="mt-6 flex justify-end gap-3">
           <button

@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import { Search, UserPlus, Edit2, Trash2, Building2, Shield, User, Mail, Check, XCircle, RefreshCw } from "lucide-react";
 import { UserType, Role, UserStatus } from "@/types/user";
 import type { Warehouse } from "@/types/dashboard";
-import { getUsers, updateUser, deleteUser } from "@/services/users-service";
+import { getUsers, updateUser, deleteUser, createUser } from "@/services/users-service";
 import { getWarehouses } from "@/services/dashboard-service";
 import { initials, avatarColor } from "@/lib/format";
 import { Badge, ActionBtn, Modal, ModalFooter, FormField, Pagination } from "@/components/ui";
 import { usePagination } from "@/lib/use-pagination";
+import { ApiError } from "@/lib/api-client";
+import { adminCreateUserSchema } from "@/schemas/auth";
 
 export default function UsersView({ role, userWarehouseId }: { role: Role; userWarehouseId: number | "all" }) {
   const [users, setUsers] = useState<UserType[]>([]);
@@ -20,10 +22,11 @@ export default function UsersView({ role, userWarehouseId }: { role: Role; userW
   const [rf, setRf] = useState("All");
   const [sf, setSf] = useState("All");
   const [search, setSearch] = useState("");
-  const [nu, setNu] = useState({ name: "", email: "", role: "staff" as Role, warehouseId: 0 as number | "all", status: "pending" as UserStatus });
+  const [nu, setNu] = useState({ name: "", email: "", password: "", role: "staff" as Role, warehouseId: 0 as number | "all" });
   const [eu, setEu] = useState({ name: "", email: "", role: "staff" as Role, warehouseId: 0 as number | "all", status: "pending" as UserStatus });
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
 
   const refreshUsers = async () => {
     setRefreshing(true);
@@ -115,10 +118,31 @@ export default function UsersView({ role, userWarehouseId }: { role: Role; userW
     }
   };
 
-  const addUser = () => {
-    setUsers(p => [...p, { ...nu, id: `u${p.length + 1}`, warehouseId: nu.role === "admin" ? "all" : nu.warehouseId, joinedDate: new Date().toISOString().slice(0, 10), loginAttempts: 0, lockoutUntil: null }]);
-    setShowAdd(false);
-    setNu({ name: "", email: "", role: "staff", warehouseId: warehouses[0]?.id ?? 0, status: "pending" });
+  const addUser = async () => {
+    setAddError(null);
+    const result = adminCreateUserSchema.safeParse({
+      name: nu.name,
+      email: nu.email,
+      password: nu.password,
+      role: nu.role,
+      warehouseId: nu.role === "admin" ? undefined : (nu.warehouseId === "all" ? undefined : nu.warehouseId),
+    });
+    if (!result.success) {
+      setAddError(result.error.issues[0].message);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const created = await createUser(result.data);
+      setUsers(p => [...p, created]);
+      setShowAdd(false);
+      setNu({ name: "", email: "", password: "", role: "staff", warehouseId: warehouses[0]?.id ?? 0 });
+    } catch (error) {
+      setAddError(error instanceof ApiError ? error.message : "Failed to create user. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const roleDesc: Record<Role, string> = {
@@ -217,7 +241,7 @@ export default function UsersView({ role, userWarehouseId }: { role: Role; userW
               </div>
               {role === "admin" && (
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                  <ActionBtn icon={Edit2} onClick={() => {
+                  <ActionBtn icon={Edit2} aria-label={`Edit ${u.name}`} onClick={() => {
                     setShowEdit(u);
                     setEu({
                       name: u.name,
@@ -227,7 +251,7 @@ export default function UsersView({ role, userWarehouseId }: { role: Role; userW
                       status: u.status,
                     });
                   }} />
-                  {u.role !== "admin" && <ActionBtn icon={Trash2} danger onClick={() => setShowDelete(u)} />}
+                  {u.role !== "admin" && <ActionBtn icon={Trash2} danger aria-label={`Delete ${u.name}`} onClick={() => setShowDelete(u)} />}
                 </div>
               )}
             </div>
@@ -269,7 +293,7 @@ export default function UsersView({ role, userWarehouseId }: { role: Role; userW
 
       {/* Add User Modal */}
       {showAdd && (
-        <Modal title="Add New User" subtitle="Invite a team member to GRGI" onClose={() => setShowAdd(false)}>
+        <Modal title="Add New User" subtitle="Create an account with a temporary password" onClose={() => { setShowAdd(false); setAddError(null); }}>
           <div className="p-5 space-y-4">
             <FormField label="Full Name">
               <div className="relative">
@@ -283,22 +307,19 @@ export default function UsersView({ role, userWarehouseId }: { role: Role; userW
                 <input type="email" placeholder="taylor@grandroyal.com" value={nu.email} onChange={e => setNu(p => ({ ...p, email: e.target.value }))} className="modal-input pl-8" />
               </div>
             </FormField>
-            <div className="grid grid-cols-2 gap-3">
-              <FormField label="Role">
-                <select value={nu.role} onChange={e => setNu(p => ({ ...p, role: e.target.value as Role }))} className="modal-input">
-                  <option value="staff">Staff</option>
-                  <option value="manager">Manager</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </FormField>
-              <FormField label="Status">
-                <select value={nu.status} onChange={e => setNu(p => ({ ...p, status: e.target.value as UserStatus }))} className="modal-input">
-                  <option value="pending">Pending</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </FormField>
-            </div>
+            <FormField label="Temporary Password">
+              <input type="text" placeholder="Given to the user to sign in with" value={nu.password} onChange={e => setNu(p => ({ ...p, password: e.target.value }))} className="modal-input" />
+            </FormField>
+            <p className="text-[11px] text-muted-foreground -mt-2">
+              They must change it on first login. At least 8 characters, with uppercase, lowercase, a number & a symbol.
+            </p>
+            <FormField label="Role">
+              <select value={nu.role} onChange={e => setNu(p => ({ ...p, role: e.target.value as Role }))} className="modal-input">
+                <option value="staff">Staff</option>
+                <option value="manager">Manager</option>
+                <option value="admin">Admin</option>
+              </select>
+            </FormField>
             {nu.role !== "admin" && (
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-2">Warehouse Assignment</label>
@@ -319,8 +340,13 @@ export default function UsersView({ role, userWarehouseId }: { role: Role; userW
             <div className="rounded-lg bg-secondary/60 px-3 py-2.5 text-xs text-muted-foreground leading-relaxed">
               {roleDesc[nu.role]}
             </div>
+            {addError && (
+              <p className="text-sm text-red-600 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">
+                {addError}
+              </p>
+            )}
           </div>
-          <ModalFooter onCancel={() => setShowAdd(false)} onConfirm={addUser} confirmLabel="Send Invite" disabled={!nu.name || !nu.email} />
+          <ModalFooter onCancel={() => { setShowAdd(false); setAddError(null); }} onConfirm={addUser} confirmLabel="Create Account" disabled={!nu.name || !nu.email || !nu.password} loading={loading} />
         </Modal>
       )}
 

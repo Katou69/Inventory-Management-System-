@@ -28,6 +28,10 @@ class User(Base):
     )
     login_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     lockout_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Set on admin-created accounts (temp password); cleared once the user sets
+    # their own password via /auth/change-password. Self-registered accounts
+    # never get this -- they picked their own password already.
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # Baked into every access token at mint time (auth/jwt.py create_access_token)
     # and checked on every request (auth/dependencies.py get_current_user).
     # Bumping this instantly invalidates every access token issued before the

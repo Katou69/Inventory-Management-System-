@@ -13,6 +13,13 @@ class FloorOut(BaseModel):
     warehouseId: int = Field(validation_alias="warehouse_id")
     level: int
     name: str
+    blueprintDataUrl: Optional[str] = Field(default=None, validation_alias="blueprint_data_url")
+    blueprintX: Optional[float] = Field(default=None, validation_alias="blueprint_x")
+    blueprintY: Optional[float] = Field(default=None, validation_alias="blueprint_y")
+    blueprintWidth: Optional[float] = Field(default=None, validation_alias="blueprint_width")
+    blueprintHeight: Optional[float] = Field(default=None, validation_alias="blueprint_height")
+    scalePxPerUnit: Optional[float] = Field(default=None, validation_alias="scale_px_per_unit")
+    scaleUnit: Optional[str] = Field(default=None, validation_alias="scale_unit")
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
@@ -23,7 +30,23 @@ class FloorIn(BaseModel):
 
 
 class FloorUpdate(BaseModel):
-    name: str
+    """Partial patch — only fields the client actually sent are applied.
+
+    `exclude_unset` in the service is what makes this a patch rather than a
+    replace, so every field here must default to None and stay optional,
+    including `name` (rename and blueprint saves reuse the same endpoint).
+    """
+
+    name: Optional[str] = None
+    blueprintDataUrl: Optional[str] = None
+    blueprintX: Optional[float] = None
+    blueprintY: Optional[float] = None
+    blueprintWidth: Optional[float] = None
+    blueprintHeight: Optional[float] = None
+    scalePxPerUnit: Optional[float] = None
+    scaleUnit: Optional[str] = None
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class ZoneSectionOut(BaseModel):

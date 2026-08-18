@@ -176,10 +176,11 @@ def update_warehouse_profile(
 
 @router.get("/notifications", response_model=List[NotificationOut])
 def notifications(
+    limit: int = Query(default=20, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin", "manager", "staff")),
 ) -> List[dict]:
-    return service.get_notifications(db, current_user)
+    return service.get_notifications(db, current_user, limit=limit)
 
 
 # Declared before /notifications/{id}/read so "read-all" is not swallowed as an id.

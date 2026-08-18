@@ -118,6 +118,14 @@ export interface Floor {
   warehouseId: number
   level: number
   name: string
+  // Blueprint backdrop + real-world scale, set once someone imports one.
+  blueprintDataUrl?: string | null
+  blueprintX?: number | null
+  blueprintY?: number | null
+  blueprintWidth?: number | null
+  blueprintHeight?: number | null
+  scalePxPerUnit?: number | null
+  scaleUnit?: "ft" | "m" | null
 }
 
 export interface ZoneSection {

@@ -18,7 +18,7 @@ export default function CancelPurchaseModal({ purchase, onClose, onConfirm }: Pr
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-foreground">Cancel Purchase</h2>
 
-          <button onClick={onClose} className="p-2 hover:bg-accent rounded-lg">
+          <button onClick={onClose} aria-label="Close" className="p-2 hover:bg-accent rounded-lg">
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>

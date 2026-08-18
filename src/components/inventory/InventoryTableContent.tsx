@@ -96,47 +96,47 @@ export default function InventoryTableContent({
             <tr className="text-left">
 
 
-              <th className="px-6 py-4 text-sm font-semibold text-muted-foreground">
+              <th scope="col" className="px-6 py-4 text-sm font-semibold text-muted-foreground">
                 Name
               </th>
 
 
-              <th className="px-6 py-4 text-sm font-semibold text-muted-foreground">
+              <th scope="col" className="px-6 py-4 text-sm font-semibold text-muted-foreground">
                 SKU
               </th>
 
 
-              <th className="px-6 py-4 text-sm font-semibold text-muted-foreground">
+              <th scope="col" className="px-6 py-4 text-sm font-semibold text-muted-foreground">
                 Price
               </th>
 
 
-              <th className="px-6 py-4 text-sm font-semibold text-muted-foreground">
+              <th scope="col" className="px-6 py-4 text-sm font-semibold text-muted-foreground">
                 Category
               </th>
 
 
-              <th className="px-6 py-4 text-sm font-semibold text-muted-foreground">
+              <th scope="col" className="px-6 py-4 text-sm font-semibold text-muted-foreground">
                 Supplier
               </th>
 
 
-              <th className="px-6 py-4 text-sm font-semibold text-muted-foreground">
+              <th scope="col" className="px-6 py-4 text-sm font-semibold text-muted-foreground">
                 Supplier ID
               </th>
 
 
-              <th className="px-6 py-4 text-sm font-semibold text-muted-foreground">
+              <th scope="col" className="px-6 py-4 text-sm font-semibold text-muted-foreground">
                 Stock
               </th>
 
 
-              <th className="px-6 py-4 text-sm font-semibold text-muted-foreground">
+              <th scope="col" className="px-6 py-4 text-sm font-semibold text-muted-foreground">
                 Status
               </th>
 
 
-              <th></th>
+              <th scope="col" aria-label="Actions"></th>
 
 
             </tr>

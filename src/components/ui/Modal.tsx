@@ -57,7 +57,7 @@ export default function Modal({
             <h3 className="font-semibold text-sm">{title}</h3>
             {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
           </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors ml-3 mt-0.5">
+          <button onClick={onClose} aria-label="Close" className="text-muted-foreground hover:text-foreground transition-colors ml-3 mt-0.5">
             <X className="w-4 h-4" />
           </button>
         </div>

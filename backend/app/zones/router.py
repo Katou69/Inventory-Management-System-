@@ -24,10 +24,7 @@ from app.zones.schemas import (
 
 router = APIRouter(tags=["zones"])
 
-# ponytail: fixed cap, not real pagination. The only caller asks for ?status=pending,
-# which is bounded by review throughput -- it's the approved/rejected history that grows
-# forever. Swap for a cursor if anyone needs to page through the full audit trail.
-_MAX_LAYOUT_REQUESTS = 200
+_DEFAULT_LAYOUT_REQUESTS_LIMIT = 200
 
 
 def _get_warehouse_or_404(db: Session, warehouse_id: int) -> Warehouse:
@@ -79,7 +76,7 @@ def create_floor(
 
 
 @router.patch("/floors/{floor_id}", response_model=FloorOut)
-def rename_floor(
+def update_floor(
     floor_id: int,
     body: FloorUpdate,
     db: Session = Depends(get_db),
@@ -87,7 +84,7 @@ def rename_floor(
 ) -> Floor:
     floor = service.get_floor_or_404(db, floor_id)
     _scoped_warehouse_or_403(db, floor.warehouse_id, current_user)
-    return service.rename_floor(db, floor, body.name)
+    return service.update_floor(db, floor, body)
 
 
 @router.delete("/floors/{floor_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -130,6 +127,10 @@ def list_zone_stock(
 def list_layout_requests(
     warehouse_id: int,
     status_filter: Optional[ZoneChangeStatus] = Query(default=None, alias="status"),
+    before_id: Optional[int] = Query(
+        default=None, alias="before", description="Cursor: only requests older than this id"
+    ),
+    limit: int = Query(default=_DEFAULT_LAYOUT_REQUESTS_LIMIT, gt=0, le=500),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin", "manager", "staff")),
 ) -> List[LayoutRequest]:
@@ -144,9 +145,11 @@ def list_layout_requests(
     if status_filter is not None:
         query = query.filter(LayoutRequest.status == status_filter)
     # This table only grows -- every layout edit ever made is a row, and nothing
-    # prunes it. Newest first so the cap drops old history, not the pending work
-    # an admin is here to review.
-    return query.order_by(LayoutRequest.id.desc()).limit(_MAX_LAYOUT_REQUESTS).all()
+    # prunes it. Newest first, and `before` is the cursor for paging further
+    # back: pass the id of the last row you got to fetch the next page.
+    if before_id is not None:
+        query = query.filter(LayoutRequest.id < before_id)
+    return query.order_by(LayoutRequest.id.desc()).limit(limit).all()
 
 
 @router.post(

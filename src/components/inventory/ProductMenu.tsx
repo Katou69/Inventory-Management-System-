@@ -44,6 +44,9 @@ export default function ProductMenu({
     <div className="relative inline-block" ref={menuRef}>
       <button
         onClick={() => setOpen((prev) => !prev)}
+        aria-label="Product actions"
+        aria-haspopup="menu"
+        aria-expanded={open}
         className="rounded-lg p-2 hover:bg-slate-100 transition-colors"
       >
         <MoreHorizontal className="w-4 h-4 text-slate-500" />

@@ -136,7 +136,7 @@ export default function SettingsView({ role }: { role: Role; userWarehouseId: nu
                 <span key={c.id} className="inline-flex items-center gap-1 px-3 py-1.5 bg-secondary rounded-full text-sm">
                   {c.name}
                   {role === "admin" && (
-                    <button onClick={() => handleRemoveCategory(c.id)} className="ml-1 hover:text-destructive">
+                    <button onClick={() => handleRemoveCategory(c.id)} aria-label={`Remove ${c.name}`} className="ml-1 hover:text-destructive">
                       <X className="w-3.5 h-3.5" />
                     </button>
                   )}

@@ -57,6 +57,7 @@ export default function OrderDetailsModal({
 
           <button
             onClick={onClose}
+            aria-label="Close"
             className="rounded-lg p-2 hover:bg-accent"
           >
             <X className="h-5 w-5 text-muted-foreground" />

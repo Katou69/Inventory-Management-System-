@@ -114,6 +114,9 @@ export default function OrderActionsMenu({
       <button
         ref={buttonRef}
         onClick={() => (open ? setOpen(false) : openMenu())}
+        aria-label={`Open actions for ${order.id}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
         className="hover:bg-accent p-2 rounded-lg"
       >
         <MoreHorizontal className="w-4 h-4 text-muted-foreground" />

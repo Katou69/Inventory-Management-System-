@@ -18,6 +18,7 @@ class UserOut(BaseModel):
     joinedDate: date = Field(validation_alias="joined_date")
     loginAttempts: int = Field(validation_alias="login_attempts", default=0)
     lockoutUntil: Optional[date] = Field(validation_alias="lockout_until", default=None)
+    mustChangePassword: bool = Field(validation_alias="must_change_password", default=False)
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
@@ -43,6 +44,19 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
     warehouse_id: int
+
+
+class AdminCreateUserRequest(BaseModel):
+    name: str
+    email: EmailStr
+    password: str = Field(min_length=8)
+    role: Role
+    warehouse_id: Optional[int] = None
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8)
 
 
 class UserUpdate(BaseModel):

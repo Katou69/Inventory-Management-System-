@@ -2,7 +2,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
-import { LayoutDashboard, ShoppingCart, ClipboardList, Users, Settings, Package, LogOut, ChevronDown } from "lucide-react"
+import { LayoutDashboard, ShoppingCart, ClipboardList, Users, Settings, Package, LogOut, ChevronDown, User } from "lucide-react"
 import { useAuth } from "@/lib/auth/auth-context"
 import { initials } from "@/lib/format"
 
@@ -54,6 +54,9 @@ export default function Sidebar() {
           <>
             <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
             <div className="absolute bottom-full left-0 right-0 mb-2 bg-card rounded-lg border border-border shadow-lg py-1 z-20">
+              <Link href="/dashboard/profile" onClick={() => setMenuOpen(false)} className="flex items-center gap-2.5 px-3 py-2 text-sm text-muted-foreground hover:bg-accent transition-colors">
+                <User className="size-4" /> Profile
+              </Link>
               {user?.role !== "staff" && (
                 <Link href="/dashboard/settings" onClick={() => setMenuOpen(false)} className="flex items-center gap-2.5 px-3 py-2 text-sm text-muted-foreground hover:bg-accent transition-colors">
                   <Settings className="size-4" /> Settings

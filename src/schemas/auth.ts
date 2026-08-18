@@ -32,5 +32,19 @@ export const registerSchema = z.object({
   warehouseId: z.number().int(),
 })
 
+export const changePasswordSchema = z.object({
+  current: z.string().min(1, "Current password is required"),
+  next: password,
+})
+
+export const adminCreateUserSchema = z.object({
+  name: z.string().trim().min(1, "Full name is required"),
+  email,
+  password,
+  role: z.enum(["admin", "manager", "staff"]),
+  warehouseId: z.number().int().optional(),
+})
+
 export type LoginInput = z.infer<typeof loginSchema>
 export type RegisterInput = z.infer<typeof registerSchema>
+export type AdminCreateUserInput = z.infer<typeof adminCreateUserSchema>

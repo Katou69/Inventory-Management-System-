@@ -19,7 +19,7 @@ export default function WarehouseProfileCard({ wh }: { wh: WarehouseDetail }) {
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 flex-wrap mb-1">
-            <h2 className="text-xl font-bold text-foreground">{wh.name}</h2>
+            <h1 className="text-xl font-bold text-foreground">{wh.name}</h1>
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${warehouseStatusStyle[wh.status]}`}>
               <span className={`size-1.5 rounded-full ${warehouseStatusDot[wh.status]}`} />
               {wh.status}

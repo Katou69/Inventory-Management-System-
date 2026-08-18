@@ -17,6 +17,8 @@ interface AuthContextValue {
   signIn: (email: string, password: string, to?: string) => Promise<void>
   /** Register a new account. Live mode always gets role "staff"; throws ApiError on failure (e.g. 409 duplicate email). */
   signUp: (name: string, email: string, password: string, warehouseId: number) => Promise<void>
+  /** Set a new password for the signed-in user (the forced first-login reset). Throws ApiError on failure (e.g. 401 wrong current password). */
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>
   /** Mock-only quick demo login (no-op affordance when live). `to` as in signIn. */
   signInDemo: (role: Role, to?: string) => void
   logout: () => void
@@ -154,6 +156,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Don't log in automatically - user needs admin approval first.
   }
 
+  const changePassword: AuthContextValue["changePassword"] = async (currentPassword, newPassword) => {
+    // Updates the flag on the existing user in place -- no navigation, this
+    // just unblocks AuthGate's forced-reset screen so the dashboard renders.
+    const updated = await authService.changePassword(currentPassword, newPassword)
+    swapIdentity(updated)
+  }
+
   const signInDemo = (role: Role, to?: string) => {
     swapIdentity(authService.demoLogin(role), to)
   }
@@ -168,7 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const setTheme = (t: Theme) => setThemeState(t)
 
   return (
-    <AuthContext.Provider value={{ user, signIn, signUp, signInDemo, logout, theme, setTheme, ready, settling }}>
+    <AuthContext.Provider value={{ user, signIn, signUp, signInDemo, changePassword, logout, theme, setTheme, ready, settling }}>
       {children}
     </AuthContext.Provider>
   )

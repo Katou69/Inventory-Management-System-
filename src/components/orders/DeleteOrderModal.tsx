@@ -20,7 +20,7 @@ export default function DeleteOrderModal({ order, onClose, onConfirm }: Props) {
             Delete Order
           </h2>
 
-          <button onClick={onClose} className="p-2 hover:bg-accent rounded-lg">
+          <button onClick={onClose} aria-label="Close" className="p-2 hover:bg-accent rounded-lg">
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>

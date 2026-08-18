@@ -84,7 +84,11 @@
   --secondary: #E4E9F0;
   --secondary-foreground: #0D1117;
   --muted: #E4E9F0;
-  --muted-foreground: #6B7A8D;
+  /* #475569, not #6B7A8D: table headers/badges render text-muted-foreground
+     on the bg-accent (#E8EDF4) row background, not just white -- that pairing
+     needs 4.5:1 too. #64748B cleared white (4.76:1) but only hit 4.05:1 on
+     accent, so it went one step darker to clear both (accesslint scan). */
+  --muted-foreground: #475569;
   --accent: #E8EDF4;
   --accent-foreground: #0D1117;
   --destructive: #DC2626;
@@ -193,21 +197,31 @@ body {
   white-space: nowrap;
 }
 .btn-primary:hover { opacity: 0.9; }
-.select-sm,
-.modal-input {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  background: var(--input-background);
-  color: var(--foreground);
-  outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-.select-sm { width: auto; }
-.select-sm:focus,
-.modal-input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
+/* @layer components: plain classes here sit BEFORE Tailwind's utility layer,
+   so pl-8/pr-9 etc. (needed to clear an icon inside input wrappers) still
+   win when combined with modal-input/select-sm in a className. Unlayered
+   CSS always beats utilities in Tailwind v4 regardless of source order --
+   that's what silently broke every icon-padded modal-input (text rendered
+   under the icon) until this was scoped into the layer. */
+@layer components {
+  .select-sm,
+  .modal-input,
+  .field-input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    background: var(--input-background);
+    color: var(--foreground);
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .select-sm { width: auto; }
+  .select-sm:focus,
+  .modal-input:focus,
+  .field-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
+  }
 }

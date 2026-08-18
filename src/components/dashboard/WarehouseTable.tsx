@@ -121,7 +121,7 @@ export default function WarehouseTable({ initialWarehouses }: { initialWarehouse
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="flex items-center justify-between px-5 py-4 border-b border-border">
         <div>
-          <h3 className="text-base font-semibold text-foreground">Warehouse Overview</h3>
+          <h2 className="text-base font-semibold text-foreground">Warehouse Overview</h2>
           <p className="text-xs text-muted-foreground mt-0.5">{warehouses.length} warehouses total</p>
         </div>
         <button
@@ -137,14 +137,14 @@ export default function WarehouseTable({ initialWarehouses }: { initialWarehouse
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-accent border-b border-border">
-              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-5 py-3 w-10">#</th>
-              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">Warehouse</th>
-              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">ID</th>
-              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">Location</th>
-              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">Manager</th>
-              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">Last Inspection</th>
-              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3 min-w-[160px]">Capacity</th>
-              <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-5 py-3">Action</th>
+              <th scope="col" className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-5 py-3 w-10">#</th>
+              <th scope="col" className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">Warehouse</th>
+              <th scope="col" className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">ID</th>
+              <th scope="col" className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">Location</th>
+              <th scope="col" className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">Manager</th>
+              <th scope="col" className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3">Last Inspection</th>
+              <th scope="col" className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 py-3 min-w-[160px]">Capacity</th>
+              <th scope="col" className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide px-5 py-3">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">

@@ -93,9 +93,9 @@ export async function getRecentActivities(): Promise<ActivityEntry[]> {
   return apiFetch<ActivityEntry[]>("/activities")
 }
 
-export async function getNotifications(): Promise<NotificationItem[]> {
+export async function getNotifications(limit = 20): Promise<NotificationItem[]> {
   if (config.useMock) return clone(notifications)
-  return apiFetch<NotificationItem[]>("/notifications")
+  return apiFetch<NotificationItem[]>(`/notifications?limit=${limit}`)
 }
 
 export async function getSalesOverview(): Promise<SalesOverview> {

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -13,6 +13,12 @@ class Floor(Base):
     `level` is the ordinal the map sorts tabs by (1 = ground). It is unique per
     warehouse, so two floors can't claim the same storey, while `name` is free
     text ("Mezzanine", "Cold Level").
+
+    The blueprint_* / scale_* columns store the imported backdrop image (as a
+    data URL) and its placement + real-world scale, all nullable -- most
+    floors never get a blueprint. They live on the floor row rather than a
+    separate table because they're 1:1 with a floor and never queried on
+    their own.
     """
 
     __tablename__ = "floors"
@@ -22,6 +28,14 @@ class Floor(Base):
     warehouse_id: Mapped[int] = mapped_column(ForeignKey("warehouses.id"), nullable=False, index=True)
     level: Mapped[int] = mapped_column(Integer, nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
+
+    blueprint_data_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    blueprint_x: Mapped[float | None] = mapped_column(Float, nullable=True)
+    blueprint_y: Mapped[float | None] = mapped_column(Float, nullable=True)
+    blueprint_width: Mapped[float | None] = mapped_column(Float, nullable=True)
+    blueprint_height: Mapped[float | None] = mapped_column(Float, nullable=True)
+    scale_px_per_unit: Mapped[float | None] = mapped_column(Float, nullable=True)
+    scale_unit: Mapped[str | None] = mapped_column(String, nullable=True)
 
     sections: Mapped[list["ZoneSection"]] = relationship(back_populates="floor")
 

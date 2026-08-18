@@ -65,11 +65,11 @@ export default function SalesGauge({
     <div className="bg-card rounded-xl border border-border shadow-sm p-5 flex flex-col">
       <div className="flex items-center justify-between mb-2">
         <div>
-          <h3 className="text-base font-semibold text-foreground">Sales Overview</h3>
+          <h2 className="text-base font-semibold text-foreground">Sales Overview</h2>
           <p className="text-xs text-muted-foreground mt-0.5">Goal: {money(target)}</p>
         </div>
         <div className="relative">
-          <button onClick={() => setMenuOpen((v) => !v)} className="p-1.5 rounded-lg hover:bg-accent transition-colors">
+          <button onClick={() => setMenuOpen((v) => !v)} aria-label="Sales overview actions" aria-haspopup="menu" aria-expanded={menuOpen} className="p-1.5 rounded-lg hover:bg-accent transition-colors">
             <MoreVertical className="size-4 text-muted-foreground" />
           </button>
           {menuOpen && (
@@ -140,7 +140,7 @@ export default function SalesGauge({
           <div className="relative bg-card rounded-2xl shadow-xl w-full max-w-xs p-6 border border-border">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-semibold text-foreground">Edit goal target</h3>
-              <button onClick={() => setEditing(false)} className="p-1.5 rounded-lg hover:bg-accent transition-colors">
+              <button onClick={() => setEditing(false)} aria-label="Close" className="p-1.5 rounded-lg hover:bg-accent transition-colors">
                 <X className="size-4 text-muted-foreground" />
               </button>
             </div>

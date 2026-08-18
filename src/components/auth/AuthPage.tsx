@@ -11,10 +11,10 @@ import { config } from "@/lib/config";
 import { ApiError } from "@/lib/api-client";
 import { loginSchema, registerSchema } from "@/schemas/auth";
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ id, label, children }: { id: string; label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-sm font-medium mb-1.5">{label}</label>
+      <label htmlFor={id} className="block text-sm font-medium mb-1.5">{label}</label>
       <div className="relative">{children}</div>
     </div>
   );
@@ -86,7 +86,7 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <main className="min-h-screen bg-background flex">
       {/* Brand panel */}
       <div className="hidden lg:flex w-[460px] flex-col bg-[#0D1B2A] dark:bg-[#080F18] text-white p-10 relative overflow-hidden shrink-0">
         <div className="absolute inset-0 overflow-hidden">
@@ -146,6 +146,7 @@ export default function AuthPage() {
         <div className="flex justify-end p-4">
           <button
             onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+            aria-label={theme === "light" ? "Switch to dark theme" : "Switch to light theme"}
             className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-accent transition-colors text-muted-foreground"
           >
             {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
@@ -169,9 +170,10 @@ export default function AuthPage() {
 
             <form onSubmit={submit} className="space-y-4">
               {mode === "signup" && (
-                <Field label="Full Name">
+                <Field id="auth-name" label="Full Name">
                   <FieldIcon><User className="w-3.5 h-3.5" /></FieldIcon>
                   <input
+                    id="auth-name"
                     type="text"
                     placeholder="Jordan Blake"
                     value={form.name}
@@ -180,9 +182,10 @@ export default function AuthPage() {
                   />
                 </Field>
               )}
-              <Field label="Email Address">
+              <Field id="auth-email" label="Email Address">
                 <FieldIcon><Mail className="w-3.5 h-3.5" /></FieldIcon>
                 <input
+                  id="auth-email"
                   type="email"
                   placeholder="you@grandroyal.com"
                   value={form.email}
@@ -190,9 +193,10 @@ export default function AuthPage() {
                   className="field-input pl-9"
                 />
               </Field>
-              <Field label="Password">
+              <Field id="auth-password" label="Password">
                 <FieldIcon><Lock className="w-3.5 h-3.5" /></FieldIcon>
                 <input
+                  id="auth-password"
                   type={showPw ? "text" : "password"}
                   placeholder="••••••••"
                   value={form.password}
@@ -202,6 +206,7 @@ export default function AuthPage() {
                 <button
                   type="button"
                   onClick={() => setShowPw(s => !s)}
+                  aria-label={showPw ? "Hide password" : "Show password"}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {showPw ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -284,6 +289,6 @@ export default function AuthPage() {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

@@ -12,17 +12,17 @@ export const CATEGORIES = [
 ];
 
 export const MOCK_USERS: UserType[] = [
-  { id: "u1", name: "Admin User", email: "admin@grandroyal.com", role: "admin", warehouseId: "all", status: "active", joinedDate: "2023-01-10", loginAttempts: 0, lockoutUntil: null },
-  { id: "u2", name: "Jordan Blake", email: "j.blake@grandroyal.com", role: "manager", warehouseId: 1, status: "active", joinedDate: "2023-03-15", loginAttempts: 0, lockoutUntil: null },
-  { id: "u3", name: "Casey Rowan", email: "c.rowan@grandroyal.com", role: "manager", warehouseId: 2, status: "active", joinedDate: "2023-05-20", loginAttempts: 0, lockoutUntil: null },
-  { id: "u4", name: "Riley Quinn", email: "r.quinn@grandroyal.com", role: "staff", warehouseId: 1, status: "active", joinedDate: "2023-07-01", loginAttempts: 0, lockoutUntil: null },
-  { id: "u5", name: "Drew Santos", email: "d.santos@grandroyal.com", role: "staff", warehouseId: 3, status: "active", joinedDate: "2023-08-12", loginAttempts: 0, lockoutUntil: null },
-  { id: "u6", name: "Avery Kim", email: "a.kim@grandroyal.com", role: "staff", warehouseId: 2, status: "inactive", joinedDate: "2023-09-05", loginAttempts: 0, lockoutUntil: null },
-  { id: "u7", name: "Sam Park", email: "s.park@grandroyal.com", role: "manager", warehouseId: 4, status: "active", joinedDate: "2023-11-20", loginAttempts: 0, lockoutUntil: null },
-  { id: "u8", name: "Quinn Torres", email: "q.torres@grandroyal.com", role: "staff", warehouseId: 4, status: "active", joinedDate: "2024-01-08", loginAttempts: 0, lockoutUntil: null },
-  { id: "u9", name: "Alex Rivera", email: "a.rivera@grandroyal.com", role: "staff", warehouseId: 3, status: "active", joinedDate: "2024-02-14", loginAttempts: 0, lockoutUntil: null },
-  { id: "u10", name: "Jamie Chen", email: "j.chen@grandroyal.com", role: "manager", warehouseId: 3, status: "active", joinedDate: "2024-03-01", loginAttempts: 0, lockoutUntil: null },
-  { id: "u11", name: "Taylor Kim", email: "taylor.kim@grandroyal.com", role: "staff", warehouseId: 1, status: "pending", joinedDate: "2024-07-09", loginAttempts: 0, lockoutUntil: null },
+  { id: "u1", name: "Admin User", email: "admin@grandroyal.com", role: "admin", warehouseId: "all", status: "active", joinedDate: "2023-01-10", loginAttempts: 0, lockoutUntil: null, mustChangePassword: false },
+  { id: "u2", name: "Jordan Blake", email: "j.blake@grandroyal.com", role: "manager", warehouseId: 1, status: "active", joinedDate: "2023-03-15", loginAttempts: 0, lockoutUntil: null, mustChangePassword: false },
+  { id: "u3", name: "Casey Rowan", email: "c.rowan@grandroyal.com", role: "manager", warehouseId: 2, status: "active", joinedDate: "2023-05-20", loginAttempts: 0, lockoutUntil: null, mustChangePassword: false },
+  { id: "u4", name: "Riley Quinn", email: "r.quinn@grandroyal.com", role: "staff", warehouseId: 1, status: "active", joinedDate: "2023-07-01", loginAttempts: 0, lockoutUntil: null, mustChangePassword: false },
+  { id: "u5", name: "Drew Santos", email: "d.santos@grandroyal.com", role: "staff", warehouseId: 3, status: "active", joinedDate: "2023-08-12", loginAttempts: 0, lockoutUntil: null, mustChangePassword: false },
+  { id: "u6", name: "Avery Kim", email: "a.kim@grandroyal.com", role: "staff", warehouseId: 2, status: "inactive", joinedDate: "2023-09-05", loginAttempts: 0, lockoutUntil: null, mustChangePassword: false },
+  { id: "u7", name: "Sam Park", email: "s.park@grandroyal.com", role: "manager", warehouseId: 4, status: "active", joinedDate: "2023-11-20", loginAttempts: 0, lockoutUntil: null, mustChangePassword: false },
+  { id: "u8", name: "Quinn Torres", email: "q.torres@grandroyal.com", role: "staff", warehouseId: 4, status: "active", joinedDate: "2024-01-08", loginAttempts: 0, lockoutUntil: null, mustChangePassword: false },
+  { id: "u9", name: "Alex Rivera", email: "a.rivera@grandroyal.com", role: "staff", warehouseId: 3, status: "active", joinedDate: "2024-02-14", loginAttempts: 0, lockoutUntil: null, mustChangePassword: false },
+  { id: "u10", name: "Jamie Chen", email: "j.chen@grandroyal.com", role: "manager", warehouseId: 3, status: "active", joinedDate: "2024-03-01", loginAttempts: 0, lockoutUntil: null, mustChangePassword: false },
+  { id: "u11", name: "Taylor Kim", email: "taylor.kim@grandroyal.com", role: "staff", warehouseId: 1, status: "pending", joinedDate: "2024-07-09", loginAttempts: 0, lockoutUntil: null, mustChangePassword: false },
 ];
 
 export const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {

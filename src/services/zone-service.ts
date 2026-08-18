@@ -255,15 +255,20 @@ export async function createFloor(warehouseId: number, level: number, name: stri
 
 export async function renameFloor(floorId: number, name: string): Promise<Floor> {
   if (!name.trim()) throw new Error("A floor name is required.")
+  return updateFloor(floorId, { name: name.trim() })
+}
+
+/** Partial floor patch — rename and/or the blueprint image, placement, and scale. */
+export async function updateFloor(floorId: number, patch: Partial<Omit<Floor, "id" | "warehouseId" | "level">>): Promise<Floor> {
   if (config.useMock) {
     const floor = store.floors.find((f) => f.id === floorId)
     if (!floor) throw new Error("Floor not found.")
-    floor.name = name.trim()
+    Object.assign(floor, patch)
     return clone(floor)
   }
   return apiFetch<Floor>(`/floors/${floorId}`, {
     method: "PATCH",
-    body: JSON.stringify({ name: name.trim() }),
+    body: JSON.stringify(patch),
   })
 }
 

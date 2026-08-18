@@ -34,6 +34,7 @@ export default function WarehouseSelector() {
 
   return (
     <select
+      aria-label="Warehouse"
       className="border border-border rounded-lg px-3 py-2 text-sm bg-card"
       value={selected}
       onChange={(e) => handleChange(e.target.value)}

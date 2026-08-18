@@ -6,7 +6,20 @@ from sqlalchemy.orm import Session
 from app.activity.service import log_event
 from app.users.models import User
 from app.zones.models import Floor, LayoutRequest, LayoutRequestItem, ZoneSection
-from app.zones.schemas import ZoneChangeItemIn
+from app.zones.schemas import FloorUpdate, ZoneChangeItemIn
+
+# FloorUpdate field -> Floor column. Camel-cased blueprint/scale fields map
+# 1:1 to their snake_case columns; "name" is handled separately below since
+# it also validates non-empty.
+_FLOOR_PATCH_FIELDS = {
+    "blueprintDataUrl": "blueprint_data_url",
+    "blueprintX": "blueprint_x",
+    "blueprintY": "blueprint_y",
+    "blueprintWidth": "blueprint_width",
+    "blueprintHeight": "blueprint_height",
+    "scalePxPerUnit": "scale_px_per_unit",
+    "scaleUnit": "scale_unit",
+}
 
 
 def _describe(items: list[ZoneChangeItemIn] | list[LayoutRequestItem]) -> str:
@@ -49,10 +62,18 @@ def create_floor(db: Session, warehouse_id: int, level: int, name: str) -> Floor
     return floor
 
 
-def rename_floor(db: Session, floor: Floor, name: str) -> Floor:
-    if not name.strip():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Floor name is required")
-    floor.name = name.strip()
+def update_floor(db: Session, floor: Floor, updates: FloorUpdate) -> Floor:
+    """Applies only the fields the client actually sent (rename, and/or the
+    blueprint image + placement + scale save on the layout canvas)."""
+    data = updates.model_dump(exclude_unset=True)
+    if "name" in data:
+        name = (data["name"] or "").strip()
+        if not name:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Floor name is required")
+        floor.name = name
+    for field, column in _FLOOR_PATCH_FIELDS.items():
+        if field in data:
+            setattr(floor, column, data[field])
     db.commit()
     db.refresh(floor)
     return floor

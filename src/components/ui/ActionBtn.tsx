@@ -1,6 +1,9 @@
-type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
+type Props = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "aria-label"> & {
   icon: React.ElementType;
   danger?: boolean;
+  // Required, not optional: this button only ever renders an icon, so
+  // without it screen readers announce "button" with no name.
+  "aria-label": string;
 };
 
 export default function ActionBtn({ icon: Icon, danger, className, ...props }: Props) {

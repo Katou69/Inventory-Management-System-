@@ -13,4 +13,5 @@ export interface UserType {
   joinedDate: string;
   loginAttempts: number;
   lockoutUntil: string | null;
+  mustChangePassword: boolean;
 }

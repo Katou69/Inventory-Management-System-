@@ -65,6 +65,7 @@ export async function register(
       joinedDate: new Date().toISOString().slice(0, 10),
       loginAttempts: 0,
       lockoutUntil: null,
+      mustChangePassword: false,
     }
     MOCK_USERS.push(newUser)
     return newUser
@@ -83,6 +84,22 @@ export function demoLogin(role: Role): UserType {
     staff: MOCK_USERS[3],
   }
   return map[role]
+}
+
+/**
+ * Change the current user's password (self-service; used for the forced
+ * first-login reset on admin-provisioned accounts, and available generally).
+ * Mock mode: no-op, always succeeds.
+ */
+export async function changePassword(currentPassword: string, newPassword: string): Promise<UserType> {
+  if (config.useMockAuth) {
+    const user = MOCK_USERS[0]
+    return { ...user, mustChangePassword: false }
+  }
+  return apiFetch<UserType>("/users/me/change-password", {
+    method: "PUT",
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  })
 }
 
 /** Log out. Mock: no-op. Live: POST /auth/logout clears cookies + revokes the session. */

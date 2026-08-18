@@ -45,6 +45,42 @@ export async function updateUser(
   })
 }
 
+export async function createUser(data: {
+  name: string
+  email: string
+  password: string
+  role: Role
+  warehouseId?: number
+}): Promise<UserType> {
+  if (config.useMock) {
+    const newUser: UserType = {
+      id: `u${MOCK_USERS.length + 1}`,
+      name: data.name,
+      email: data.email,
+      role: data.role,
+      warehouseId: data.role === "admin" ? "all" : (data.warehouseId ?? MOCK_USERS[0]?.warehouseId ?? 1),
+      status: "active",
+      joinedDate: new Date().toISOString().slice(0, 10),
+      loginAttempts: 0,
+      lockoutUntil: null,
+      mustChangePassword: true,
+    }
+    MOCK_USERS.push(newUser)
+    return clone(newUser)
+  }
+  return apiFetch<UserType>("/users", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: data.name,
+      email: data.email,
+      password: data.password,
+      role: data.role,
+      warehouse_id: data.warehouseId ?? null,
+    }),
+  })
+}
+
 export async function deleteUser(userId: string): Promise<void> {
   if (config.useMock) {
     // Mock implementation

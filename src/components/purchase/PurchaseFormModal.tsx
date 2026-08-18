@@ -3,10 +3,15 @@
 import { useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import {
-  PurchaseItem,
   PurchaseOrder,
   PurchaseStatus,
 } from "@/types/purchases";
+
+type FormItem = {
+  product: string;
+  quantity: number;
+  unitPrice: number;
+};
 
 type Props = {
   purchase: PurchaseOrder | null;
@@ -36,10 +41,18 @@ export default function PurchaseFormModal({
   const [status, setStatus] = useState<PurchaseStatus>(
     purchase?.status ?? "pending"
   );
-  const [total, setTotal] = useState(purchase?.total ?? 0);
-  const [items, setItems] = useState<PurchaseItem[]>(
-    purchase?.items ?? [{ product: "", quantity: 0 }]
+  const [error, setError] = useState<string | null>(null);
+  // unitPrice doesn't exist on the persisted PurchaseItem (no per-line price
+  // is stored anywhere yet -- see ISSUES.md), so editing an existing
+  // purchase always starts each row's price at 0 and total recomputes from there.
+  const [items, setItems] = useState<FormItem[]>(
+    purchase?.items.map((item) => ({ ...item, unitPrice: 0 })) ?? [
+      { product: "", quantity: 0, unitPrice: 0 },
+    ]
   );
+
+  // Derived, not typed -- must always equal what the rows below add up to.
+  const total = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
   if (!open) return null;
 
@@ -47,7 +60,7 @@ export default function PurchaseFormModal({
 
   const updateItem = (
     index: number,
-    field: keyof PurchaseItem,
+    field: keyof FormItem,
     value: string | number
   ) => {
     setItems((currentItems) =>
@@ -62,7 +75,7 @@ export default function PurchaseFormModal({
   const addItem = () => {
     setItems((currentItems) => [
       ...currentItems,
-      { product: "", quantity: 0 },
+      { product: "", quantity: 0, unitPrice: 0 },
     ]);
   };
 
@@ -73,6 +86,7 @@ export default function PurchaseFormModal({
   };
 
   const handleSave = () => {
+    setError(null);
     const cleanedSupplier = supplier.trim();
 
     const validItems = items
@@ -86,22 +100,22 @@ export default function PurchaseFormModal({
       );
 
     if (!cleanedSupplier) {
-      alert("Please enter a supplier name.");
+      setError("Please enter a supplier name.");
       return;
     }
 
     if (!date) {
-      alert("Please select a purchase date.");
+      setError("Please select a purchase date.");
       return;
     }
 
     if (validItems.length === 0) {
-      alert("Please add at least one valid product.");
+      setError("Please add at least one valid product.");
       return;
     }
 
     if (total < 0) {
-      alert("Total amount cannot be negative.");
+      setError("Total amount cannot be negative.");
       return;
     }
 
@@ -213,15 +227,14 @@ export default function PurchaseFormModal({
               Total Amount
             </label>
 
+            {/* Derived from the rows below (qty × unit price) -- never typed
+                directly, so it can't drift from what the purchase actually contains. */}
             <input
               id="purchase-total"
-              type="number"
-              min="0"
-              value={total}
-              onChange={(event) =>
-                setTotal(Number(event.target.value))
-              }
-              className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+              type="text"
+              readOnly
+              value={total.toFixed(2)}
+              className="mt-1 w-full cursor-not-allowed rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground outline-none"
             />
           </div>
         </div>
@@ -242,11 +255,18 @@ export default function PurchaseFormModal({
             </button>
           </div>
 
+          <div className="mb-1.5 grid grid-cols-[minmax(0,1fr)_90px_110px_40px] gap-3 px-0.5 text-xs text-muted-foreground">
+            <span>Product</span>
+            <span>Qty</span>
+            <span>Unit Price</span>
+            <span />
+          </div>
+
           <div className="max-h-72 space-y-3 overflow-y-auto pr-1">
             {items.map((item, index) => (
               <div
                 key={index}
-                className="grid grid-cols-[minmax(0,1fr)_140px_40px] gap-3"
+                className="grid grid-cols-[minmax(0,1fr)_90px_110px_40px] gap-3"
               >
                 <input
                   value={item.product}
@@ -259,6 +279,7 @@ export default function PurchaseFormModal({
                   }
                   placeholder="Product name"
                   className="rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+                  aria-label={`Product ${index + 1} name`}
                 />
 
                 <input
@@ -274,6 +295,24 @@ export default function PurchaseFormModal({
                   }
                   placeholder="Qty"
                   className="rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+                  aria-label={`Product ${index + 1} quantity`}
+                />
+
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={item.unitPrice}
+                  onChange={(event) =>
+                    updateItem(
+                      index,
+                      "unitPrice",
+                      Number(event.target.value)
+                    )
+                  }
+                  placeholder="0.00"
+                  className="rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+                  aria-label={`Product ${index + 1} unit price`}
                 />
 
                 <button
@@ -289,6 +328,12 @@ export default function PurchaseFormModal({
             ))}
           </div>
         </div>
+
+        {error && (
+          <p className="mt-4 text-sm text-red-600 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2">
+            {error}
+          </p>
+        )}
 
         <div className="mt-6 flex justify-end gap-3">
           <button
